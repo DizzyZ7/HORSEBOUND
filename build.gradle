@@ -4,10 +4,11 @@ plugins {
 }
 
 group = 'com.dizzyz7'
-version = '0.4.3'
+version = '0.4.4'
 
 ext {
     gdxVersion = '1.14.2'
+    gdxControllersVersion = '2.2.4'
     creatorName = 'Dimash Janibekov (DizZyZ7)'
 }
 
@@ -25,6 +26,9 @@ dependencies {
     implementation "com.badlogicgames.gdx:gdx:${gdxVersion}"
     implementation "com.badlogicgames.gdx:gdx-backend-lwjgl3:${gdxVersion}"
     runtimeOnly "com.badlogicgames.gdx:gdx-platform:${gdxVersion}:natives-desktop"
+
+    implementation "com.badlogicgames.gdx-controllers:gdx-controllers-core:${gdxControllersVersion}"
+    implementation "com.badlogicgames.gdx-controllers:gdx-controllers-desktop:${gdxControllersVersion}"
 
     testImplementation platform('org.junit:junit-bom:5.11.4')
     testImplementation 'org.junit.jupiter:junit-jupiter'
@@ -85,5 +89,16 @@ tasks.register('windowsImage', Exec) {
             '--copyright', 'Copyright (c) 2026 Dimash Janibekov (DizZyZ7). All rights reserved.',
             '--description', 'HORSEBOUND - cozy 3D horse sandbox created by Dimash Janibekov (DizZyZ7).',
             '--dest', layout.buildDirectory.dir('jpackage').get().asFile.absolutePath
+    }
+    doLast {
+        def imageRoot = layout.buildDirectory.dir('jpackage/HORSEBOUND').get().asFile
+        copy {
+            from 'THIRD_PARTY_NOTICES.txt'
+            into imageRoot
+        }
+        copy {
+            from 'licenses'
+            into new File(imageRoot, 'licenses')
+        }
     }
 }

@@ -41,7 +41,11 @@ jobs:
           $required = @(
             "HORSEBOUND.exe",
             "app/HORSEBOUND.jar",
-            "runtime"
+            "runtime",
+            "THIRD_PARTY_NOTICES.txt",
+            "licenses/APACHE-2.0.txt",
+            "licenses/BSD-3-CLAUSE.txt",
+            "licenses/ZLIB.txt"
           )
 
           foreach ($relative in $required) {
@@ -65,9 +69,24 @@ jobs:
             throw "Mutable user data or local Steam configuration leaked into the app image"
           }
 
+          $jarPath = Join-Path $root "app/HORSEBOUND.jar"
+          $jarEntries = & jar tf $jarPath
+          $requiredJarEntries = @(
+            "com/badlogic/gdx/controllers/Controllers.class",
+            "com/badlogic/gdx/controllers/desktop/JamepadControllerManager.class",
+            "com/studiohartman/jamepad/ControllerManager.class",
+            "jamepad64.dll"
+          )
+          foreach ($entry in $requiredJarEntries) {
+            if ($jarEntries -notcontains $entry) {
+              throw "Controller runtime entry is missing from HORSEBOUND.jar: $entry"
+            }
+          }
+
           $hashTargets = @(
             (Join-Path $root "HORSEBOUND.exe"),
-            (Join-Path $root "app/HORSEBOUND.jar")
+            $jarPath,
+            (Join-Path $root "THIRD_PARTY_NOTICES.txt")
           )
           $hashLines = foreach ($target in $hashTargets) {
             $hash = Get-FileHash $target -Algorithm SHA256
@@ -76,7 +95,7 @@ jobs:
           $hashLines | Set-Content (Join-Path $root "SHA256SUMS.txt") -Encoding ascii
 
           Get-Item (Join-Path $root "HORSEBOUND.exe") | Format-List Name,Length,FullName
-          Get-Item (Join-Path $root "app/HORSEBOUND.jar") | Format-List Name,Length,FullName
+          Get-Item $jarPath | Format-List Name,Length,FullName
           Get-Content (Join-Path $root "SHA256SUMS.txt")
 
       - name: Upload self-contained Windows build

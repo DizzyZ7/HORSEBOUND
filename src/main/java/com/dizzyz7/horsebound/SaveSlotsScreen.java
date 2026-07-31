@@ -2,7 +2,6 @@
 package com.dizzyz7.horsebound;
 
 import com.badlogic.gdx.Gdx;
-import com.badlogic.gdx.Input;
 import com.badlogic.gdx.Screen;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
@@ -24,18 +23,22 @@ final class SaveSlotsScreen implements Screen {
 
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
         .withZone(ZoneId.systemDefault());
+    private static final int BACK_INDEX = 3;
+    private static final int ITEM_COUNT = 4;
 
     private final HorseboundGame game;
     private final Mode mode;
     private final SpriteBatch batch = new SpriteBatch();
     private final ShapeRenderer shapes = new ShapeRenderer();
     private final BitmapFont font = new BitmapFont();
+    private final MenuInputMapper menuInput = new MenuInputMapper();
     private final Rectangle[] slotButtons = {new Rectangle(), new Rectangle(), new Rectangle()};
     private final Rectangle backButton = new Rectangle();
 
     private List<SaveSlotInfo> slots = List.of();
     private String pendingOverwriteSlot;
     private String message;
+    private int selectedIndex;
 
     SaveSlotsScreen(HorseboundGame game, Mode mode) {
         this.game = game;
@@ -46,6 +49,7 @@ final class SaveSlotsScreen implements Screen {
     public void show() {
         Gdx.input.setCursorCatched(false);
         slots = game.saveSlots();
+        selectedIndex = 0;
     }
 
     @Override
@@ -60,6 +64,10 @@ final class SaveSlotsScreen implements Screen {
         }
         backButton.set(centerX - 100f, top - 345f, 200f, 52f);
 
+        MenuInputSnapshot input = menuInput.sample();
+        if (handleNavigation(input.command())) return;
+        if (handlePointer(height)) return;
+
         Gdx.gl.glClearColor(0.055f, 0.075f, 0.10f, 1f);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT | GL20.GL_DEPTH_BUFFER_BIT);
 
@@ -69,18 +77,14 @@ final class SaveSlotsScreen implements Screen {
         shapes.rect(0f, 0f, width, height);
 
         for (int i = 0; i < slotButtons.length; i++) {
-            SaveSlotInfo slot = slots.get(i);
-            if (slot.state() == SaveSlotInfo.State.READY) {
-                shapes.setColor(new Color(0.17f, 0.31f, 0.23f, 1f));
-            } else if (slot.state() == SaveSlotInfo.State.CORRUPT) {
-                shapes.setColor(new Color(0.35f, 0.17f, 0.16f, 1f));
-            } else {
-                shapes.setColor(new Color(0.15f, 0.20f, 0.17f, 1f));
-            }
-            shapes.rect(slotButtons[i].x, slotButtons[i].y, slotButtons[i].width, slotButtons[i].height);
+            shapes.setColor(slotColor(slots.get(i), i == selectedIndex));
+            Rectangle rect = slotButtons[i];
+            shapes.rect(rect.x, rect.y, rect.width, rect.height);
         }
 
-        shapes.setColor(new Color(0.16f, 0.21f, 0.18f, 1f));
+        shapes.setColor(selectedIndex == BACK_INDEX
+            ? new Color(0.28f, 0.52f, 0.36f, 1f)
+            : new Color(0.16f, 0.21f, 0.18f, 1f));
         shapes.rect(backButton.x, backButton.y, backButton.width, backButton.height);
         shapes.end();
 
@@ -94,7 +98,7 @@ final class SaveSlotsScreen implements Screen {
         font.setColor(new Color(0.76f, 0.84f, 0.78f, 1f));
         font.draw(batch,
             mode == Mode.NEW_GAME
-                ? "Choose a world slot. Existing ranches require a second click to overwrite."
+                ? "Choose a world slot. Existing ranches require a second confirmation to overwrite."
                 : "Choose a saved ranch to continue.",
             centerX - 250f,
             height * 0.84f - 38f
@@ -108,47 +112,64 @@ final class SaveSlotsScreen implements Screen {
         font.getData().setScale(1.05f);
         font.draw(batch, "BACK", backButton.x + 72f, backButton.y + 34f);
 
+        font.getData().setScale(0.78f);
+        font.setColor(new Color(0.68f, 0.76f, 0.70f, 1f));
+        font.draw(batch, inputHint(input.activeDevice()), centerX - 235f, 78f);
+
         if (message != null) {
             font.getData().setScale(0.85f);
             font.setColor(new Color(1f, 0.88f, 0.58f, 1f));
-            font.draw(batch, message, centerX - 240f, 56f);
+            font.draw(batch, message, centerX - 240f, 52f);
         }
 
         font.getData().setScale(0.72f);
         font.setColor(new Color(0.68f, 0.73f, 0.69f, 1f));
         font.draw(batch, "Created by Dimash Janibekov (DizZyZ7)", 18f, 20f);
         batch.end();
+    }
 
-        if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
+    private boolean handleNavigation(MenuCommand command) {
+        if (command.upPressed()) selectedIndex = Math.floorMod(selectedIndex - 1, ITEM_COUNT);
+        if (command.downPressed()) selectedIndex = Math.floorMod(selectedIndex + 1, ITEM_COUNT);
+        if (command.confirmPressed()) {
+            if (selectedIndex == BACK_INDEX) game.returnToMenu();
+            else activateSlot(selectedIndex);
+            return true;
+        }
+        if (command.backPressed()) {
             game.returnToMenu();
-            return;
+            return true;
         }
-        if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_1)) {
-            activateSlot(0);
-            return;
-        }
-        if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_2)) {
-            activateSlot(1);
-            return;
-        }
-        if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_3)) {
-            activateSlot(2);
-            return;
-        }
+        return false;
+    }
 
-        if (Gdx.input.justTouched()) {
-            float x = Gdx.input.getX();
-            float y = height - Gdx.input.getY();
-            for (int i = 0; i < slotButtons.length; i++) {
-                if (slotButtons[i].contains(x, y)) {
-                    activateSlot(i);
-                    return;
-                }
-            }
-            if (backButton.contains(x, y)) {
-                game.returnToMenu();
+    private boolean handlePointer(int height) {
+        if (!Gdx.input.justTouched()) return false;
+        menuInput.markPointerActive();
+        float x = Gdx.input.getX();
+        float y = height - Gdx.input.getY();
+        for (int i = 0; i < slotButtons.length; i++) {
+            if (slotButtons[i].contains(x, y)) {
+                selectedIndex = i;
+                activateSlot(i);
+                return true;
             }
         }
+        if (backButton.contains(x, y)) {
+            selectedIndex = BACK_INDEX;
+            game.returnToMenu();
+            return true;
+        }
+        return false;
+    }
+
+    private Color slotColor(SaveSlotInfo slot, boolean selected) {
+        if (selected) return new Color(0.28f, 0.52f, 0.36f, 1f);
+        return switch (slot.state()) {
+            case READY -> new Color(0.17f, 0.31f, 0.23f, 1f);
+            case CORRUPT -> new Color(0.35f, 0.17f, 0.16f, 1f);
+            case EMPTY -> new Color(0.15f, 0.20f, 0.17f, 1f);
+        };
     }
 
     private void drawSlot(SaveSlotInfo slot, Rectangle rect, int number) {
@@ -179,9 +200,7 @@ final class SaveSlotsScreen implements Screen {
     }
 
     private void activateSlot(int index) {
-        if (index < 0 || index >= slots.size()) {
-            return;
-        }
+        if (index < 0 || index >= slots.size()) return;
         SaveSlotInfo slot = slots.get(index);
 
         if (mode == Mode.LOAD_GAME) {
@@ -202,28 +221,23 @@ final class SaveSlotsScreen implements Screen {
 
         if (!slot.slotId().equals(pendingOverwriteSlot)) {
             pendingOverwriteSlot = slot.slotId();
-            message = "Click " + slot.label() + " again to permanently replace that ranch.";
+            message = "Select " + slot.label() + " again to permanently replace that ranch.";
             return;
         }
 
         game.startNewWorld(slot.slotId());
     }
 
-    @Override
-    public void resize(int width, int height) {
+    private static String inputHint(InputDeviceType device) {
+        return device == InputDeviceType.KEYBOARD_MOUSE
+            ? "Up/Down or W/S navigate | Enter confirm | Esc back"
+            : "D-pad/Left Stick navigate | A confirm | B back";
     }
 
-    @Override
-    public void pause() {
-    }
-
-    @Override
-    public void resume() {
-    }
-
-    @Override
-    public void hide() {
-    }
+    @Override public void resize(int width, int height) { }
+    @Override public void pause() { }
+    @Override public void resume() { }
+    @Override public void hide() { }
 
     @Override
     public void dispose() {

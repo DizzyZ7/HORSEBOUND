@@ -17,6 +17,8 @@ record PlayerCommand(
     boolean savePressed,
     boolean pausePressed
 ) {
+    private static final float ACTIVITY_EPSILON = 0.015f;
+
     PlayerCommand {
         moveForward = clampAxis(moveForward);
         moveRight = clampAxis(moveRight);
@@ -26,6 +28,20 @@ record PlayerCommand(
 
     static PlayerCommand idle() {
         return new PlayerCommand(0f, 0f, 0f, 0f, false, false, false, false, false, false, false);
+    }
+
+    boolean hasActivity() {
+        return Math.abs(moveForward) > ACTIVITY_EPSILON
+            || Math.abs(moveRight) > ACTIVITY_EPSILON
+            || Math.abs(lookYaw) > ACTIVITY_EPSILON
+            || Math.abs(lookPitch) > ACTIVITY_EPSILON
+            || sprint
+            || jumpPressed
+            || interactPressed
+            || mountPressed
+            || buildPressed
+            || savePressed
+            || pausePressed;
     }
 
     PlayerCommand merge(PlayerCommand other) {
