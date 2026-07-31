@@ -53,7 +53,8 @@ final class SettingsScreen implements Screen {
         int width = Gdx.graphics.getWidth();
         int height = Gdx.graphics.getHeight();
         float ui = UiScale.effective(width, height, settings.uiScale());
-        layout(width, height, ui);
+        float layoutScale = Math.min(ui, 1.15f);
+        layout(width, height, layoutScale);
 
         MenuInputSnapshot input = menuInput.sample();
         if (handleNavigation(input.command())) return;
@@ -77,36 +78,36 @@ final class SettingsScreen implements Screen {
         batch.begin();
         font.setColor(Color.WHITE);
         font.getData().setScale(2.25f * ui);
-        font.draw(batch, "SETTINGS", width * 0.5f - 105f * ui, height - 34f * ui);
+        font.draw(batch, "SETTINGS", width * 0.5f - 105f * layoutScale, height - 34f * layoutScale);
 
         font.getData().setScale(0.92f * ui);
-        for (int i = 0; i < rows.length; i++) drawRow(i, rows[i], ui);
+        for (int i = 0; i < rows.length; i++) drawRow(i, rows[i], ui, layoutScale);
 
         font.getData().setScale(0.72f * ui);
         font.setColor(new Color(0.68f, 0.73f, 0.69f, 1f));
-        font.draw(batch, "Display settings are device-local and excluded from Steam Cloud.", 18f * ui, 42f * ui);
-        font.draw(batch, InputPromptCatalog.menuHint(input.activeDevice()), 18f * ui, 23f * ui);
+        font.draw(batch, "Display settings are device-local and excluded from Steam Cloud.", 18f * layoutScale, 42f * layoutScale);
+        font.draw(batch, InputPromptCatalog.menuHint(input.activeDevice()), 18f * layoutScale, 23f * layoutScale);
         batch.end();
     }
 
-    private void layout(int width, int height, float ui) {
-        float rowWidth = Math.min(width - 40f * ui, 680f * ui);
-        float rowHeight = 40f * ui;
-        float gap = 46f * ui;
-        float startY = height - 116f * ui;
+    private void layout(int width, int height, float scale) {
+        float rowWidth = Math.min(width - 40f * scale, 680f * scale);
+        float rowHeight = 40f * scale;
+        float gap = 46f * scale;
+        float startY = height - 116f * scale;
         float x = (width - rowWidth) * 0.5f;
         for (int i = 0; i < rows.length; i++) {
             rows[i].set(x, startY - i * gap, rowWidth, rowHeight);
         }
     }
 
-    private void drawRow(int index, Rectangle row, float ui) {
+    private void drawRow(int index, Rectangle row, float ui, float layoutScale) {
         font.setColor(index == selectedIndex ? Color.WHITE : new Color(0.84f, 0.90f, 0.85f, 1f));
-        font.draw(batch, label(index), row.x + 14f * ui, row.y + 27f * ui);
+        font.draw(batch, label(index), row.x + 14f * layoutScale, row.y + 27f * layoutScale);
         String value = value(index);
         if (!value.isEmpty()) {
             font.setColor(new Color(1f, 0.88f, 0.58f, 1f));
-            font.draw(batch, value, row.x + row.width - 245f * ui, row.y + 27f * ui);
+            font.draw(batch, value, row.x + row.width - 245f * layoutScale, row.y + 27f * layoutScale);
         }
     }
 
@@ -131,7 +132,7 @@ final class SettingsScreen implements Screen {
             case WINDOW_MODE -> settings.windowMode().displayName();
             case RESOLUTION -> settings.displayResolution().displayName();
             case VSYNC -> settings.vsync() ? "ON" : "OFF";
-            case GRAPHICS -> settings.graphicsPreset().displayName();
+            case GRAPHICS -> settings.graphicsPreset().displayName() + " | MSAA next launch";
             case UI_SCALE -> Math.round(settings.uiScale() * 100f) + "%";
             case SENSITIVITY -> String.format(Locale.ROOT, "%.2f", settings.mouseSensitivity());
             case PERFORMANCE -> settings.showPerformanceStats() ? "ON" : "OFF";
