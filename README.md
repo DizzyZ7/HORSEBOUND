@@ -5,13 +5,52 @@ Copyright © 2026 Dimash Janibekov. All rights reserved.
 
 HORSEBOUND is a cozy stylized 3D Java sandbox about horses, exploration, taming, riding and building a ranch. The world uses continuous terrain and is intentionally not voxel/block based.
 
-## 0.4.3 — Gameplay Loop Integration
+## 0.4.4 — Controller Foundation
 
-The active Living Ranch gameplay path now runs through a device-neutral fixed-step simulation loop.
+HORSEBOUND now has a standardized controller path across live gameplay and the core menu flow.
 
-### Live fixed-step gameplay
+### Controller gameplay
 
-At 60 deterministic simulation ticks per second HORSEBOUND now updates:
+The official `gdx-controllers` desktop backend provides standardized mappings instead of device-specific numeric button guesses.
+
+- radial movement and camera dead zones;
+- hot-plug and disconnect recovery;
+- mixed keyboard/mouse + controller input;
+- active prompt device changes only after meaningful input;
+- bounds checks for incomplete controller layouts;
+- controller-native runtime verified inside the packaged JAR.
+
+Default gameplay bindings:
+
+| Controller input | Action |
+|---|---|
+| Left Stick | Move / steer |
+| Right Stick | Camera |
+| A | Jump |
+| X | Interact |
+| Y | Mount / dismount |
+| L1 | Build |
+| R1 | Sprint / gallop |
+| Back / View | Manual save |
+| Start / Menu or B | Pause / back |
+
+### Controller menu flow
+
+Controller navigation is available in:
+
+- main menu;
+- New Game ranch slots;
+- Load Game ranch slots;
+- overwrite confirmation;
+- Settings.
+
+D-pad or Left Stick navigates, A confirms and B returns. Keyboard and mouse remain fully supported.
+
+This is not yet a claim of Steam Deck Verified status. Physical-device testing, platform-specific graphical glyphs, 1280×800 readability, performance validation and Valve compatibility review remain required.
+
+## Fixed-step gameplay
+
+At 60 deterministic simulation ticks per second HORSEBOUND updates:
 
 - player movement and jumping;
 - mounted horse acceleration, steering, stamina and jumping;
@@ -21,19 +60,6 @@ At 60 deterministic simulation ticks per second HORSEBOUND now updates:
 - world time.
 
 Render stalls are capped, catch-up work is bounded and tests compare behavior at 30, 60 and 144 render FPS.
-
-### Device-neutral input
-
-- `PlayerCommand` models intent instead of key codes;
-- `InputMapper` converts physical devices into commands;
-- `GameSimulationLoop` bridges render-rate sampling and fixed simulation;
-- continuous movement persists between ticks;
-- jump/interact/mount/build/save/pause edges execute exactly once;
-- active device identity reaches the HUD/prompt layer;
-- keyboard/mouse is the current adapter;
-- gamepad and Steam Input will reuse the same gameplay code.
-
-Controller glyph mapping is still in progress and is not claimed as complete controller support yet.
 
 ## Persistent worlds
 
@@ -66,7 +92,7 @@ Pushik is the required completely black fluffy cat with fluffy black paws and al
 - three ranch save slots;
 - manual save, autosave and backup recovery.
 
-## Controls
+## Keyboard controls
 
 | Input | Action |
 |---|---|
@@ -79,8 +105,6 @@ Pushik is the required completely black fluffy cat with fluffy black paws and al
 | B | Build fence |
 | F5 | Save |
 | Esc | Save and menu |
-
-Controller-complete menus and gameplay remain a Steam Deck target.
 
 ## User data
 
@@ -103,6 +127,7 @@ HORSEBOUND is developed against SteamPipe, Steam Cloud, offline single-player an
 - [`docs/STEAM_RELEASE_READINESS.md`](docs/STEAM_RELEASE_READINESS.md)
 - [`docs/releases/0.4.2.md`](docs/releases/0.4.2.md)
 - [`docs/releases/0.4.3.md`](docs/releases/0.4.3.md)
+- [`docs/releases/0.4.4.md`](docs/releases/0.4.4.md)
 - [`steam/README.md`](steam/README.md)
 
 The planned Steam launch target is `HORSEBOUND.exe` directly, without a mandatory external launcher.
@@ -126,18 +151,27 @@ gradle clean test windowsImage
 build/jpackage/HORSEBOUND/HORSEBOUND.exe
 ```
 
-The packaged game includes its Java runtime. CI verifies the executable, app JAR, runtime, absence of mutable user data and SHA-256 hashes.
+The packaged game includes its Java runtime. CI verifies:
+
+- executable, application JAR and runtime;
+- standardized controller classes and `jamepad64.dll`;
+- third-party notices and exact license texts;
+- absence of mutable user data inside the install image;
+- SHA-256 package hashes.
 
 ## Tech
 
 - Java 21
 - libGDX 1.14.2
 - LWJGL3
+- gdx-controllers 2.2.4 / Jamepad desktop backend
 - Gradle
 - JDK binary persistence
 - JDK Properties settings
 - jpackage Windows app image
 
-## Ownership
+## Licensing and ownership
 
 HORSEBOUND is an original project by **Dimash Janibekov (DizZyZ7)**. Public repository access does not grant reuse rights. See [LICENSE](LICENSE) and [NOTICE.md](NOTICE.md).
+
+Third-party runtime components retain their own licenses. See [THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt) and the [`licenses/`](licenses/) directory.
