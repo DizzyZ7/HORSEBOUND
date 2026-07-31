@@ -30,10 +30,10 @@ final class WorldScreen implements Screen {
     private static final float PLAYER_WALK_SPEED = 5.2f;
     private static final float PLAYER_RUN_SPEED = 8.4f;
     private static final float WORLD_LIMIT = Terrain.WORLD_HALF_SIZE - 3f;
-    private static final float AUTOSAVE_INTERVAL_SECONDS = 60f;
 
     private final HorseboundGame game;
     private final SaveService saveService;
+    private final GameSettings settings;
     private final long worldSeed;
     private final Random random;
 
@@ -78,6 +78,7 @@ final class WorldScreen implements Screen {
     WorldScreen(HorseboundGame game, SaveService saveService, SaveGame initialState) {
         this.game = game;
         this.saveService = saveService;
+        this.settings = game.settings();
         this.worldSeed = initialState.worldSeed();
         this.random = new Random(worldSeed ^ 0x484F525345424F55L);
 
@@ -271,7 +272,7 @@ final class WorldScreen implements Screen {
     }
 
     private void updateCameraInput() {
-        float sensitivity = 0.16f;
+        float sensitivity = settings.mouseSensitivity();
         cameraYaw -= Gdx.input.getDeltaX() * sensitivity;
         cameraPitch += Gdx.input.getDeltaY() * sensitivity * 0.75f;
         cameraPitch = MathUtils.clamp(cameraPitch, 12f, 62f);
@@ -528,7 +529,7 @@ final class WorldScreen implements Screen {
 
     private void updateAutosave(float dt) {
         autosaveTimer += dt;
-        if (autosaveTimer >= AUTOSAVE_INTERVAL_SECONDS) {
+        if (autosaveTimer >= settings.autosaveSeconds()) {
             autosaveTimer = 0f;
             saveNow("Autosaved.");
         }
@@ -608,7 +609,11 @@ final class WorldScreen implements Screen {
         font.getData().setScale(0.82f);
         font.setColor(new Color(0.88f, 0.91f, 0.86f, 1f));
         font.draw(spriteBatch, "WASD move | Mouse camera | E interact | F mount | B build | F5 save | Shift sprint/gallop | Space jump", 18f, height - 42f);
-        font.draw(spriteBatch, "Wood: " + wood + "    Apples: " + apples + "    Seed: " + worldSeed, 18f, height - 64f);
+        font.draw(spriteBatch,
+            "Wood: " + wood + "    Apples: " + apples + "    Seed: " + worldSeed + "    Save: " + saveService.activeSlot(),
+            18f,
+            height - 64f
+        );
 
         if (mountedHorse != null) {
             font.setColor(new Color(1f, 0.87f, 0.57f, 1f));
