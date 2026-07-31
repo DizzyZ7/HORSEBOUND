@@ -1,0 +1,49 @@
+name: HORSEBOUND Windows Build
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-x64:
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout HORSEBOUND
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Compile and package Windows app
+        shell: pwsh
+        run: gradle clean windowsImage --no-daemon --stacktrace
+
+      - name: Verify executable
+        shell: pwsh
+        run: |
+          if (!(Test-Path "build/jpackage/HORSEBOUND/HORSEBOUND.exe")) {
+            throw "HORSEBOUND.exe was not produced"
+          }
+          Get-Item "build/jpackage/HORSEBOUND/HORSEBOUND.exe" | Format-List Name,Length,FullName
+
+      - name: Upload self-contained Windows build
+        uses: actions/upload-artifact@v4
+        with:
+          name: HORSEBOUND-Windows-x64
+          path: build/jpackage/HORSEBOUND/
+          if-no-files-found: error
+          retention-days: 30
