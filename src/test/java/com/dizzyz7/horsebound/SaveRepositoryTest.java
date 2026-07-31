@@ -59,6 +59,26 @@ class SaveRepositoryTest {
         assertEquals(first, recovered);
     }
 
+    @Test
+    void saveAfterRecoveryDoesNotReplaceGoodBackupWithCorruptPrimary() throws Exception {
+        SaveRepository repository = new SaveRepository(tempDir.resolve("HORSEBOUND"));
+        SaveGame first = sampleSave(4, 5, 20f);
+        SaveGame second = sampleSave(99, 1, 100f);
+        SaveGame third = sampleSave(12, 6, 81f);
+
+        repository.save("slot-1", first);
+        repository.save("slot-1", second);
+
+        Path primary = repository.root().resolve("saves").resolve("slot-1").resolve("save.hbs");
+        Files.writeString(primary, "corrupted-second-primary");
+        assertEquals(first, repository.load("slot-1").orElseThrow());
+
+        repository.save("slot-1", third);
+        Files.writeString(primary, "corrupted-third-primary");
+
+        assertEquals(first, repository.load("slot-1").orElseThrow());
+    }
+
     private static SaveGame sampleSave(int wood, int apples, float trust) {
         UUID horseId = UUID.fromString("6f50e536-4459-4be6-9cee-5839aef4b59c");
         return new SaveGame(

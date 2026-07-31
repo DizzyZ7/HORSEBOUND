@@ -28,7 +28,7 @@ final class SaveRepository {
     private final Path root;
 
     SaveRepository() {
-        this(defaultRoot());
+        this(AppPaths.userDataRoot());
     }
 
     SaveRepository(Path root) {
@@ -79,9 +79,9 @@ final class SaveRepository {
             Files.createDirectories(directory);
             writeAndSync(temporary, saveGame);
 
-            if (Files.isRegularFile(primary)) {
+            if (isValidSave(primary)) {
                 Files.copy(primary, backup, StandardCopyOption.REPLACE_EXISTING);
-            } else {
+            } else if (!isValidSave(backup)) {
                 Files.copy(temporary, backup, StandardCopyOption.REPLACE_EXISTING);
             }
 
@@ -98,6 +98,18 @@ final class SaveRepository {
 
     Path root() {
         return root;
+    }
+
+    private boolean isValidSave(Path path) {
+        if (!Files.isRegularFile(path)) {
+            return false;
+        }
+        try {
+            read(path);
+            return true;
+        } catch (IOException ex) {
+            return false;
+        }
     }
 
     private SaveGame read(Path path) throws IOException {
@@ -266,14 +278,6 @@ final class SaveRepository {
 
     private Path backupPath(String slot) {
         return slotDirectory(slot).resolve("save.bak");
-    }
-
-    private static Path defaultRoot() {
-        String appData = System.getenv("APPDATA");
-        if (appData != null && !appData.isBlank()) {
-            return Path.of(appData, "HORSEBOUND");
-        }
-        return Path.of(System.getProperty("user.home"), ".horsebound");
     }
 
     static final class SaveException extends RuntimeException {
