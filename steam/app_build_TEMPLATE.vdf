@@ -1,0 +1,13 @@
+"AppBuild"
+{
+    "AppID"        "APP_ID_HERE"
+    "Desc"         "HORSEBOUND Windows x64 release candidate"
+    "Preview"      "1"
+    "ContentRoot"  "..\\content\\"
+    "BuildOutput"  "..\\output\\"
+
+    "Depots"
+    {
+        "DEPOT_ID_HERE"    "depot_build_TEMPLATE.vdf"
+    }
+}
