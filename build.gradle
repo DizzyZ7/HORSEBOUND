@@ -90,4 +90,15 @@ tasks.register('windowsImage', Exec) {
             '--description', 'HORSEBOUND - cozy 3D horse sandbox created by Dimash Janibekov (DizZyZ7).',
             '--dest', layout.buildDirectory.dir('jpackage').get().asFile.absolutePath
     }
+    doLast {
+        def imageRoot = layout.buildDirectory.dir('jpackage/HORSEBOUND').get().asFile
+        copy {
+            from 'THIRD_PARTY_NOTICES.txt'
+            into imageRoot
+        }
+        copy {
+            from 'licenses'
+            into new File(imageRoot, 'licenses')
+        }
+    }
 }
