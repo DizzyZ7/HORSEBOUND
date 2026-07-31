@@ -7,15 +7,40 @@ A cozy stylized 3D Java sandbox about horses, exploration, taming, riding, gathe
 and building a small ranch. The world is intentionally **not voxel/block based**:
 terrain is a continuous procedural mesh and characters are simple low-poly 3D forms.
 
-## HORSEBOUND 0.2.1 Application Foundation
+## HORSEBOUND 0.3 Horse Domain
 
-HORSEBOUND is moving from a vertical slice toward a real persistent single-player game.
+HORSEBOUND is moving from a vertical slice toward a persistent single-player game where individual horses feel different instead of being copies of one entity.
+
+### Horse identity and relationships
+
+Every persistent horse now has:
+
+- a UUID that survives restarts;
+- a deterministic personality: `CALM`, `CURIOUS`, `SHY`, `BRAVE`, `STUBBORN`, or `ENERGETIC`;
+- trust (`0..100`);
+- bond (`0..100`);
+- fear (`0..100`);
+- stamina and taming state.
+
+Personality changes gameplay. Curious horses gain trust faster; stubborn horses take longer to win over; shy horses react more strongly to threatening approaches; brave horses accumulate less fear. Feeding increases trust and bond while calming fear. Petting a tamed horse strengthens the bond. Wild horses become more frightened when the player rushes toward them or approaches on horseback, and fear gradually falls when they are left in peace.
+
+A horse is ready to tame when its trust is complete and it is calm enough. The HUD exposes personality, trust, bond, fear and relevant riding state so the player can understand the relationship rather than filling a hidden XP bar.
+
+### Save format v2
+
+The JDK-only `.hbs` world format is now version 2. Horse personality, bond and fear are persisted with each horse.
+
+**Version 1 ranches remain supported.** A v1 file is read using its original binary layout and migrated in memory to v2. Existing horse UUID, name, position, heading, trust, stamina and taming progress are preserved; the new personality and relationship values receive deterministic compatibility defaults. The next successful save writes the ranch in v2 format.
+
+Migration and corruption-recovery behavior are covered by unit tests.
+
+## Current game foundation
 
 - third-person 3D movement and mouse camera;
 - smooth procedural terrain with hills, a lake, trees and resource gathering;
-- several wild horses with wandering/fleeing behavior;
-- persistent UUID identity for horses;
-- trust-based taming using apples;
+- wild horses with wandering/fleeing behavior;
+- persistent horse UUID, personality and relationship state;
+- relationship-based taming using apples;
 - mounting, riding, gallop stamina and jumping;
 - simple fence building from gathered wood;
 - time-of-day lighting;
@@ -72,7 +97,7 @@ On Windows user data is stored under:
 
 Each ranch is independent. The Load Game screen shows its last-save time and current horse/tamed-horse/fence counts. Continue selects the newest readable slot.
 
-Writes go through a temporary file, are flushed to disk, and replace the primary save atomically where the filesystem supports it. The previous valid state is retained as `save.bak`; if the primary save is unreadable, HORSEBOUND attempts to recover from the backup.
+Writes go through a temporary file, are flushed to disk, and replace the primary save atomically where the filesystem supports it. The previous valid state is retained as `save.bak`; if the primary save is unreadable, HORSEBOUND attempts to recover from the backup. A corrupt primary is never copied over a valid backup during the next save.
 
 ## Settings
 
@@ -92,7 +117,7 @@ Requirements: JDK 21 and Gradle 8.x+.
 gradle run
 ```
 
-The project uses libGDX 1.14.2. Gameplay, world logic, persistence and application code are Java 21.
+The project uses libGDX 1.14.2. Gameplay, horse domain logic, world logic, persistence and application code are Java 21.
 
 ## Tests
 
@@ -100,7 +125,7 @@ The project uses libGDX 1.14.2. Gameplay, world logic, persistence and applicati
 gradle test
 ```
 
-Tests cover save/load round trips, recovery from deliberately corrupted primary saves, first-save backups, save-slot metadata/selection and settings persistence/fallback behavior.
+Tests cover save/load round trips, recovery from deliberately corrupted primary saves, first-save backups, backup preservation after recovery, v1-to-v2 migration, horse relationship behavior, save-slot metadata/selection and settings persistence/fallback behavior.
 
 ## Windows build
 

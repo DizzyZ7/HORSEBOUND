@@ -16,7 +16,7 @@ record SaveGame(
     List<FenceData> fences,
     List<Integer> harvestedTreeIds
 ) {
-    static final int CURRENT_VERSION = 1;
+    static final int CURRENT_VERSION = 2;
 
     SaveGame {
         player = Objects.requireNonNull(player, "player");
@@ -54,14 +54,57 @@ record SaveGame(
         float heading,
         float trust,
         float stamina,
-        boolean tamed
+        boolean tamed,
+        HorsePersonality personality,
+        float bond,
+        float fear
     ) {
         HorseData {
             id = Objects.requireNonNull(id, "id");
             name = Objects.requireNonNull(name, "name");
+            personality = Objects.requireNonNull(personality, "personality");
+            trust = clampPercent(trust);
+            stamina = clampPercent(stamina);
+            bond = clampPercent(bond);
+            fear = clampPercent(fear);
+        }
+
+        /**
+         * Compatibility constructor used by v1 migration and older tests/call sites.
+         */
+        HorseData(
+            UUID id,
+            String name,
+            float x,
+            float z,
+            float heading,
+            float trust,
+            float stamina,
+            boolean tamed
+        ) {
+            this(
+                id,
+                name,
+                x,
+                z,
+                heading,
+                trust,
+                stamina,
+                tamed,
+                HorsePersonality.fromIdentity(id),
+                tamed ? Math.max(20f, trust * 0.55f) : trust * 0.25f,
+                tamed ? 5f : 12f
+            );
         }
     }
 
     record FenceData(float x, float z, float heading) {
+    }
+
+    private static float clampPercent(float value) {
+        if (!Float.isFinite(value)) {
+            return 0f;
+        }
+        return Math.max(0f, Math.min(100f, value));
     }
 }

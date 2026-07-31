@@ -226,12 +226,15 @@ final class WorldScreen implements Screen {
 
     private Horse newHorse(String name, float x, float z, float heading) {
         UUID id = UUID.nameUUIDFromBytes((worldSeed + ":horse:" + name).getBytes(StandardCharsets.UTF_8));
+        HorsePersonality personality = HorsePersonality.fromIdentity(id);
         return new Horse(
             id,
             name,
             new ModelInstance(models.horse),
             new Vector3(x, Terrain.heightAt(x, z), z),
-            heading
+            heading,
+            personality,
+            HorseRelationship.wild()
         );
     }
 
@@ -248,9 +251,10 @@ final class WorldScreen implements Screen {
                 data.name(),
                 new ModelInstance(models.horse),
                 new Vector3(x, Terrain.heightAt(x, z), z),
-                data.heading()
+                data.heading(),
+                data.personality(),
+                new HorseRelationship(data.trust(), data.bond(), data.fear())
             );
-            horse.trust = MathUtils.clamp(data.trust(), 0f, 100f);
             horse.stamina = MathUtils.clamp(data.stamina(), 0f, 100f);
             horse.tamed = data.tamed();
             horse.wanderTimer = randomRange(1.5f, 5f);
@@ -358,22 +362,32 @@ final class WorldScreen implements Screen {
             horse.speed *= 0.65f;
         }
         horse.position.y = Terrain.heightAt(horse.position.x, horse.position.z);
+        horse.relationship.calm(dt * 0.35f);
         playerPosition.set(horse.position);
         playerFacing = horse.heading;
     }
 
     private void updateWildHorses(float dt) {
         Vector3 danger = mountedHorse == null ? playerPosition : mountedHorse.position;
+        boolean playerIsRushing = mountedHorse != null || Gdx.input.isKeyPressed(Input.Keys.SHIFT_LEFT);
+
         for (Horse horse : horses) {
             if (horse == mountedHorse) continue;
 
+            horse.relationship.calm(dt);
             float distance = planarDistance(horse.position.x, horse.position.z, danger.x, danger.z);
             float desiredSpeed;
             if (!horse.tamed && distance < 8f) {
                 float awayX = horse.position.x - danger.x;
                 float awayZ = horse.position.z - danger.z;
                 horse.heading = MathUtils.atan2(awayX, awayZ) * MathUtils.radiansToDegrees;
-                desiredSpeed = 5.9f;
+
+                float threat = Math.max(0f, 8f - distance) * 1.7f * dt;
+                if (playerIsRushing) {
+                    threat *= 2.2f;
+                }
+                horse.relationship.observeThreat(threat, horse.personality);
+                desiredSpeed = 5.2f + horse.relationship.fear() * 0.025f;
                 horse.wanderTimer = randomRange(2f, 4f);
             } else {
                 horse.wanderTimer -= dt;
@@ -436,17 +450,32 @@ final class WorldScreen implements Screen {
                         return;
                     }
                     apples--;
-                    horse.trust = Math.min(100f, horse.trust + 34f);
-                    if (horse.trust >= 100f) {
+                    horse.relationship.feed(horse.personality);
+                    if (horse.relationship.isReadyToTame()) {
                         horse.tamed = true;
-                        horse.trust = 100f;
                         saveNow(null);
-                        setStatus(horse.name + " trusts you now. Progress saved. Press F nearby to ride.");
+                        setStatus(
+                            horse.name + " trusts you now. Bond " + Math.round(horse.relationship.bond())
+                                + "%. Progress saved; press F nearby to ride."
+                        );
+                    } else if (horse.relationship.trust() >= 100f) {
+                        setStatus(
+                            horse.name + " trusts you, but is still nervous. Fear: "
+                                + Math.round(horse.relationship.fear()) + "%"
+                        );
                     } else {
-                        setStatus(horse.name + " accepted the apple. Trust: " + Math.round(horse.trust) + "%");
+                        setStatus(
+                            horse.name + " accepted the apple. " + horse.personality.displayName()
+                                + " | trust " + Math.round(horse.relationship.trust())
+                                + "% | fear " + Math.round(horse.relationship.fear()) + "%"
+                        );
                     }
                 } else {
-                    setStatus("You pet " + horse.name + ". The horse relaxes beside you.");
+                    horse.relationship.pet(horse.personality);
+                    setStatus(
+                        "You pet " + horse.name + ". Bond: " + Math.round(horse.relationship.bond())
+                            + "% | fear " + Math.round(horse.relationship.fear()) + "%"
+                    );
                 }
                 return;
             }
@@ -480,7 +509,10 @@ final class WorldScreen implements Screen {
             if (horse == null) {
                 setStatus("Stand closer to a horse to mount.");
             } else if (!horse.tamed) {
-                setStatus(horse.name + " does not trust you enough yet. Feed with E.");
+                setStatus(
+                    horse.name + " is not ready yet. Trust " + Math.round(horse.relationship.trust())
+                        + "% | fear " + Math.round(horse.relationship.fear()) + "%"
+                );
             } else {
                 mountedHorse = horse;
                 horse.mounted = true;
@@ -617,12 +649,30 @@ final class WorldScreen implements Screen {
 
         if (mountedHorse != null) {
             font.setColor(new Color(1f, 0.87f, 0.57f, 1f));
-            font.draw(spriteBatch, mountedHorse.name + " | stamina " + Math.round(mountedHorse.stamina) + "% | speed " + String.format(Locale.ROOT, "%.1f", Math.abs(mountedHorse.speed)), 18f, height - 86f);
+            font.draw(
+                spriteBatch,
+                mountedHorse.name + " | " + mountedHorse.personality.displayName()
+                    + " | bond " + Math.round(mountedHorse.relationship.bond())
+                    + "% | fear " + Math.round(mountedHorse.relationship.fear())
+                    + "% | stamina " + Math.round(mountedHorse.stamina)
+                    + "% | speed " + String.format(Locale.ROOT, "%.1f", Math.abs(mountedHorse.speed)),
+                18f,
+                height - 86f
+            );
         } else {
             Horse close = nearestHorse(7f);
             if (close != null) {
                 font.setColor(new Color(1f, 0.87f, 0.57f, 1f));
-                font.draw(spriteBatch, close.name + " | trust " + Math.round(close.trust) + "%" + (close.tamed ? " | tamed" : " | wild"), 18f, height - 86f);
+                font.draw(
+                    spriteBatch,
+                    close.name + " | " + close.personality.displayName()
+                        + " | trust " + Math.round(close.relationship.trust())
+                        + "% | bond " + Math.round(close.relationship.bond())
+                        + "% | fear " + Math.round(close.relationship.fear())
+                        + "%" + (close.tamed ? " | tamed" : " | wild"),
+                    18f,
+                    height - 86f
+                );
             }
         }
 
@@ -707,9 +757,12 @@ final class WorldScreen implements Screen {
                 horse.position.x,
                 horse.position.z,
                 horse.heading,
-                horse.trust,
+                horse.relationship.trust(),
                 horse.stamina,
-                horse.tamed
+                horse.tamed,
+                horse.personality,
+                horse.relationship.bond(),
+                horse.relationship.fear()
             ));
         }
 
@@ -834,8 +887,9 @@ final class WorldScreen implements Screen {
         final String name;
         final ModelInstance instance;
         final Vector3 position;
+        final HorsePersonality personality;
+        final HorseRelationship relationship;
         float heading;
-        float trust;
         float stamina = 100f;
         float speed;
         float wanderTimer;
@@ -844,12 +898,22 @@ final class WorldScreen implements Screen {
         boolean tamed;
         boolean mounted;
 
-        Horse(UUID id, String name, ModelInstance instance, Vector3 position, float heading) {
+        Horse(
+            UUID id,
+            String name,
+            ModelInstance instance,
+            Vector3 position,
+            float heading,
+            HorsePersonality personality,
+            HorseRelationship relationship
+        ) {
             this.id = id;
             this.name = name;
             this.instance = instance;
             this.position = position;
             this.heading = heading;
+            this.personality = personality;
+            this.relationship = relationship;
         }
     }
 
