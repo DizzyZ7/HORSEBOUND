@@ -1,0 +1,82 @@
+plugins {
+    id 'java'
+    id 'application'
+}
+
+group = 'com.dizzyz7'
+version = '0.1.0'
+
+ext {
+    gdxVersion = '1.14.2'
+    creatorName = 'Dimash Dzhanibekov (DizZyZ7)'
+}
+
+repositories {
+    mavenCentral()
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+dependencies {
+    implementation "com.badlogicgames.gdx:gdx:${gdxVersion}"
+    implementation "com.badlogicgames.gdx:gdx-backend-lwjgl3:${gdxVersion}"
+    runtimeOnly "com.badlogicgames.gdx:gdx-platform:${gdxVersion}:natives-desktop"
+}
+
+application {
+    mainClass = 'com.dizzyz7.horsebound.DesktopLauncher'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+tasks.named('run', JavaExec) {
+    workingDir = projectDir
+    standardInput = System.in
+}
+
+tasks.register('fatJar', Jar) {
+    archiveFileName = 'HORSEBOUND.jar'
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    manifest {
+        attributes(
+            'Main-Class': application.mainClass.get(),
+            'Implementation-Title': 'HORSEBOUND',
+            'Implementation-Version': project.version,
+            'Implementation-Vendor': creatorName,
+            'Built-By': creatorName
+        )
+    }
+    from sourceSets.main.output
+    dependsOn configurations.runtimeClasspath
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+}
+
+tasks.register('windowsImage', Exec) {
+    dependsOn 'fatJar'
+    doFirst {
+        if (!System.getProperty('os.name').toLowerCase().contains('windows')) {
+            throw new GradleException('windowsImage must be built on Windows because jpackage creates platform-specific launchers.')
+        }
+        delete layout.buildDirectory.dir('jpackage')
+        def jpackage = "${System.getProperty('java.home')}\\bin\\jpackage.exe"
+        commandLine jpackage,
+            '--type', 'app-image',
+            '--input', layout.buildDirectory.dir('libs').get().asFile.absolutePath,
+            '--main-jar', 'HORSEBOUND.jar',
+            '--main-class', application.mainClass.get(),
+            '--name', 'HORSEBOUND',
+            '--app-version', project.version.toString(),
+            '--vendor', creatorName,
+            '--copyright', 'Copyright (c) 2026 Dimash Dzhanibekov (DizZyZ7). All rights reserved.',
+            '--description', 'HORSEBOUND - cozy 3D horse sandbox created by Dimash Dzhanibekov (DizZyZ7).',
+            '--dest', layout.buildDirectory.dir('jpackage').get().asFile.absolutePath
+    }
+}
