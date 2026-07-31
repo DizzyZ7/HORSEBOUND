@@ -74,21 +74,18 @@ final class SaveRepository {
         Path primary = savePath(slot);
         Path backup = backupPath(slot);
         Path temporary = directory.resolve("save.tmp");
-        boolean primaryAlreadyExisted = Files.isRegularFile(primary);
 
         try {
             Files.createDirectories(directory);
             writeAndSync(temporary, saveGame);
 
-            if (primaryAlreadyExisted) {
+            if (Files.isRegularFile(primary)) {
                 Files.copy(primary, backup, StandardCopyOption.REPLACE_EXISTING);
+            } else {
+                Files.copy(temporary, backup, StandardCopyOption.REPLACE_EXISTING);
             }
 
             moveAtomically(temporary, primary);
-
-            if (!primaryAlreadyExisted || !Files.isRegularFile(backup)) {
-                Files.copy(primary, backup, StandardCopyOption.REPLACE_EXISTING);
-            }
         } catch (IOException ex) {
             try {
                 Files.deleteIfExists(temporary);
