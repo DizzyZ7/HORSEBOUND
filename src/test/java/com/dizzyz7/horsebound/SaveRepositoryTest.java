@@ -29,7 +29,22 @@ class SaveRepositoryTest {
     }
 
     @Test
-    void fallsBackToBackupWhenPrimaryIsCorrupt() throws Exception {
+    void firstSuccessfulSaveAlreadyHasRecoverableBackup() throws Exception {
+        SaveRepository repository = new SaveRepository(tempDir.resolve("HORSEBOUND"));
+        SaveGame expected = sampleSave(7, 3, 48f);
+
+        repository.save("slot-1", expected);
+        Path primary = repository.root().resolve("saves").resolve("slot-1").resolve("save.hbs");
+        Path backup = repository.root().resolve("saves").resolve("slot-1").resolve("save.bak");
+
+        assertTrue(Files.isRegularFile(backup));
+        Files.writeString(primary, "corrupted");
+
+        assertEquals(expected, repository.load("slot-1").orElseThrow());
+    }
+
+    @Test
+    void fallsBackToPreviousBackupWhenLatestPrimaryIsCorrupt() throws Exception {
         SaveRepository repository = new SaveRepository(tempDir.resolve("HORSEBOUND"));
         SaveGame first = sampleSave(4, 5, 20f);
         SaveGame second = sampleSave(99, 1, 100f);
