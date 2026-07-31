@@ -14,4 +14,12 @@ final class AppPaths {
         }
         return Path.of(System.getProperty("user.home"), ".horsebound");
     }
+
+    static Path savesDirectory() {
+        return userDataRoot().resolve("saves");
+    }
+
+    static Path logsDirectory() {
+        return userDataRoot().resolve("logs");
+    }
 }
