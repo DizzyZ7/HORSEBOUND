@@ -9,13 +9,16 @@ public final class DesktopLauncher {
     }
 
     public static void main(String[] args) {
+        SettingsRepository settingsRepository = new SettingsRepository();
+        GameSettings settings = settingsRepository.load();
+
         Lwjgl3ApplicationConfiguration config = new Lwjgl3ApplicationConfiguration();
         config.setTitle(AuthorInfo.GAME_NAME + " | Created by DizZyZ7");
         config.setWindowedMode(1280, 720);
         config.setResizable(true);
-        config.useVsync(true);
+        config.useVsync(settings.vsync());
         config.setForegroundFPS(144);
         config.setBackBufferConfig(8, 8, 8, 8, 24, 8, 4);
-        new Lwjgl3Application(new HorseboundGame(), config);
+        new Lwjgl3Application(new HorseboundGame(settingsRepository, settings), config);
     }
 }
