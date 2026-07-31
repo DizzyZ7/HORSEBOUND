@@ -83,9 +83,14 @@ jobs:
             }
           }
 
+          $versionMatch = Select-String -Path "build.gradle" -Pattern "^\s*version\s*=\s*'([^']+)'" | Select-Object -First 1
+          if (!$versionMatch) {
+            throw "Could not derive the project version from build.gradle"
+          }
+          $expectedVersion = $versionMatch.Matches[0].Groups[1].Value
           $expectedCommit = $env:GITHUB_SHA.Substring(0, 12)
           $versionOutput = & java -jar $jarPath --version
-          $expectedBuildLine = "HORSEBOUND 0.4.5 ($expectedCommit)"
+          $expectedBuildLine = "HORSEBOUND $expectedVersion ($expectedCommit)"
           if ($versionOutput -notcontains $expectedBuildLine) {
             $versionOutput | Write-Host
             throw "Packaged build identity mismatch. Expected: $expectedBuildLine"
