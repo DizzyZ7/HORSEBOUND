@@ -5,29 +5,35 @@ Copyright © 2026 Dimash Janibekov. All rights reserved.
 
 HORSEBOUND is a cozy stylized 3D Java sandbox about horses, exploration, taming, riding and building a ranch. The world uses continuous terrain and is intentionally not voxel/block based.
 
-## 0.4.2 — Simulation & Input Foundation
+## 0.4.3 — Gameplay Loop Integration
 
-HORSEBOUND now has a pure Java boundary between render cadence, simulation time and physical input devices.
+The active Living Ranch gameplay path now runs through a device-neutral fixed-step simulation loop.
 
-### Fixed-step simulation
+### Live fixed-step gameplay
 
-- 60 deterministic simulation ticks per second;
-- equal world-clock results at 30, 60 and 144 render FPS;
-- capped frame stalls and bounded catch-up work;
-- interpolation alpha prepared for smooth rendering;
-- world time advances through the fixed-step clock.
+At 60 deterministic simulation ticks per second HORSEBOUND now updates:
+
+- player movement and jumping;
+- mounted horse acceleration, steering, stamina and jumping;
+- wild horse personality, fear, wandering and fleeing;
+- Pushik companion behavior;
+- interaction, taming, mounting and building;
+- world time.
+
+Render stalls are capped, catch-up work is bounded and tests compare behavior at 30, 60 and 144 render FPS.
 
 ### Device-neutral input
 
 - `PlayerCommand` models intent instead of key codes;
-- `InputSnapshot` tracks the active prompt device;
-- keyboard/mouse, gamepad and Steam Input device identities;
-- current keyboard/mouse adapter;
-- mixed-input command merging;
-- command buffer between render sampling and fixed simulation;
-- continuous movement persists while edge actions execute exactly once.
+- `InputMapper` converts physical devices into commands;
+- `GameSimulationLoop` bridges render-rate sampling and fixed simulation;
+- continuous movement persists between ticks;
+- jump/interact/mount/build/save/pause edges execute exactly once;
+- active device identity reaches the HUD/prompt layer;
+- keyboard/mouse is the current adapter;
+- gamepad and Steam Input will reuse the same gameplay code.
 
-The next integration moves player, horse, Pushik and interaction updates behind this boundary so gameplay no longer reads `Gdx.input` directly.
+Controller glyph mapping is still in progress and is not claimed as complete controller support yet.
 
 ## Persistent worlds
 
@@ -74,7 +80,7 @@ Pushik is the required completely black fluffy cat with fluffy black paws and al
 | F5 | Save |
 | Esc | Save and menu |
 
-Controller-complete menus and gameplay remain a Steam Deck target. Keyboard, controller and Steam Input will use the same command contract.
+Controller-complete menus and gameplay remain a Steam Deck target.
 
 ## User data
 
@@ -96,6 +102,7 @@ HORSEBOUND is developed against SteamPipe, Steam Cloud, offline single-player an
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 - [`docs/STEAM_RELEASE_READINESS.md`](docs/STEAM_RELEASE_READINESS.md)
 - [`docs/releases/0.4.2.md`](docs/releases/0.4.2.md)
+- [`docs/releases/0.4.3.md`](docs/releases/0.4.3.md)
 - [`steam/README.md`](steam/README.md)
 
 The planned Steam launch target is `HORSEBOUND.exe` directly, without a mandatory external launcher.

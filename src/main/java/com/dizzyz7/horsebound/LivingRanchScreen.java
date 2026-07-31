@@ -2,7 +2,6 @@
 package com.dizzyz7.horsebound;
 
 import com.badlogic.gdx.Gdx;
-import com.badlogic.gdx.Input;
 import com.badlogic.gdx.Screen;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
@@ -27,9 +26,7 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * HORSEBOUND presentation/input layer.
- * Gameplay state lives in pure Java domain objects such as GameSession, Inventory,
- * HorseRelationship and PushikMind instead of being modeled as renderer fields.
+ * libGDX presentation layer over a fixed-step, device-neutral gameplay loop.
  */
 final class LivingRanchScreen implements Screen {
     private static final float PLAYER_WALK_SPEED = 5.2f;
@@ -40,6 +37,7 @@ final class LivingRanchScreen implements Screen {
     private final SaveService saveService;
     private final GameSettings settings;
     private final GameSession session;
+    private final GameSimulationLoop simulationLoop;
     private final Random random;
 
     private final Terrain terrain = new Terrain();
@@ -66,6 +64,7 @@ final class LivingRanchScreen implements Screen {
     private final Vector3 tmpTarget = new Vector3();
 
     private HorseActor mountedHorse;
+    private InputDeviceType activeInputDevice = InputDeviceType.KEYBOARD_MOUSE;
     private float cameraYaw = 18f;
     private float cameraPitch = 27f;
     private float cameraDistance = 10f;
@@ -75,6 +74,7 @@ final class LivingRanchScreen implements Screen {
     private float autosaveTimer;
     private String status = "Explore the meadow, meet a horse, and build your first paddock.";
     private float statusTimer = 8f;
+    private boolean returnToMenuRequested;
     private boolean disposed;
 
     LivingRanchScreen(HorseboundGame game, SaveService saveService, SaveGame initialState) {
@@ -82,6 +82,10 @@ final class LivingRanchScreen implements Screen {
         this.saveService = saveService;
         this.settings = game.settings();
         this.session = new GameSession(initialState);
+        this.simulationLoop = new GameSimulationLoop(
+            session,
+            new KeyboardMouseInputMapper(settings.mouseSensitivity())
+        );
         this.random = new Random(session.worldSeed() ^ 0x4C4956494E47524CL);
 
         camera = new PerspectiveCamera(67f, Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
@@ -118,6 +122,7 @@ final class LivingRanchScreen implements Screen {
             new Vector3(px, Terrain.heightAt(px, pz), pz),
             savedPushik.heading()
         );
+
         syncTransforms();
         updateLighting();
         updateCamera();
@@ -130,27 +135,47 @@ final class LivingRanchScreen implements Screen {
 
     @Override
     public void render(float delta) {
-        float dt = Math.min(delta, 0.05f);
-        if (Gdx.input.isKeyJustPressed(Input.Keys.F5)) saveNow("Game saved.");
-        if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
+        float frameDelta = Math.min(Math.max(0f, delta), FixedStepClock.DEFAULT_MAX_FRAME_SECONDS);
+        simulationLoop.advance(frameDelta, this::updateSimulation);
+        activeInputDevice = simulationLoop.activeDevice();
+
+        if (returnToMenuRequested) {
+            returnToMenuRequested = false;
             saveNow(null);
+            simulationLoop.resetInput();
+            Gdx.input.setCursorCatched(false);
             game.returnToMenu();
             return;
         }
 
-        updateCameraInput();
-        if (mountedHorse == null) updatePlayer(dt); else updateMountedHorse(dt);
-        updateWildHorses(dt);
-        updatePushik(dt);
-        handleInteractions();
-        session.advanceWorldTime(dt);
         updateLighting();
-        updateAutosave(dt);
+        updateAutosave(frameDelta);
         syncTransforms();
         updateCamera();
         renderWorld();
         renderHud();
-        statusTimer = Math.max(0f, statusTimer - dt);
+        statusTimer = Math.max(0f, statusTimer - frameDelta);
+    }
+
+    private void updateSimulation(float fixedDelta, PlayerCommand command) {
+        updateCameraInput(command);
+
+        if (command.savePressed()) {
+            saveNow("Game saved.");
+        }
+        if (command.pausePressed()) {
+            returnToMenuRequested = true;
+            return;
+        }
+
+        if (mountedHorse == null) {
+            updatePlayer(fixedDelta, command);
+        } else {
+            updateMountedHorse(fixedDelta, command);
+        }
+        updateWildHorses(fixedDelta, command);
+        updatePushik(fixedDelta);
+        handleInteractions(command);
     }
 
     private void generateNature() {
@@ -164,9 +189,11 @@ final class LivingRanchScreen implements Screen {
             float scale = randomRange(0.72f, 1.35f);
             ModelInstance tree = new ModelInstance(models.tree);
             tree.transform.setToTranslation(x, Terrain.heightAt(x, z), z)
-                .rotate(Vector3.Y, randomRange(0f, 360f)).scale(scale, scale, scale);
+                .rotate(Vector3.Y, randomRange(0f, 360f))
+                .scale(scale, scale, scale);
             trees.add(new TreeNode(i, tree, x, z));
         }
+
         for (int i = 0; i < 30; i++) {
             float x = randomRange(-110f, 110f);
             float z = randomRange(-110f, 110f);
@@ -177,14 +204,17 @@ final class LivingRanchScreen implements Screen {
             float scale = randomRange(0.55f, 1.75f);
             ModelInstance rock = new ModelInstance(models.rock);
             rock.transform.setToTranslation(x, Terrain.heightAt(x, z) + 0.35f * scale, z)
-                .rotate(Vector3.Y, randomRange(0f, 360f)).scale(scale, scale, scale);
+                .rotate(Vector3.Y, randomRange(0f, 360f))
+                .scale(scale, scale, scale);
             rocks.add(rock);
         }
     }
 
     private void applyHarvestedTrees(List<Integer> harvestedIds) {
         Set<Integer> ids = new HashSet<>(harvestedIds);
-        for (TreeNode tree : trees) tree.harvested = ids.contains(tree.id);
+        for (TreeNode tree : trees) {
+            tree.harvested = ids.contains(tree.id);
+        }
     }
 
     private void spawnHorses() {
@@ -195,11 +225,17 @@ final class LivingRanchScreen implements Screen {
     }
 
     private HorseActor newHorse(String name, float x, float z, float heading) {
-        UUID id = UUID.nameUUIDFromBytes((session.worldSeed() + ":horse:" + name).getBytes(StandardCharsets.UTF_8));
+        UUID id = UUID.nameUUIDFromBytes(
+            (session.worldSeed() + ":horse:" + name).getBytes(StandardCharsets.UTF_8)
+        );
         HorseActor horse = new HorseActor(
-            id, name, new ModelInstance(models.horse),
-            new Vector3(x, Terrain.heightAt(x, z), z), heading,
-            HorsePersonality.fromIdentity(id), HorseRelationship.wild()
+            id,
+            name,
+            new ModelInstance(models.horse),
+            new Vector3(x, Terrain.heightAt(x, z), z),
+            heading,
+            HorsePersonality.fromIdentity(id),
+            HorseRelationship.wild()
         );
         horse.wanderTimer = randomRange(1.5f, 5f);
         return horse;
@@ -209,10 +245,17 @@ final class LivingRanchScreen implements Screen {
         for (SaveGame.HorseData saved : data) {
             float x = clampWorld(saved.x());
             float z = clampWorld(saved.z());
-            if (Terrain.isInsideLake(x, z)) { x = 0f; z = 0f; }
+            if (Terrain.isInsideLake(x, z)) {
+                x = 0f;
+                z = 0f;
+            }
             HorseActor horse = new HorseActor(
-                saved.id(), saved.name(), new ModelInstance(models.horse),
-                new Vector3(x, Terrain.heightAt(x, z), z), saved.heading(), saved.personality(),
+                saved.id(),
+                saved.name(),
+                new ModelInstance(models.horse),
+                new Vector3(x, Terrain.heightAt(x, z), z),
+                saved.heading(),
+                saved.personality(),
                 new HorseRelationship(saved.trust(), saved.bond(), saved.fear())
             );
             horse.stamina = MathUtils.clamp(saved.stamina(), 0f, 100f);
@@ -228,94 +271,140 @@ final class LivingRanchScreen implements Screen {
             float z = clampWorld(saved.z());
             if (Terrain.isInsideLake(x, z)) continue;
             ModelInstance model = new ModelInstance(models.fence);
-            model.transform.setToTranslation(x, Terrain.heightAt(x, z), z).rotate(Vector3.Y, saved.heading());
+            model.transform.setToTranslation(x, Terrain.heightAt(x, z), z)
+                .rotate(Vector3.Y, saved.heading());
             fences.add(new FenceNode(model, x, z, saved.heading()));
         }
     }
 
-    private void updateCameraInput() {
-        float sensitivity = settings.mouseSensitivity();
-        cameraYaw -= Gdx.input.getDeltaX() * sensitivity;
-        cameraPitch += Gdx.input.getDeltaY() * sensitivity * 0.75f;
+    private void updateCameraInput(PlayerCommand command) {
+        cameraYaw += command.lookYaw();
+        cameraPitch += command.lookPitch();
         cameraPitch = MathUtils.clamp(cameraPitch, 12f, 62f);
     }
 
-    private void updatePlayer(float dt) {
+    private void updatePlayer(float dt, PlayerCommand command) {
         getCameraForward(tmpForward);
         tmpRight.set(tmpForward.z, 0f, -tmpForward.x);
-        tmpMove.setZero();
-        if (Gdx.input.isKeyPressed(Input.Keys.W)) tmpMove.add(tmpForward);
-        if (Gdx.input.isKeyPressed(Input.Keys.S)) tmpMove.sub(tmpForward);
-        if (Gdx.input.isKeyPressed(Input.Keys.D)) tmpMove.add(tmpRight);
-        if (Gdx.input.isKeyPressed(Input.Keys.A)) tmpMove.sub(tmpRight);
+        tmpMove.setZero()
+            .mulAdd(tmpForward, command.moveForward())
+            .mulAdd(tmpRight, command.moveRight());
+
         if (!tmpMove.isZero(0.001f)) {
-            tmpMove.nor();
-            float speed = Gdx.input.isKeyPressed(Input.Keys.SHIFT_LEFT) ? PLAYER_RUN_SPEED : PLAYER_WALK_SPEED;
+            if (tmpMove.len2() > 1f) tmpMove.nor();
+            float speed = command.sprint() ? PLAYER_RUN_SPEED : PLAYER_WALK_SPEED;
             float nx = MathUtils.clamp(playerPosition.x + tmpMove.x * speed * dt, -WORLD_LIMIT, WORLD_LIMIT);
             float nz = MathUtils.clamp(playerPosition.z + tmpMove.z * speed * dt, -WORLD_LIMIT, WORLD_LIMIT);
-            if (!Terrain.isInsideLake(nx, nz)) { playerPosition.x = nx; playerPosition.z = nz; }
+            if (!Terrain.isInsideLake(nx, nz)) {
+                playerPosition.x = nx;
+                playerPosition.z = nz;
+            }
             playerFacing = MathUtils.atan2(tmpMove.x, tmpMove.z) * MathUtils.radiansToDegrees;
         }
-        if (Gdx.input.isKeyJustPressed(Input.Keys.SPACE) && playerJumpOffset <= 0.001f) playerJumpVelocity = 7.1f;
+
+        if (command.jumpPressed() && playerJumpOffset <= 0.001f) {
+            playerJumpVelocity = 7.1f;
+        }
         playerJumpVelocity -= 18.5f * dt;
         playerJumpOffset += playerJumpVelocity * dt;
-        if (playerJumpOffset < 0f) { playerJumpOffset = 0f; playerJumpVelocity = 0f; }
+        if (playerJumpOffset < 0f) {
+            playerJumpOffset = 0f;
+            playerJumpVelocity = 0f;
+        }
         playerPosition.y = Terrain.heightAt(playerPosition.x, playerPosition.z);
     }
 
-    private void updateMountedHorse(float dt) {
+    private void updateMountedHorse(float dt, PlayerCommand command) {
         HorseActor horse = mountedHorse;
+        float forward = command.moveForward();
         float targetSpeed = 0f;
-        if (Gdx.input.isKeyPressed(Input.Keys.W)) {
-            boolean gallop = Gdx.input.isKeyPressed(Input.Keys.SHIFT_LEFT) && horse.stamina > 1f;
-            targetSpeed = gallop ? 11.5f : 6.4f;
+        boolean gallop = forward > 0f && command.sprint() && horse.stamina > 1f;
+
+        if (forward > 0f) {
+            targetSpeed = forward * (gallop ? 11.5f : 6.4f);
             if (gallop) horse.stamina = Math.max(0f, horse.stamina - 12f * dt);
-        } else if (Gdx.input.isKeyPressed(Input.Keys.S)) targetSpeed = -2.8f;
-        if (!Gdx.input.isKeyPressed(Input.Keys.SHIFT_LEFT) || targetSpeed <= 6.4f) horse.stamina = Math.min(100f, horse.stamina + 7f * dt);
+        } else if (forward < 0f) {
+            targetSpeed = forward * 2.8f;
+        }
+        if (!gallop) {
+            horse.stamina = Math.min(100f, horse.stamina + 7f * dt);
+        }
+
         horse.speed = MathUtils.lerp(horse.speed, targetSpeed, Math.min(1f, 3.4f * dt));
-        float steering = 0f;
-        if (Gdx.input.isKeyPressed(Input.Keys.A)) steering += 1f;
-        if (Gdx.input.isKeyPressed(Input.Keys.D)) steering -= 1f;
-        horse.heading += steering * (35f + Math.min(45f, Math.abs(horse.speed) * 4f)) * dt;
-        if (Gdx.input.isKeyJustPressed(Input.Keys.SPACE) && horse.jumpOffset <= 0.001f) horse.jumpVelocity = 7.4f;
+        float steeringScale = 35f + Math.min(45f, Math.abs(horse.speed) * 4f);
+        horse.heading -= command.moveRight() * steeringScale * dt;
+
+        if (command.jumpPressed() && horse.jumpOffset <= 0.001f) {
+            horse.jumpVelocity = 7.4f;
+        }
         horse.jumpVelocity -= 19f * dt;
         horse.jumpOffset += horse.jumpVelocity * dt;
-        if (horse.jumpOffset < 0f) { horse.jumpOffset = 0f; horse.jumpVelocity = 0f; }
-        float nx = MathUtils.clamp(horse.position.x + MathUtils.sinDeg(horse.heading) * horse.speed * dt, -WORLD_LIMIT, WORLD_LIMIT);
-        float nz = MathUtils.clamp(horse.position.z + MathUtils.cosDeg(horse.heading) * horse.speed * dt, -WORLD_LIMIT, WORLD_LIMIT);
-        if (!Terrain.isInsideLake(nx, nz)) { horse.position.x = nx; horse.position.z = nz; } else horse.speed *= 0.65f;
+        if (horse.jumpOffset < 0f) {
+            horse.jumpOffset = 0f;
+            horse.jumpVelocity = 0f;
+        }
+
+        float nx = MathUtils.clamp(
+            horse.position.x + MathUtils.sinDeg(horse.heading) * horse.speed * dt,
+            -WORLD_LIMIT,
+            WORLD_LIMIT
+        );
+        float nz = MathUtils.clamp(
+            horse.position.z + MathUtils.cosDeg(horse.heading) * horse.speed * dt,
+            -WORLD_LIMIT,
+            WORLD_LIMIT
+        );
+        if (!Terrain.isInsideLake(nx, nz)) {
+            horse.position.x = nx;
+            horse.position.z = nz;
+        } else {
+            horse.speed *= 0.65f;
+        }
         horse.position.y = Terrain.heightAt(horse.position.x, horse.position.z);
         horse.relationship.calm(dt * 0.35f);
         playerPosition.set(horse.position);
         playerFacing = horse.heading;
     }
 
-    private void updateWildHorses(float dt) {
+    private void updateWildHorses(float dt, PlayerCommand command) {
         Vector3 danger = mountedHorse == null ? playerPosition : mountedHorse.position;
-        boolean rushing = mountedHorse != null || Gdx.input.isKeyPressed(Input.Keys.SHIFT_LEFT);
+        boolean moving = Math.abs(command.moveForward()) > 0.1f || Math.abs(command.moveRight()) > 0.1f;
+        boolean rushing = mountedHorse != null || (command.sprint() && moving);
+
         for (HorseActor horse : horses) {
             if (horse == mountedHorse) continue;
+
             horse.relationship.calm(dt);
             float distance = planarDistance(horse.position.x, horse.position.z, danger.x, danger.z);
             float desiredSpeed;
             if (!horse.tamed && distance < 8f) {
-                horse.heading = MathUtils.atan2(horse.position.x - danger.x, horse.position.z - danger.z) * MathUtils.radiansToDegrees;
+                horse.heading = MathUtils.atan2(
+                    horse.position.x - danger.x,
+                    horse.position.z - danger.z
+                ) * MathUtils.radiansToDegrees;
                 float threat = Math.max(0f, 8f - distance) * 1.7f * dt * (rushing ? 2.2f : 1f);
                 horse.relationship.observeThreat(threat, horse.personality);
                 desiredSpeed = 5.2f + horse.relationship.fear() * 0.025f;
                 horse.wanderTimer = randomRange(2f, 4f);
             } else {
                 horse.wanderTimer -= dt;
-                if (horse.wanderTimer <= 0f) { horse.heading += randomRange(-75f, 75f); horse.wanderTimer = randomRange(2.2f, 6.5f); }
+                if (horse.wanderTimer <= 0f) {
+                    horse.heading += randomRange(-75f, 75f);
+                    horse.wanderTimer = randomRange(2.2f, 6.5f);
+                }
                 desiredSpeed = horse.tamed ? 0.45f : 0.75f;
             }
+
             horse.speed = MathUtils.lerp(horse.speed, desiredSpeed, Math.min(1f, 2.2f * dt));
             float nx = horse.position.x + MathUtils.sinDeg(horse.heading) * horse.speed * dt;
             float nz = horse.position.z + MathUtils.cosDeg(horse.heading) * horse.speed * dt;
             if (Math.abs(nx) > WORLD_LIMIT || Math.abs(nz) > WORLD_LIMIT || Terrain.isInsideLake(nx, nz)) {
                 horse.heading += 150f + randomRange(-25f, 25f);
                 horse.speed *= 0.3f;
-            } else { horse.position.x = nx; horse.position.z = nz; }
+            } else {
+                horse.position.x = nx;
+                horse.position.z = nz;
+            }
             horse.position.y = Terrain.heightAt(horse.position.x, horse.position.z);
         }
     }
@@ -323,11 +412,17 @@ final class LivingRanchScreen implements Screen {
     private void updatePushik(float dt) {
         Vector3 target = mountedHorse == null ? playerPosition : mountedHorse.position;
         float distance = planarDistance(pushik.position.x, pushik.position.z, target.x, target.z);
+
         if (distance > 28f) {
-            pushik.position.set(target.x - 2f, Terrain.heightAt(target.x - 2f, target.z - 1f), target.z - 1f);
+            pushik.position.set(
+                target.x - 2f,
+                Terrain.heightAt(target.x - 2f, target.z - 1f),
+                target.z - 1f
+            );
             session.pushikMind().reunited();
             distance = 0f;
         }
+
         session.pushikMind().tick(dt, distance, session.worldTime());
         PushikState state = session.pushikMind().state();
         if ((state == PushikState.FOLLOW || state == PushikState.GREET) && distance > 2.2f) {
@@ -356,18 +451,23 @@ final class LivingRanchScreen implements Screen {
         }
     }
 
-    private void handleInteractions() {
-        if (Gdx.input.isKeyJustPressed(Input.Keys.E)) {
+    private void handleInteractions(PlayerCommand command) {
+        if (command.interactPressed()) {
             if (planarDistance(playerPosition.x, playerPosition.z, pushik.position.x, pushik.position.z) < 3.1f) {
                 session.pushikMind().pet();
-                setStatus("Pushik purrs. Affection " + Math.round(session.pushikMind().affection()) + "% — his fluffy black paws are almost silent.");
+                setStatus(
+                    "Pushik purrs. Affection " + Math.round(session.pushikMind().affection())
+                        + "% — his fluffy black paws are almost silent."
+                );
                 return;
             }
+
             HorseActor horse = nearestHorse(4.4f);
             if (horse != null) {
                 interactHorse(horse);
                 return;
             }
+
             TreeNode tree = nearestTree(3.7f);
             if (tree != null && !tree.harvested) {
                 tree.harvested = true;
@@ -378,8 +478,8 @@ final class LivingRanchScreen implements Screen {
             setStatus("Nothing close enough to interact with.");
         }
 
-        if (Gdx.input.isKeyJustPressed(Input.Keys.F)) toggleMount();
-        if (Gdx.input.isKeyJustPressed(Input.Keys.B)) buildFence();
+        if (command.mountPressed()) toggleMount();
+        if (command.buildPressed()) buildFence();
     }
 
     private void interactHorse(HorseActor horse) {
@@ -392,12 +492,21 @@ final class LivingRanchScreen implements Screen {
             if (horse.relationship.isReadyToTame()) {
                 horse.tamed = true;
                 saveNow(null);
-                setStatus(horse.name + " trusts you now. Bond " + Math.round(horse.relationship.bond()) + "%. Progress saved.");
+                setStatus(
+                    horse.name + " trusts you now. Bond " + Math.round(horse.relationship.bond())
+                        + "%. Progress saved."
+                );
             } else if (horse.relationship.trust() >= 100f) {
-                setStatus(horse.name + " trusts you but needs calm. Fear " + Math.round(horse.relationship.fear()) + "%.");
+                setStatus(
+                    horse.name + " trusts you but needs calm. Fear "
+                        + Math.round(horse.relationship.fear()) + "%."
+                );
             } else {
-                setStatus(horse.name + " accepted the apple. " + horse.personality.displayName() + " | trust "
-                    + Math.round(horse.relationship.trust()) + "% | fear " + Math.round(horse.relationship.fear()) + "%");
+                setStatus(
+                    horse.name + " accepted the apple. " + horse.personality.displayName()
+                        + " | trust " + Math.round(horse.relationship.trust())
+                        + "% | fear " + Math.round(horse.relationship.fear()) + "%"
+                );
             }
         } else {
             horse.relationship.pet(horse.personality);
@@ -411,19 +520,29 @@ final class LivingRanchScreen implements Screen {
             old.mounted = false;
             old.speed = 0f;
             mountedHorse = null;
-            playerPosition.set(old.position.x + MathUtils.cosDeg(old.heading) * 2f, 0f, old.position.z - MathUtils.sinDeg(old.heading) * 2f);
+            playerPosition.set(
+                old.position.x + MathUtils.cosDeg(old.heading) * 2f,
+                0f,
+                old.position.z - MathUtils.sinDeg(old.heading) * 2f
+            );
             playerPosition.y = Terrain.heightAt(playerPosition.x, playerPosition.z);
             setStatus("Dismounted " + old.name + ".");
             return;
         }
+
         HorseActor horse = nearestHorse(4.8f);
-        if (horse == null) setStatus("Stand closer to a horse to mount.");
-        else if (!horse.tamed) setStatus(horse.name + " is not ready yet. Trust " + Math.round(horse.relationship.trust()) + "%.");
-        else {
+        if (horse == null) {
+            setStatus("Stand closer to a horse to mount.");
+        } else if (!horse.tamed) {
+            setStatus(
+                horse.name + " is not ready yet. Trust "
+                    + Math.round(horse.relationship.trust()) + "%."
+            );
+        } else {
             mountedHorse = horse;
             horse.mounted = true;
             horse.speed = 0f;
-            setStatus("Mounted " + horse.name + ". Shift gallops; Space jumps.");
+            setStatus("Mounted " + horse.name + ". Sprint gallops; jump clears obstacles.");
         }
     }
 
@@ -432,6 +551,7 @@ final class LivingRanchScreen implements Screen {
             setStatus("You need 2 wood for a fence segment.");
             return;
         }
+
         Vector3 origin = mountedHorse == null ? playerPosition : mountedHorse.position;
         getActorForward(tmpForward);
         float x = origin.x + tmpForward.x * 3.3f;
@@ -441,6 +561,7 @@ final class LivingRanchScreen implements Screen {
             setStatus("You cannot build there.");
             return;
         }
+
         float heading = mountedHorse == null ? playerFacing : mountedHorse.heading;
         ModelInstance fence = new ModelInstance(models.fence);
         fence.transform.setToTranslation(x, Terrain.heightAt(x, z), z).rotate(Vector3.Y, heading);
@@ -452,9 +573,23 @@ final class LivingRanchScreen implements Screen {
         float solarAngle = session.worldTime() * 360f - 90f;
         float sunHeight = MathUtils.sinDeg(solarAngle);
         float daylight = MathUtils.clamp((sunHeight + 0.20f) / 1.05f, 0.10f, 1f);
-        sun.direction.set(-MathUtils.cosDeg(solarAngle) * 0.55f, -Math.max(0.18f, sunHeight), -0.34f).nor();
-        sun.color.set(0.95f * daylight + 0.05f, 0.87f * daylight + 0.08f, 0.72f * daylight + 0.12f, 1f);
-        environment.set(ColorAttribute.createAmbientLight(0.10f + daylight * 0.48f, 0.12f + daylight * 0.50f, 0.16f + daylight * 0.42f, 1f));
+        sun.direction.set(
+            -MathUtils.cosDeg(solarAngle) * 0.55f,
+            -Math.max(0.18f, sunHeight),
+            -0.34f
+        ).nor();
+        sun.color.set(
+            0.95f * daylight + 0.05f,
+            0.87f * daylight + 0.08f,
+            0.72f * daylight + 0.12f,
+            1f
+        );
+        environment.set(ColorAttribute.createAmbientLight(
+            0.10f + daylight * 0.48f,
+            0.12f + daylight * 0.50f,
+            0.16f + daylight * 0.42f,
+            1f
+        ));
     }
 
     private void updateAutosave(float dt) {
@@ -467,21 +602,35 @@ final class LivingRanchScreen implements Screen {
 
     private void syncTransforms() {
         if (mountedHorse == null) {
-            player.transform.idt().translate(playerPosition.x, playerPosition.y + playerJumpOffset, playerPosition.z).rotate(Vector3.Y, playerFacing);
+            player.transform.idt()
+                .translate(playerPosition.x, playerPosition.y + playerJumpOffset, playerPosition.z)
+                .rotate(Vector3.Y, playerFacing);
         } else {
-            player.transform.idt().translate(mountedHorse.position.x, mountedHorse.position.y + mountedHorse.jumpOffset + 2.35f, mountedHorse.position.z)
-                .rotate(Vector3.Y, mountedHorse.heading).scale(0.88f, 0.88f, 0.88f);
+            player.transform.idt()
+                .translate(
+                    mountedHorse.position.x,
+                    mountedHorse.position.y + mountedHorse.jumpOffset + 2.35f,
+                    mountedHorse.position.z
+                )
+                .rotate(Vector3.Y, mountedHorse.heading)
+                .scale(0.88f, 0.88f, 0.88f);
         }
+
         for (HorseActor horse : horses) {
-            horse.instance.transform.idt().translate(horse.position.x, horse.position.y + horse.jumpOffset, horse.position.z).rotate(Vector3.Y, horse.heading);
+            horse.instance.transform.idt()
+                .translate(horse.position.x, horse.position.y + horse.jumpOffset, horse.position.z)
+                .rotate(Vector3.Y, horse.heading);
         }
-        pushik.instance.transform.idt().translate(pushik.position.x, pushik.position.y, pushik.position.z).rotate(Vector3.Y, pushik.heading);
+        pushik.instance.transform.idt()
+            .translate(pushik.position.x, pushik.position.y, pushik.position.z)
+            .rotate(Vector3.Y, pushik.heading);
     }
 
     private void updateCamera() {
         Vector3 actor = mountedHorse == null ? playerPosition : mountedHorse.position;
         float targetHeight = mountedHorse == null ? 1.45f + playerJumpOffset : 2.15f + mountedHorse.jumpOffset;
         tmpTarget.set(actor.x, actor.y + targetHeight, actor.z);
+
         float cosPitch = MathUtils.cosDeg(cameraPitch);
         camera.position.set(
             tmpTarget.x - MathUtils.sinDeg(cameraYaw) * cosPitch * cameraDistance,
@@ -495,10 +644,20 @@ final class LivingRanchScreen implements Screen {
 
     private void renderWorld() {
         float solarAngle = session.worldTime() * 360f - 90f;
-        float daylight = MathUtils.clamp((MathUtils.sinDeg(solarAngle) + 0.20f) / 1.05f, 0.08f, 1f);
-        Gdx.gl.glClearColor(0.035f + daylight * 0.39f, 0.055f + daylight * 0.58f, 0.09f + daylight * 0.68f, 1f);
+        float daylight = MathUtils.clamp(
+            (MathUtils.sinDeg(solarAngle) + 0.20f) / 1.05f,
+            0.08f,
+            1f
+        );
+        Gdx.gl.glClearColor(
+            0.035f + daylight * 0.39f,
+            0.055f + daylight * 0.58f,
+            0.09f + daylight * 0.68f,
+            1f
+        );
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT | GL20.GL_DEPTH_BUFFER_BIT);
         Gdx.gl.glEnable(GL20.GL_DEPTH_TEST);
+
         modelBatch.begin(camera);
         modelBatch.render(terrain.instance, environment);
         modelBatch.render(water, environment);
@@ -517,42 +676,78 @@ final class LivingRanchScreen implements Screen {
         Gdx.gl.glDisable(GL20.GL_DEPTH_TEST);
         spriteBatch.getProjectionMatrix().setToOrtho2D(0f, 0f, width, height);
         spriteBatch.begin();
+
         font.setColor(Color.WHITE);
         font.getData().setScale(1f);
-        font.draw(spriteBatch, "HORSEBOUND 0.4.1", 18f, height - 18f);
+        font.draw(spriteBatch, "HORSEBOUND 0.4.3", 18f, height - 18f);
         font.getData().setScale(0.82f);
         font.setColor(new Color(0.88f, 0.91f, 0.86f, 1f));
-        font.draw(spriteBatch, "WASD move | E interact | F mount | B build | F5 save | Shift sprint/gallop | Space jump", 18f, height - 42f);
-        font.draw(spriteBatch,
-            "Wood " + session.inventory().count(ItemId.WOOD) + " | Apples " + session.inventory().count(ItemId.APPLE)
-                + " | Seed " + session.worldSeed() + " | Save " + saveService.activeSlot(), 18f, height - 64f);
+        font.draw(spriteBatch, inputHint(), 18f, height - 42f);
+        font.draw(
+            spriteBatch,
+            "Wood " + session.inventory().count(ItemId.WOOD)
+                + " | Apples " + session.inventory().count(ItemId.APPLE)
+                + " | Seed " + session.worldSeed()
+                + " | Save " + saveService.activeSlot()
+                + " | Input " + activeInputDevice,
+            18f,
+            height - 64f
+        );
 
         HorseActor focus = mountedHorse != null ? mountedHorse : nearestHorse(7f);
         if (focus != null) {
             font.setColor(new Color(1f, 0.87f, 0.57f, 1f));
-            font.draw(spriteBatch,
-                focus.name + " | " + focus.personality.displayName() + " | trust " + Math.round(focus.relationship.trust())
-                    + "% | bond " + Math.round(focus.relationship.bond()) + "% | fear " + Math.round(focus.relationship.fear())
+            font.draw(
+                spriteBatch,
+                focus.name + " | " + focus.personality.displayName()
+                    + " | trust " + Math.round(focus.relationship.trust())
+                    + "% | bond " + Math.round(focus.relationship.bond())
+                    + "% | fear " + Math.round(focus.relationship.fear())
                     + "%" + (focus.tamed ? " | tamed" : " | wild")
-                    + (focus == mountedHorse ? " | stamina " + Math.round(focus.stamina) + "% | speed " + String.format(Locale.ROOT, "%.1f", Math.abs(focus.speed)) : ""),
-                18f, height - 86f);
+                    + (focus == mountedHorse
+                    ? " | stamina " + Math.round(focus.stamina)
+                        + "% | speed " + String.format(Locale.ROOT, "%.1f", Math.abs(focus.speed))
+                    : ""),
+                18f,
+                height - 86f
+            );
         }
 
         if (planarDistance(playerPosition.x, playerPosition.z, pushik.position.x, pushik.position.z) < 9f) {
             font.setColor(new Color(0.82f, 0.82f, 0.86f, 1f));
-            font.draw(spriteBatch,
-                "Pushik: " + session.pushikMind().state() + " | affection " + Math.round(session.pushikMind().affection()) + "% | fluffy paws: silent",
-                18f, 52f);
+            font.draw(
+                spriteBatch,
+                "Pushik: " + session.pushikMind().state()
+                    + " | affection " + Math.round(session.pushikMind().affection())
+                    + "% | fluffy paws: silent",
+                18f,
+                52f
+            );
         }
         if (statusTimer > 0f) {
             font.setColor(new Color(1f, 0.96f, 0.78f, 1f));
             font.draw(spriteBatch, status, 18f, 82f);
         }
+
         font.setColor(new Color(0.68f, 0.73f, 0.69f, 1f));
         font.getData().setScale(0.72f);
-        font.draw(spriteBatch, "Created by Dimash Janibekov (DizZyZ7) | (c) 2026 All rights reserved", Math.max(18f, width - 420f), 20f);
+        font.draw(
+            spriteBatch,
+            "Created by Dimash Janibekov (DizZyZ7) | (c) 2026 All rights reserved",
+            Math.max(18f, width - 420f),
+            20f
+        );
         spriteBatch.end();
         Gdx.gl.glEnable(GL20.GL_DEPTH_TEST);
+    }
+
+    private String inputHint() {
+        return switch (activeInputDevice) {
+            case KEYBOARD_MOUSE ->
+                "WASD move | E interact | F mount | B build | F5 save | Shift sprint/gallop | Space jump";
+            case GAMEPAD, STEAM_INPUT ->
+                "Controller connected | Left Stick move | Right Stick camera | glyph mapping in progress";
+        };
     }
 
     private HorseActor nearestHorse(float radius) {
@@ -562,7 +757,10 @@ final class LivingRanchScreen implements Screen {
         for (HorseActor horse : horses) {
             if (horse == mountedHorse) continue;
             float distance = planarDistance(origin.x, origin.z, horse.position.x, horse.position.z);
-            if (distance < best) { best = distance; nearest = horse; }
+            if (distance < best) {
+                best = distance;
+                nearest = horse;
+            }
         }
         return nearest;
     }
@@ -574,7 +772,10 @@ final class LivingRanchScreen implements Screen {
         for (TreeNode tree : trees) {
             if (tree.harvested) continue;
             float distance = planarDistance(origin.x, origin.z, tree.x, tree.z);
-            if (distance < best) { best = distance; nearest = tree; }
+            if (distance < best) {
+                best = distance;
+                nearest = tree;
+            }
         }
         return nearest;
     }
@@ -593,15 +794,29 @@ final class LivingRanchScreen implements Screen {
         List<SaveGame.HorseData> horseData = new ArrayList<>(horses.size());
         for (HorseActor horse : horses) {
             horseData.add(new SaveGame.HorseData(
-                horse.id, horse.name, horse.position.x, horse.position.z, horse.heading,
-                horse.relationship.trust(), horse.stamina, horse.tamed, horse.personality,
-                horse.relationship.bond(), horse.relationship.fear()
+                horse.id,
+                horse.name,
+                horse.position.x,
+                horse.position.z,
+                horse.heading,
+                horse.relationship.trust(),
+                horse.stamina,
+                horse.tamed,
+                horse.personality,
+                horse.relationship.bond(),
+                horse.relationship.fear()
             ));
         }
+
         List<SaveGame.FenceData> fenceData = new ArrayList<>(fences.size());
-        for (FenceNode fence : fences) fenceData.add(new SaveGame.FenceData(fence.x, fence.z, fence.heading));
+        for (FenceNode fence : fences) {
+            fenceData.add(new SaveGame.FenceData(fence.x, fence.z, fence.heading));
+        }
+
         List<Integer> harvested = new ArrayList<>();
-        for (TreeNode tree : trees) if (tree.harvested) harvested.add(tree.id);
+        for (TreeNode tree : trees) {
+            if (tree.harvested) harvested.add(tree.id);
+        }
 
         List<SaveGame.ItemStackData> inventoryData = session.inventory().snapshot().entrySet().stream()
             .filter(entry -> entry.getValue() > 0)
@@ -609,7 +824,10 @@ final class LivingRanchScreen implements Screen {
             .toList();
 
         return new SaveGame(
-            SaveGame.CURRENT_VERSION, session.worldSeed(), System.currentTimeMillis(), session.worldTime(),
+            SaveGame.CURRENT_VERSION,
+            session.worldSeed(),
+            System.currentTimeMillis(),
+            session.worldTime(),
             new SaveGame.PlayerData(
                 playerPosition.x,
                 playerPosition.z,
@@ -625,7 +843,9 @@ final class LivingRanchScreen implements Screen {
                 session.pushikMind().affection(),
                 session.pushikMind().state()
             ),
-            horseData, fenceData, harvested
+            horseData,
+            fenceData,
+            harvested
         );
     }
 
@@ -638,25 +858,54 @@ final class LivingRanchScreen implements Screen {
         out.set(MathUtils.sinDeg(yaw), 0f, MathUtils.cosDeg(yaw)).nor();
     }
 
-    private float randomRange(float min, float max) { return min + random.nextFloat() * (max - min); }
-    private static float planarDistance(float ax, float az, float bx, float bz) {
-        float dx = ax - bx; float dz = az - bz; return (float) Math.sqrt(dx * dx + dz * dz);
+    private float randomRange(float min, float max) {
+        return min + random.nextFloat() * (max - min);
     }
+
+    private static float planarDistance(float ax, float az, float bx, float bz) {
+        float dx = ax - bx;
+        float dz = az - bz;
+        return (float) Math.sqrt(dx * dx + dz * dz);
+    }
+
     private static float clampWorld(float value) {
         if (!Float.isFinite(value)) return 0f;
         return MathUtils.clamp(value, -WORLD_LIMIT, WORLD_LIMIT);
     }
-    private void setStatus(String message) { status = message; statusTimer = 5f; }
 
-    @Override public void resize(int width, int height) { camera.viewportWidth = width; camera.viewportHeight = height; camera.update(); }
-    @Override public void pause() { saveNow(null); }
-    @Override public void resume() { }
-    @Override public void hide() { Gdx.input.setCursorCatched(false); }
+    private void setStatus(String message) {
+        status = message;
+        statusTimer = 5f;
+    }
+
+    @Override
+    public void resize(int width, int height) {
+        camera.viewportWidth = width;
+        camera.viewportHeight = height;
+        camera.update();
+    }
+
+    @Override
+    public void pause() {
+        simulationLoop.resetInput();
+        saveNow(null);
+    }
+
+    @Override
+    public void resume() {
+    }
+
+    @Override
+    public void hide() {
+        simulationLoop.resetInput();
+        Gdx.input.setCursorCatched(false);
+    }
 
     @Override
     public void dispose() {
         if (disposed) return;
         disposed = true;
+        simulationLoop.resetInput();
         saveNow(null);
         Gdx.input.setCursorCatched(false);
         modelBatch.dispose();
@@ -667,29 +916,79 @@ final class LivingRanchScreen implements Screen {
     }
 
     private static final class TreeNode {
-        final int id; final ModelInstance instance; final float x; final float z; boolean harvested;
-        TreeNode(int id, ModelInstance instance, float x, float z) { this.id = id; this.instance = instance; this.x = x; this.z = z; }
+        final int id;
+        final ModelInstance instance;
+        final float x;
+        final float z;
+        boolean harvested;
+
+        TreeNode(int id, ModelInstance instance, float x, float z) {
+            this.id = id;
+            this.instance = instance;
+            this.x = x;
+            this.z = z;
+        }
     }
 
     private static final class FenceNode {
-        final ModelInstance instance; final float x; final float z; final float heading;
-        FenceNode(ModelInstance instance, float x, float z, float heading) { this.instance = instance; this.x = x; this.z = z; this.heading = heading; }
+        final ModelInstance instance;
+        final float x;
+        final float z;
+        final float heading;
+
+        FenceNode(ModelInstance instance, float x, float z, float heading) {
+            this.instance = instance;
+            this.x = x;
+            this.z = z;
+            this.heading = heading;
+        }
     }
 
     private static final class HorseActor {
-        final UUID id; final String name; final ModelInstance instance; final Vector3 position;
-        final HorsePersonality personality; final HorseRelationship relationship;
-        float heading; float stamina = 100f; float speed; float wanderTimer; float jumpOffset; float jumpVelocity;
-        boolean tamed; boolean mounted;
-        HorseActor(UUID id, String name, ModelInstance instance, Vector3 position, float heading,
-                   HorsePersonality personality, HorseRelationship relationship) {
-            this.id = id; this.name = name; this.instance = instance; this.position = position; this.heading = heading;
-            this.personality = personality; this.relationship = relationship;
+        final UUID id;
+        final String name;
+        final ModelInstance instance;
+        final Vector3 position;
+        final HorsePersonality personality;
+        final HorseRelationship relationship;
+        float heading;
+        float stamina = 100f;
+        float speed;
+        float wanderTimer;
+        float jumpOffset;
+        float jumpVelocity;
+        boolean tamed;
+        boolean mounted;
+
+        HorseActor(
+            UUID id,
+            String name,
+            ModelInstance instance,
+            Vector3 position,
+            float heading,
+            HorsePersonality personality,
+            HorseRelationship relationship
+        ) {
+            this.id = id;
+            this.name = name;
+            this.instance = instance;
+            this.position = position;
+            this.heading = heading;
+            this.personality = personality;
+            this.relationship = relationship;
         }
     }
 
     private static final class PushikActor {
-        final ModelInstance instance; final Vector3 position; float heading; float wanderTimer = 2f;
-        PushikActor(ModelInstance instance, Vector3 position, float heading) { this.instance = instance; this.position = position; this.heading = heading; }
+        final ModelInstance instance;
+        final Vector3 position;
+        float heading;
+        float wanderTimer = 2f;
+
+        PushikActor(ModelInstance instance, Vector3 position, float heading) {
+            this.instance = instance;
+            this.position = position;
+            this.heading = heading;
+        }
     }
 }

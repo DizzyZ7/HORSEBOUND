@@ -1,6 +1,8 @@
 // HORSEBOUND — Created by Dimash Janibekov (DizZyZ7), © 2026. All rights reserved.
 package com.dizzyz7.horsebound;
 
+import java.util.Objects;
+
 final class GameSession {
     private final long worldSeed;
     private final Inventory inventory;
@@ -22,7 +24,7 @@ final class GameSession {
             initialState.player().apples()
         );
         this.pushikMind = new PushikMind(initialState.pushik().state(), initialState.pushik().affection());
-        this.simulationClock = simulationClock;
+        this.simulationClock = Objects.requireNonNull(simulationClock, "simulationClock");
     }
 
     long worldSeed() {
@@ -50,7 +52,15 @@ final class GameSession {
     }
 
     int advanceWorldTime(float frameDeltaSeconds) {
-        return simulationClock.advance(frameDeltaSeconds, this::updateFixed);
+        return advanceSimulation(frameDeltaSeconds, ignored -> { });
+    }
+
+    int advanceSimulation(float frameDeltaSeconds, SimulationStep gameplayStep) {
+        Objects.requireNonNull(gameplayStep, "gameplayStep");
+        return simulationClock.advance(frameDeltaSeconds, fixedDeltaSeconds -> {
+            updateFixed(fixedDeltaSeconds);
+            gameplayStep.update(fixedDeltaSeconds);
+        });
     }
 
     private void updateFixed(float fixedDeltaSeconds) {
