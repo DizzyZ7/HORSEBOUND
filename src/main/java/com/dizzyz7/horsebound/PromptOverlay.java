@@ -16,6 +16,7 @@ import java.util.List;
 /** Global Deck-safe prompt strip rendered after the active screen. */
 final class PromptOverlay {
     private static final Color PANEL = new Color(0.035f, 0.055f, 0.05f, 0.94f);
+    private static final Color HEADER_PANEL = new Color(0.035f, 0.055f, 0.05f, 1f);
     private static final Color CHIP = new Color(0.20f, 0.36f, 0.27f, 1f);
     private static final Color CHIP_CONTROLLER = new Color(0.24f, 0.31f, 0.48f, 1f);
     private static final Color TEXT = new Color(0.94f, 0.96f, 0.93f, 1f);
@@ -50,6 +51,7 @@ final class PromptOverlay {
         shapes.rect(0f, panelY, width, panelHeight);
 
         if (screen instanceof LivingRanchScreen) {
+            shapes.setColor(HEADER_PANEL);
             shapes.rect(0f, height - 52f * geometryScale, 350f * geometryScale, 52f * geometryScale);
         }
 
@@ -148,6 +150,7 @@ final class PromptOverlay {
             case PLAYSTATION -> "PlayStation controller prompts";
             case STEAM_DECK -> "Steam Deck controller prompts";
             case XBOX -> "Xbox controller prompts";
+            case NINTENDO -> "Nintendo controller prompts";
             case GENERIC -> "Generic controller prompts";
         };
     }
