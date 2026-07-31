@@ -5,6 +5,7 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
 
 import java.util.Objects;
+import java.util.function.Supplier;
 
 /**
  * Shared keyboard/controller navigation for Steam-friendly menus.
@@ -13,19 +14,21 @@ final class MenuInputMapper {
     private static final float STICK_NAVIGATION_THRESHOLD = 0.62f;
 
     private final ControllerStateSource controllerSource;
+    private final Supplier<MenuCommand> keyboardSource;
     private ControllerFrame previousController = ControllerFrame.disconnected();
     private InputDeviceType activeDevice = InputDeviceType.KEYBOARD_MOUSE;
 
     MenuInputMapper() {
-        this(new GdxControllerStateSource());
+        this(new GdxControllerStateSource(), MenuInputMapper::keyboardCommand);
     }
 
-    MenuInputMapper(ControllerStateSource controllerSource) {
+    MenuInputMapper(ControllerStateSource controllerSource, Supplier<MenuCommand> keyboardSource) {
         this.controllerSource = Objects.requireNonNull(controllerSource, "controllerSource");
+        this.keyboardSource = Objects.requireNonNull(keyboardSource, "keyboardSource");
     }
 
     MenuInputSnapshot sample() {
-        MenuCommand keyboard = keyboardCommand();
+        MenuCommand keyboard = Objects.requireNonNullElse(keyboardSource.get(), MenuCommand.idle());
         ControllerFrame current = Objects.requireNonNullElse(
             controllerSource.poll(),
             ControllerFrame.disconnected()
