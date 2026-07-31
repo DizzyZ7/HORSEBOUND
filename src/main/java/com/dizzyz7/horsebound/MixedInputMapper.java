@@ -35,6 +35,10 @@ final class MixedInputMapper implements InputMapper {
             }
         }
 
+        if (keyboardActive || controllerActive) {
+            InputActivityTracker.record(activeDevice);
+        }
+
         return new InputSnapshot(
             keyboard.command().merge(controller.command()),
             activeDevice
