@@ -21,6 +21,7 @@ import java.util.UUID;
 
 final class SaveRepository {
     private static final int MAGIC = 0x48425356; // HBSV
+    private static final int MAX_INVENTORY_ITEMS = 256;
     private static final int MAX_HORSES = 10_000;
     private static final int MAX_FENCES = 100_000;
     private static final int MAX_HARVESTED_TREES = 1_000_000;
@@ -59,9 +60,7 @@ final class SaveRepository {
             try {
                 return Optional.of(read(backup));
             } catch (IOException backupFailure) {
-                if (primaryFailure != null) {
-                    backupFailure.addSuppressed(primaryFailure);
-                }
+                if (primaryFailure != null) backupFailure.addSuppressed(primaryFailure);
                 throw new SaveException("Both primary and backup HORSEBOUND saves are unreadable.", backupFailure);
             }
         }
@@ -101,9 +100,7 @@ final class SaveRepository {
     }
 
     private boolean isValidSave(Path path) {
-        if (!Files.isRegularFile(path)) {
-            return false;
-        }
+        if (!Files.isRegularFile(path)) return false;
         try {
             read(path);
             return true;
@@ -115,9 +112,7 @@ final class SaveRepository {
     private SaveGame read(Path path) throws IOException {
         try (DataInputStream in = new DataInputStream(new BufferedInputStream(Files.newInputStream(path)))) {
             int magic = in.readInt();
-            if (magic != MAGIC) {
-                throw new IOException("Not a HORSEBOUND save file: " + path);
-            }
+            if (magic != MAGIC) throw new IOException("Not a HORSEBOUND save file: " + path);
 
             int version = in.readInt();
             if (version < 1 || version > SaveGame.CURRENT_VERSION) {
@@ -128,19 +123,46 @@ final class SaveRepository {
             long savedAt = in.readLong();
             float worldTime = in.readFloat();
 
-            SaveGame.PlayerData player = new SaveGame.PlayerData(
-                in.readFloat(),
-                in.readFloat(),
-                in.readFloat(),
-                in.readInt(),
-                in.readInt()
-            );
+            float playerX = in.readFloat();
+            float playerZ = in.readFloat();
+            float playerFacing = in.readFloat();
+            int legacyWood = in.readInt();
+            int legacyApples = in.readInt();
 
-            SaveGame.PushikData pushik = new SaveGame.PushikData(
-                in.readFloat(),
-                in.readFloat(),
-                in.readFloat()
-            );
+            SaveGame.PlayerData player;
+            if (version >= 3) {
+                int itemCount = checkedCount(in.readInt(), MAX_INVENTORY_ITEMS, "inventory item");
+                List<SaveGame.ItemStackData> items = new ArrayList<>(itemCount);
+                for (int i = 0; i < itemCount; i++) {
+                    items.add(new SaveGame.ItemStackData(in.readUTF(), in.readInt()));
+                }
+                player = new SaveGame.PlayerData(
+                    playerX,
+                    playerZ,
+                    playerFacing,
+                    legacyWood,
+                    legacyApples,
+                    items
+                );
+            } else {
+                player = new SaveGame.PlayerData(playerX, playerZ, playerFacing, legacyWood, legacyApples);
+            }
+
+            float pushikX = in.readFloat();
+            float pushikZ = in.readFloat();
+            float pushikHeading = in.readFloat();
+            SaveGame.PushikData pushik;
+            if (version >= 3) {
+                pushik = new SaveGame.PushikData(
+                    pushikX,
+                    pushikZ,
+                    pushikHeading,
+                    in.readFloat(),
+                    PushikState.parseOrDefault(in.readUTF())
+                );
+            } else {
+                pushik = new SaveGame.PushikData(pushikX, pushikZ, pushikHeading);
+            }
 
             int horseCount = checkedCount(in.readInt(), MAX_HORSES, "horse");
             List<SaveGame.HorseData> horses = new ArrayList<>(horseCount);
@@ -159,17 +181,7 @@ final class SaveRepository {
                     float bond = in.readFloat();
                     float fear = in.readFloat();
                     horses.add(new SaveGame.HorseData(
-                        id,
-                        name,
-                        x,
-                        z,
-                        heading,
-                        trust,
-                        stamina,
-                        tamed,
-                        personality,
-                        bond,
-                        fear
+                        id, name, x, z, heading, trust, stamina, tamed, personality, bond, fear
                     ));
                 } else {
                     horses.add(new SaveGame.HorseData(id, name, x, z, heading, trust, stamina, tamed));
@@ -184,9 +196,7 @@ final class SaveRepository {
 
             int treeCount = checkedCount(in.readInt(), MAX_HARVESTED_TREES, "harvested tree");
             List<Integer> harvestedTrees = new ArrayList<>(treeCount);
-            for (int i = 0; i < treeCount; i++) {
-                harvestedTrees.add(in.readInt());
-            }
+            for (int i = 0; i < treeCount; i++) harvestedTrees.add(in.readInt());
 
             return new SaveGame(
                 SaveGame.CURRENT_VERSION,
@@ -226,11 +236,18 @@ final class SaveRepository {
             out.writeFloat(player.facing());
             out.writeInt(player.wood());
             out.writeInt(player.apples());
+            out.writeInt(player.inventoryItems().size());
+            for (SaveGame.ItemStackData item : player.inventoryItems()) {
+                out.writeUTF(item.itemId());
+                out.writeInt(item.amount());
+            }
 
             SaveGame.PushikData pushik = saveGame.pushik();
             out.writeFloat(pushik.x());
             out.writeFloat(pushik.z());
             out.writeFloat(pushik.heading());
+            out.writeFloat(pushik.affection());
+            out.writeUTF(pushik.state().name());
 
             out.writeInt(saveGame.horses().size());
             for (SaveGame.HorseData horse : saveGame.horses()) {
@@ -256,9 +273,7 @@ final class SaveRepository {
             }
 
             out.writeInt(saveGame.harvestedTreeIds().size());
-            for (int treeId : saveGame.harvestedTreeIds()) {
-                out.writeInt(treeId);
-            }
+            for (int treeId : saveGame.harvestedTreeIds()) out.writeInt(treeId);
 
             out.flush();
             channel.force(true);
@@ -266,29 +281,20 @@ final class SaveRepository {
     }
 
     private static int checkedCount(int value, int max, String label) throws IOException {
-        if (value < 0 || value > max) {
-            throw new IOException("Invalid " + label + " count: " + value);
-        }
+        if (value < 0 || value > max) throw new IOException("Invalid " + label + " count: " + value);
         return value;
     }
 
     private static void moveAtomically(Path source, Path target) throws IOException {
         try {
-            Files.move(
-                source,
-                target,
-                StandardCopyOption.REPLACE_EXISTING,
-                StandardCopyOption.ATOMIC_MOVE
-            );
+            Files.move(source, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
         } catch (AtomicMoveNotSupportedException ex) {
             Files.move(source, target, StandardCopyOption.REPLACE_EXISTING);
         }
     }
 
     private Path slotDirectory(String slot) {
-        if (!slot.matches("[A-Za-z0-9_-]+")) {
-            throw new IllegalArgumentException("Invalid save slot: " + slot);
-        }
+        if (!slot.matches("[A-Za-z0-9_-]+")) throw new IllegalArgumentException("Invalid save slot: " + slot);
         return root.resolve("saves").resolve(slot);
     }
 

@@ -2,9 +2,18 @@
 package com.dizzyz7.horsebound;
 
 final class PushikMind {
-    private PushikState state = PushikState.FOLLOW;
+    private PushikState state;
     private float stateTime;
-    private float affection = 45f;
+    private float affection;
+
+    PushikMind() {
+        this(PushikState.FOLLOW, 45f);
+    }
+
+    PushikMind(PushikState state, float affection) {
+        this.state = state == null ? PushikState.FOLLOW : state;
+        this.affection = clampPercent(affection);
+    }
 
     PushikState state() {
         return state;
@@ -58,5 +67,10 @@ final class PushikMind {
             state = next;
             stateTime = 0f;
         }
+    }
+
+    private static float clampPercent(float value) {
+        if (!Float.isFinite(value)) return 45f;
+        return Math.max(0f, Math.min(100f, value));
     }
 }

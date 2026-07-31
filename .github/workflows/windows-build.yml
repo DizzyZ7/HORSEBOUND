@@ -34,13 +34,50 @@ jobs:
         shell: pwsh
         run: gradle clean test windowsImage --no-daemon --stacktrace
 
-      - name: Verify executable
+      - name: Verify Steam-ready app image
         shell: pwsh
         run: |
-          if (!(Test-Path "build/jpackage/HORSEBOUND/HORSEBOUND.exe")) {
-            throw "HORSEBOUND.exe was not produced"
+          $root = Resolve-Path "build/jpackage/HORSEBOUND"
+          $required = @(
+            "HORSEBOUND.exe",
+            "app/HORSEBOUND.jar",
+            "runtime"
+          )
+
+          foreach ($relative in $required) {
+            $path = Join-Path $root $relative
+            if (!(Test-Path $path)) {
+              throw "Required packaged path is missing: $relative"
+            }
           }
-          Get-Item "build/jpackage/HORSEBOUND/HORSEBOUND.exe" | Format-List Name,Length,FullName
+
+          $forbiddenNames = @(
+            "settings.properties",
+            "save.hbs",
+            "save.bak",
+            "save.tmp",
+            "steam_dev.cfg"
+          )
+          $forbidden = Get-ChildItem $root -Recurse -File |
+            Where-Object { $forbiddenNames -contains $_.Name }
+          if ($forbidden) {
+            $forbidden | Format-Table FullName
+            throw "Mutable user data or local Steam configuration leaked into the app image"
+          }
+
+          $hashTargets = @(
+            (Join-Path $root "HORSEBOUND.exe"),
+            (Join-Path $root "app/HORSEBOUND.jar")
+          )
+          $hashLines = foreach ($target in $hashTargets) {
+            $hash = Get-FileHash $target -Algorithm SHA256
+            "$($hash.Hash)  $([System.IO.Path]::GetFileName($target))"
+          }
+          $hashLines | Set-Content (Join-Path $root "SHA256SUMS.txt") -Encoding ascii
+
+          Get-Item (Join-Path $root "HORSEBOUND.exe") | Format-List Name,Length,FullName
+          Get-Item (Join-Path $root "app/HORSEBOUND.jar") | Format-List Name,Length,FullName
+          Get-Content (Join-Path $root "SHA256SUMS.txt")
 
       - name: Upload self-contained Windows build
         uses: actions/upload-artifact@v4

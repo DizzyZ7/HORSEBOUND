@@ -16,7 +16,7 @@ record SaveGame(
     List<FenceData> fences,
     List<Integer> harvestedTreeIds
 ) {
-    static final int CURRENT_VERSION = 2;
+    static final int CURRENT_VERSION = 3;
 
     SaveGame {
         player = Objects.requireNonNull(player, "player");
@@ -32,18 +32,66 @@ record SaveGame(
             seed.value(),
             System.currentTimeMillis(),
             0.29f,
-            new PlayerData(0f, -18f, 0f, 4, 5),
-            new PushikData(2f, -16f, 0f),
+            new PlayerData(
+                0f,
+                -18f,
+                0f,
+                4,
+                5,
+                List.of(new ItemStackData(ItemId.WOOD.name(), 4), new ItemStackData(ItemId.APPLE.name(), 5))
+            ),
+            new PushikData(2f, -16f, 0f, 45f, PushikState.FOLLOW),
             List.of(),
             List.of(),
             List.of()
         );
     }
 
-    record PlayerData(float x, float z, float facing, int wood, int apples) {
+    record PlayerData(
+        float x,
+        float z,
+        float facing,
+        int wood,
+        int apples,
+        List<ItemStackData> inventoryItems
+    ) {
+        PlayerData {
+            inventoryItems = List.copyOf(Objects.requireNonNull(inventoryItems, "inventoryItems"));
+        }
+
+        /** Compatibility constructor for v1/v2 saves and older call sites. */
+        PlayerData(float x, float z, float facing, int wood, int apples) {
+            this(
+                x,
+                z,
+                facing,
+                wood,
+                apples,
+                List.of(
+                    new ItemStackData(ItemId.WOOD.name(), Math.max(0, wood)),
+                    new ItemStackData(ItemId.APPLE.name(), Math.max(0, apples))
+                )
+            );
+        }
     }
 
-    record PushikData(float x, float z, float heading) {
+    record ItemStackData(String itemId, int amount) {
+        ItemStackData {
+            itemId = Objects.requireNonNull(itemId, "itemId");
+            amount = Math.max(0, amount);
+        }
+    }
+
+    record PushikData(float x, float z, float heading, float affection, PushikState state) {
+        PushikData {
+            affection = clampPercent(affection);
+            state = Objects.requireNonNull(state, "state");
+        }
+
+        /** Compatibility constructor for v1/v2 saves and older call sites. */
+        PushikData(float x, float z, float heading) {
+            this(x, z, heading, 45f, PushikState.FOLLOW);
+        }
     }
 
     record HorseData(
@@ -69,9 +117,7 @@ record SaveGame(
             fear = clampPercent(fear);
         }
 
-        /**
-         * Compatibility constructor used by v1 migration and older tests/call sites.
-         */
+        /** Compatibility constructor used by v1 migration and older tests/call sites. */
         HorseData(
             UUID id,
             String name,

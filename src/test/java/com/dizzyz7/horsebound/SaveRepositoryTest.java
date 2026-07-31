@@ -87,38 +87,15 @@ class SaveRepositoryTest {
     void versionOneSaveMigratesWithoutLosingHorseProgress() throws Exception {
         SaveRepository repository = new SaveRepository(tempDir.resolve("HORSEBOUND"));
         UUID horseId = UUID.fromString("6f50e536-4459-4be6-9cee-5839aef4b59c");
-        Path directory = repository.root().resolve("saves").resolve("slot-1");
-        Files.createDirectories(directory);
-        Path primary = directory.resolve("save.hbs");
+        Path primary = createSlot(repository, "slot-1");
 
-        try (DataOutputStream out = new DataOutputStream(new BufferedOutputStream(Files.newOutputStream(primary)))) {
-            out.writeInt(MAGIC);
-            out.writeInt(1);
-            out.writeLong(123456789L);
-            out.writeLong(1722456000000L);
-            out.writeFloat(0.51f);
-
-            out.writeFloat(11.5f);
-            out.writeFloat(-7.25f);
-            out.writeFloat(135f);
-            out.writeInt(17);
-            out.writeInt(9);
-
-            out.writeFloat(9.5f);
-            out.writeFloat(-6f);
-            out.writeFloat(42f);
+        try (DataOutputStream out = output(primary)) {
+            writeHeader(out, 1, 123456789L, 0.51f);
+            writeLegacyPlayer(out, 17, 9);
+            writeLegacyPushik(out);
 
             out.writeInt(1);
-            out.writeLong(horseId.getMostSignificantBits());
-            out.writeLong(horseId.getLeastSignificantBits());
-            out.writeUTF("Ember");
-            out.writeFloat(18f);
-            out.writeFloat(8f);
-            out.writeFloat(25f);
-            out.writeFloat(72f);
-            out.writeFloat(83f);
-            out.writeBoolean(true);
-
+            writeVersionOneHorse(out, horseId);
             out.writeInt(0);
             out.writeInt(0);
         }
@@ -136,6 +113,48 @@ class SaveRepositoryTest {
         assertEquals(HorsePersonality.fromIdentity(horseId), horse.personality());
         assertTrue(horse.bond() >= 20f);
         assertTrue(horse.fear() <= 12f);
+        assertEquals(17, inventoryAmount(migrated, ItemId.WOOD));
+        assertEquals(9, inventoryAmount(migrated, ItemId.APPLE));
+        assertEquals(45f, migrated.pushik().affection());
+        assertEquals(PushikState.FOLLOW, migrated.pushik().state());
+    }
+
+    @Test
+    void versionTwoSaveMigratesToTypedInventoryAndPersistentPushikDefaults() throws Exception {
+        SaveRepository repository = new SaveRepository(tempDir.resolve("HORSEBOUND"));
+        UUID horseId = UUID.fromString("6f50e536-4459-4be6-9cee-5839aef4b59c");
+        Path primary = createSlot(repository, "slot-2");
+
+        try (DataOutputStream out = output(primary)) {
+            writeHeader(out, 2, 987654321L, 0.73f);
+            writeLegacyPlayer(out, 31, 6);
+            writeLegacyPushik(out);
+
+            out.writeInt(1);
+            writeVersionTwoHorse(out, horseId);
+            out.writeInt(1);
+            out.writeFloat(4f);
+            out.writeFloat(6f);
+            out.writeFloat(90f);
+            out.writeInt(2);
+            out.writeInt(7);
+            out.writeInt(19);
+        }
+
+        SaveGame migrated = repository.load("slot-2").orElseThrow();
+
+        assertEquals(SaveGame.CURRENT_VERSION, migrated.saveVersion());
+        assertEquals(31, inventoryAmount(migrated, ItemId.WOOD));
+        assertEquals(6, inventoryAmount(migrated, ItemId.APPLE));
+        assertEquals(45f, migrated.pushik().affection());
+        assertEquals(PushikState.FOLLOW, migrated.pushik().state());
+        assertEquals(HorsePersonality.CURIOUS, migrated.horses().getFirst().personality());
+        assertEquals(66f, migrated.horses().getFirst().bond());
+        assertEquals(7f, migrated.horses().getFirst().fear());
+
+        repository.save("slot-2", migrated);
+        SaveGame rewrittenAsV3 = repository.load("slot-2").orElseThrow();
+        assertEquals(migrated, rewrittenAsV3);
     }
 
     private static SaveGame sampleSave(int wood, int apples, float trust) {
@@ -145,8 +164,18 @@ class SaveRepositoryTest {
             4242424242L,
             1722456000000L,
             0.51f,
-            new SaveGame.PlayerData(11.5f, -7.25f, 135f, wood, apples),
-            new SaveGame.PushikData(9.5f, -6.0f, 42f),
+            new SaveGame.PlayerData(
+                11.5f,
+                -7.25f,
+                135f,
+                wood,
+                apples,
+                List.of(
+                    new SaveGame.ItemStackData(ItemId.WOOD.name(), wood),
+                    new SaveGame.ItemStackData(ItemId.APPLE.name(), apples)
+                )
+            ),
+            new SaveGame.PushikData(9.5f, -6.0f, 42f, 88f, PushikState.SIT),
             List.of(new SaveGame.HorseData(
                 horseId,
                 "Ember",
@@ -163,5 +192,63 @@ class SaveRepositoryTest {
             List.of(new SaveGame.FenceData(4f, 6f, 90f)),
             List.of(2, 7, 19)
         );
+    }
+
+    private static Path createSlot(SaveRepository repository, String slot) throws Exception {
+        Path directory = repository.root().resolve("saves").resolve(slot);
+        Files.createDirectories(directory);
+        return directory.resolve("save.hbs");
+    }
+
+    private static DataOutputStream output(Path primary) throws Exception {
+        return new DataOutputStream(new BufferedOutputStream(Files.newOutputStream(primary)));
+    }
+
+    private static void writeHeader(DataOutputStream out, int version, long seed, float worldTime) throws Exception {
+        out.writeInt(MAGIC);
+        out.writeInt(version);
+        out.writeLong(seed);
+        out.writeLong(1722456000000L);
+        out.writeFloat(worldTime);
+    }
+
+    private static void writeLegacyPlayer(DataOutputStream out, int wood, int apples) throws Exception {
+        out.writeFloat(11.5f);
+        out.writeFloat(-7.25f);
+        out.writeFloat(135f);
+        out.writeInt(wood);
+        out.writeInt(apples);
+    }
+
+    private static void writeLegacyPushik(DataOutputStream out) throws Exception {
+        out.writeFloat(9.5f);
+        out.writeFloat(-6f);
+        out.writeFloat(42f);
+    }
+
+    private static void writeVersionOneHorse(DataOutputStream out, UUID horseId) throws Exception {
+        out.writeLong(horseId.getMostSignificantBits());
+        out.writeLong(horseId.getLeastSignificantBits());
+        out.writeUTF("Ember");
+        out.writeFloat(18f);
+        out.writeFloat(8f);
+        out.writeFloat(25f);
+        out.writeFloat(72f);
+        out.writeFloat(83f);
+        out.writeBoolean(true);
+    }
+
+    private static void writeVersionTwoHorse(DataOutputStream out, UUID horseId) throws Exception {
+        writeVersionOneHorse(out, horseId);
+        out.writeUTF(HorsePersonality.CURIOUS.name());
+        out.writeFloat(66f);
+        out.writeFloat(7f);
+    }
+
+    private static int inventoryAmount(SaveGame save, ItemId itemId) {
+        return save.player().inventoryItems().stream()
+            .filter(item -> item.itemId().equals(itemId.name()))
+            .mapToInt(SaveGame.ItemStackData::amount)
+            .sum();
     }
 }

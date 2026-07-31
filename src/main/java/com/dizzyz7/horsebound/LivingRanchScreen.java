@@ -27,7 +27,7 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * HORSEBOUND 0.4 presentation/input layer.
+ * HORSEBOUND presentation/input layer.
  * Gameplay state lives in pure Java domain objects such as GameSession, Inventory,
  * HorseRelationship and PushikMind instead of being modeled as renderer fields.
  */
@@ -519,7 +519,7 @@ final class LivingRanchScreen implements Screen {
         spriteBatch.begin();
         font.setColor(Color.WHITE);
         font.getData().setScale(1f);
-        font.draw(spriteBatch, "HORSEBOUND 0.4", 18f, height - 18f);
+        font.draw(spriteBatch, "HORSEBOUND 0.4.1", 18f, height - 18f);
         font.getData().setScale(0.82f);
         font.setColor(new Color(0.88f, 0.91f, 0.86f, 1f));
         font.draw(spriteBatch, "WASD move | E interact | F mount | B build | F5 save | Shift sprint/gallop | Space jump", 18f, height - 42f);
@@ -602,11 +602,29 @@ final class LivingRanchScreen implements Screen {
         for (FenceNode fence : fences) fenceData.add(new SaveGame.FenceData(fence.x, fence.z, fence.heading));
         List<Integer> harvested = new ArrayList<>();
         for (TreeNode tree : trees) if (tree.harvested) harvested.add(tree.id);
+
+        List<SaveGame.ItemStackData> inventoryData = session.inventory().snapshot().entrySet().stream()
+            .filter(entry -> entry.getValue() > 0)
+            .map(entry -> new SaveGame.ItemStackData(entry.getKey().name(), entry.getValue()))
+            .toList();
+
         return new SaveGame(
             SaveGame.CURRENT_VERSION, session.worldSeed(), System.currentTimeMillis(), session.worldTime(),
-            new SaveGame.PlayerData(playerPosition.x, playerPosition.z, playerFacing,
-                session.inventory().count(ItemId.WOOD), session.inventory().count(ItemId.APPLE)),
-            new SaveGame.PushikData(pushik.position.x, pushik.position.z, pushik.heading),
+            new SaveGame.PlayerData(
+                playerPosition.x,
+                playerPosition.z,
+                playerFacing,
+                session.inventory().count(ItemId.WOOD),
+                session.inventory().count(ItemId.APPLE),
+                inventoryData
+            ),
+            new SaveGame.PushikData(
+                pushik.position.x,
+                pushik.position.z,
+                pushik.heading,
+                session.pushikMind().affection(),
+                session.pushikMind().state()
+            ),
             horseData, fenceData, harvested
         );
     }

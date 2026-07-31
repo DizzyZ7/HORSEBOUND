@@ -6,5 +6,14 @@ enum PushikState {
     SIT,
     EXPLORE,
     SLEEP,
-    GREET
+    GREET;
+
+    static PushikState parseOrDefault(String value) {
+        if (value == null || value.isBlank()) return FOLLOW;
+        try {
+            return PushikState.valueOf(value);
+        } catch (IllegalArgumentException ex) {
+            return FOLLOW;
+        }
+    }
 }
