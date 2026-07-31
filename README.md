@@ -5,9 +5,47 @@ Copyright © 2026 Dimash Janibekov. All rights reserved.
 
 HORSEBOUND is a cozy stylized 3D Java sandbox about horses, exploration, taming, riding and building a ranch. The world uses continuous terrain and is intentionally not voxel/block based.
 
-## 0.4.6 — Display & Deck UX
+## 0.4.7 — HUD & Glyph Pass
 
-HORSEBOUND now has device-local display configuration, scalable 1280×800-oriented UI and measurable performance diagnostics.
+HORSEBOUND now has a centralized, scalable action-prompt layer across gameplay and the core menu flow.
+
+### Dynamic input prompts
+
+- prompts follow the last meaningfully used device;
+- small stick drift does not switch the visible prompt family;
+- keyboard/mouse prompts use the real HORSEBOUND bindings;
+- Xbox, PlayStation, Steam Deck and generic controller label families;
+- controller family is inferred from the standardized SDL device name;
+- vector-rendered prompt chips scale with the 1280×800 UI system;
+- gameplay now displays the current 0.4.7 header instead of the legacy prototype label.
+
+Examples:
+
+| Action | Keyboard | Xbox / Deck | PlayStation |
+|---|---|---|---|
+| Confirm / Jump | Enter / Space | A | Cross |
+| Back / Pause | Esc | B | Circle |
+| Interact | E | X | Square |
+| Mount | F | Y | Triangle |
+| Build | B | LB | L1 |
+| Sprint / Gallop | Shift | RB | R1 |
+
+### Save-slot readability
+
+- save-slot cards now scale from the 1280×800 design surface;
+- metadata remains readable with 150% UI scale;
+- overwrite confirmation remains fully controller accessible;
+- bottom input guidance is supplied by the shared glyph overlay instead of duplicated screen text.
+
+### Controller-only release contract
+
+Every future Steam candidate must pass the packaged launch-to-exit controller route in [`docs/STEAM_CONTROLLER_SMOKE_TEST.md`](docs/STEAM_CONTROLLER_SMOKE_TEST.md). It covers Settings, ranch slots, gameplay, save/restart, controller disconnect/reconnect and 1280×800 readability.
+
+This is not a Steam Deck Verified claim. Physical Deck testing, Proton validation and Valve compatibility review remain required.
+
+## Display & Deck UX
+
+HORSEBOUND has device-local display configuration, scalable 1280×800-oriented UI and measurable performance diagnostics.
 
 ### Display and graphics settings
 
@@ -42,16 +80,6 @@ The optional global overlay is available in menus and gameplay and reports:
 
 The overlay is a development and player-support aid. It is not a substitute for physical Steam Deck profiling.
 
-### Deck-safe UI direction
-
-- centralized scaling from a 1280×800 design surface;
-- controller-accessible display settings;
-- scaled main menu with centered labels;
-- keyboard/controller prompt catalog that never mixes both device families in one hint;
-- tests guarantee a readable minimum effective scale on smaller windows.
-
-This is not a Steam Deck Verified claim. Final graphical glyph assets, physical-device testing, Proton validation and Valve compatibility review remain required.
-
 ## Support diagnostics
 
 HORSEBOUND carries an exact build identity and can produce privacy-conscious local crash reports.
@@ -78,15 +106,15 @@ HORSEBOUND has a standardized controller path across live gameplay and the core 
 |---|---|
 | Left Stick | Move / steer |
 | Right Stick | Camera |
-| A | Jump |
-| X | Interact |
-| Y | Mount / dismount |
-| L1 | Build |
-| R1 | Sprint / gallop |
-| Back / View | Manual save |
-| Start / Menu or B | Pause / back |
+| A / Cross | Jump |
+| X / Square | Interact |
+| Y / Triangle | Mount / dismount |
+| L1 / LB | Build |
+| R1 / RB | Sprint / gallop |
+| Back / View / Share | Manual save |
+| Start / Menu or B / Circle | Pause / back |
 
-D-pad or Left Stick navigates the main menu, ranch slots and Settings. A confirms and B returns. Keyboard and mouse remain supported.
+D-pad or Left Stick navigates the main menu, ranch slots and Settings. Confirm and Back labels follow the active controller family. Keyboard and mouse remain supported.
 
 ## Fixed-step gameplay
 
@@ -167,8 +195,9 @@ HORSEBOUND is developed against SteamPipe, Steam Cloud, offline single-player an
 
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 - [`docs/STEAM_RELEASE_READINESS.md`](docs/STEAM_RELEASE_READINESS.md)
+- [`docs/STEAM_CONTROLLER_SMOKE_TEST.md`](docs/STEAM_CONTROLLER_SMOKE_TEST.md)
 - [`docs/SUPPORT.md`](docs/SUPPORT.md)
-- [`docs/releases/0.4.6.md`](docs/releases/0.4.6.md)
+- [`docs/releases/0.4.7.md`](docs/releases/0.4.7.md)
 - [`steam/README.md`](steam/README.md)
 
 The planned Steam launch target is `HORSEBOUND.exe` directly, without a mandatory external launcher.
