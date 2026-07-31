@@ -2,20 +2,32 @@
 package com.dizzyz7.horsebound;
 
 enum GraphicsPreset {
-    LOW("Low", 62f),
-    MEDIUM("Medium", 94f),
-    HIGH("High", 145f);
+    LOW("Low", 0, 60, 62f),
+    MEDIUM("Medium", 2, 90, 94f),
+    HIGH("High", 4, 144, 145f);
 
     private final String displayName;
+    private final int msaaSamples;
+    private final int foregroundFps;
     private final float objectDistance;
 
-    GraphicsPreset(String displayName, float objectDistance) {
+    GraphicsPreset(String displayName, int msaaSamples, int foregroundFps, float objectDistance) {
         this.displayName = displayName;
+        this.msaaSamples = msaaSamples;
+        this.foregroundFps = foregroundFps;
         this.objectDistance = objectDistance;
     }
 
     String displayName() {
         return displayName;
+    }
+
+    int msaaSamples() {
+        return msaaSamples;
+    }
+
+    int foregroundFps() {
+        return foregroundFps;
     }
 
     float objectDistance() {
