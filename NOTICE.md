@@ -1,8 +1,8 @@
 # HORSEBOUND — Ownership Notice
 
-**Creator and copyright holder:** Dimash Dzhanibekov (DizZyZ7)  
+**Creator and copyright holder:** Dimash Janibekov (DizZyZ7)  
 **Project:** HORSEBOUND  
-**Copyright:** © 2026 Dimash Dzhanibekov (DizZyZ7). All rights reserved.
+**Copyright:** © 2026 Dimash Janibekov (DizZyZ7). All rights reserved.
 
 This repository is the canonical public source repository for HORSEBOUND.
 The public visibility of the repository does not grant permission to copy,
