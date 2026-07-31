@@ -25,6 +25,7 @@ final class PromptOverlay {
     private final SpriteBatch batch = new SpriteBatch();
     private final BitmapFont font = new BitmapFont();
     private final GlyphLayout layout = new GlyphLayout();
+    private final String buildLabel = BuildInfo.current().displayLabel();
 
     void render(Screen screen, GameSettings settings) {
         if (screen == null || settings == null) return;
@@ -36,7 +37,6 @@ final class PromptOverlay {
         ControllerGlyphFamily family = InputActivityTracker.controllerFamily();
         List<GlyphBinding> bindings = bindings(screen, device, family);
 
-        float lineHeight = 27f * geometryScale;
         float panelHeight = bindings.size() > 4 ? 66f * geometryScale : 42f * geometryScale;
         float panelY = 0f;
 
@@ -78,7 +78,7 @@ final class PromptOverlay {
         if (screen instanceof LivingRanchScreen) {
             font.getData().setScale(0.84f * ui);
             font.setColor(TEXT);
-            font.draw(batch, "HORSEBOUND 0.4.7", 14f * geometryScale, height - 18f * geometryScale);
+            font.draw(batch, buildLabel, 14f * geometryScale, height - 18f * geometryScale);
             font.getData().setScale(0.64f * ui);
             font.setColor(SECONDARY);
             font.draw(
