@@ -1,0 +1,42 @@
+HORSEBOUND THIRD-PARTY SOFTWARE NOTICES
+
+HORSEBOUND original game code and content:
+Copyright (c) 2026 Dimash Janibekov (DizZyZ7). All rights reserved.
+
+HORSEBOUND includes or links the following third-party runtime components.
+Those components remain governed by their own licenses and are not covered by
+HORSEBOUND's proprietary game-content license.
+
+1. libGDX
+   Project: https://github.com/libgdx/libgdx
+   License: Apache License 2.0
+   License text: licenses/APACHE-2.0.txt
+
+2. gdx-controllers
+   Project: https://github.com/libgdx/gdx-controllers
+   License: Apache License 2.0
+   License text: licenses/APACHE-2.0.txt
+
+3. Jamepad
+   Project: https://github.com/libgdx/Jamepad
+   License: Apache License 2.0
+   License text: licenses/APACHE-2.0.txt
+
+4. LWJGL
+   Project: https://github.com/LWJGL/lwjgl3
+   License: BSD 3-Clause
+   License text: licenses/BSD-3-CLAUSE.txt
+
+5. SDL components used by the desktop controller backend
+   Project: https://github.com/libsdl-org/SDL
+   License: zlib License
+   License text: licenses/ZLIB.txt
+
+6. OpenJDK runtime image
+   The self-contained Windows package is produced with JDK jpackage/jlink.
+   OpenJDK module-specific legal notices are retained under the packaged
+   runtime/legal directory.
+
+This notice is informational and does not modify any third-party license.
+The release dependency/license inventory must be reviewed again before a public
+Steam demo, Early Access release, or version 1.0 whenever dependencies change.
