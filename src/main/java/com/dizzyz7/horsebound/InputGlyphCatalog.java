@@ -71,34 +71,58 @@ final class InputGlyphCatalog {
     }
 
     private static String faceA(ControllerGlyphFamily family) {
-        return family == ControllerGlyphFamily.PLAYSTATION ? "CROSS" : "A";
+        return switch (family) {
+            case PLAYSTATION -> "CROSS";
+            case NINTENDO -> "B";
+            default -> "A";
+        };
     }
 
     private static String faceB(ControllerGlyphFamily family) {
-        return family == ControllerGlyphFamily.PLAYSTATION ? "CIRCLE" : "B";
+        return switch (family) {
+            case PLAYSTATION -> "CIRCLE";
+            case NINTENDO -> "A";
+            default -> "B";
+        };
     }
 
     private static String faceX(ControllerGlyphFamily family) {
-        return family == ControllerGlyphFamily.PLAYSTATION ? "SQUARE" : "X";
+        return switch (family) {
+            case PLAYSTATION -> "SQUARE";
+            case NINTENDO -> "Y";
+            default -> "X";
+        };
     }
 
     private static String faceY(ControllerGlyphFamily family) {
-        return family == ControllerGlyphFamily.PLAYSTATION ? "TRIANGLE" : "Y";
+        return switch (family) {
+            case PLAYSTATION -> "TRIANGLE";
+            case NINTENDO -> "X";
+            default -> "Y";
+        };
     }
 
     private static String shoulderLeft(ControllerGlyphFamily family) {
-        return family == ControllerGlyphFamily.XBOX || family == ControllerGlyphFamily.STEAM_DECK ? "LB" : "L1";
+        return switch (family) {
+            case XBOX, STEAM_DECK -> "LB";
+            case NINTENDO -> "L";
+            default -> "L1";
+        };
     }
 
     private static String shoulderRight(ControllerGlyphFamily family) {
-        return family == ControllerGlyphFamily.XBOX || family == ControllerGlyphFamily.STEAM_DECK ? "RB" : "R1";
+        return switch (family) {
+            case XBOX, STEAM_DECK -> "RB";
+            case NINTENDO -> "R";
+            default -> "R1";
+        };
     }
 
     private static String viewButton(ControllerGlyphFamily family) {
         return switch (family) {
             case PLAYSTATION -> "SHARE";
-            case STEAM_DECK -> "VIEW";
-            case XBOX -> "VIEW";
+            case STEAM_DECK, XBOX -> "VIEW";
+            case NINTENDO -> "MINUS";
             case GENERIC -> "BACK";
         };
     }
