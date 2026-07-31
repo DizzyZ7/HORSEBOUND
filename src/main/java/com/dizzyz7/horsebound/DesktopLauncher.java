@@ -24,7 +24,7 @@ public final class DesktopLauncher {
         GameSettings settings = settingsRepository.load();
 
         Lwjgl3ApplicationConfiguration config = new Lwjgl3ApplicationConfiguration();
-        config.setTitle(buildInfo.diagnosticLabel() + " | Created by DizZyZ7");
+        config.setTitle(buildInfo.displayLabel() + " | Created by DizZyZ7");
         config.setWindowedMode(1280, 720);
         config.setResizable(true);
         config.useVsync(settings.vsync());
