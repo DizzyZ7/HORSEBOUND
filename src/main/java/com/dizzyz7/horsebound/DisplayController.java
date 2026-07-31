@@ -20,6 +20,8 @@ final class DisplayController {
 
     static GameSettings applyRuntime(GameSettings previous, GameSettings requested) {
         Gdx.graphics.setVSync(requested.vsync());
+        Gdx.graphics.setForegroundFPS(requested.graphicsPreset().foregroundFps());
+
         boolean displayChanged = previous.windowMode() != requested.windowMode()
             || previous.windowWidth() != requested.windowWidth()
             || previous.windowHeight() != requested.windowHeight();
