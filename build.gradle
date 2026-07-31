@@ -4,12 +4,13 @@ plugins {
 }
 
 group = 'com.dizzyz7'
-version = '0.4.4'
+version = '0.4.5'
 
 ext {
     gdxVersion = '1.14.2'
     gdxControllersVersion = '2.2.4'
     creatorName = 'Dimash Janibekov (DizZyZ7)'
+    buildCommit = (System.getenv('GITHUB_SHA') ?: 'local').take(12)
 }
 
 repositories {
@@ -60,6 +61,7 @@ tasks.register('fatJar', Jar) {
             'Implementation-Title': 'HORSEBOUND',
             'Implementation-Version': project.version,
             'Implementation-Vendor': creatorName,
+            'Build-Commit': buildCommit,
             'Built-By': creatorName
         )
     }

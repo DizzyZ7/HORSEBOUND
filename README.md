@@ -5,20 +5,37 @@ Copyright © 2026 Dimash Janibekov. All rights reserved.
 
 HORSEBOUND is a cozy stylized 3D Java sandbox about horses, exploration, taming, riding and building a ranch. The world uses continuous terrain and is intentionally not voxel/block based.
 
-## 0.4.4 — Controller Foundation
+## 0.4.5 — Support Diagnostics
 
-HORSEBOUND now has a standardized controller path across live gameplay and the core menu flow.
+HORSEBOUND now carries an exact build identity and can produce privacy-conscious local crash reports for packaged and future Steam builds.
 
-### Controller gameplay
+### Build identity
 
-The official `gdx-controllers` desktop backend provides standardized mappings instead of device-specific numeric button guesses.
+- the packaged manifest contains version, vendor and source commit;
+- `HORSEBOUND.exe --version` identifies the exact support build;
+- the player-facing title remains clean;
+- CI launches the packaged JAR and verifies that its version/commit match the workflow SHA.
 
-- radial movement and camera dead zones;
-- hot-plug and disconnect recovery;
-- mixed keyboard/mouse + controller input;
-- active prompt device changes only after meaningful input;
-- bounds checks for incomplete controller layouts;
-- controller-native runtime verified inside the packaged JAR.
+### Local crash reports
+
+Crash reports are stored only on the player's device:
+
+```text
+%APPDATA%\HORSEBOUND\logs\
+```
+
+- no automatic telemetry or uploads;
+- build, OS, architecture, Java runtime, memory summary, thread and stack trace;
+- home and AppData path prefixes are redacted;
+- only the 10 newest reports are retained;
+- a reporting failure cannot replace the original exception;
+- logs are excluded from the Steam install image and Steam Cloud policy.
+
+See [`docs/SUPPORT.md`](docs/SUPPORT.md).
+
+## Controller foundation
+
+HORSEBOUND has a standardized controller path across live gameplay and the core menu flow using the official `gdx-controllers` desktop backend.
 
 Default gameplay bindings:
 
@@ -34,19 +51,9 @@ Default gameplay bindings:
 | Back / View | Manual save |
 | Start / Menu or B | Pause / back |
 
-### Controller menu flow
+D-pad or Left Stick navigates the main menu, ranch slots and Settings. A confirms and B returns. Keyboard and mouse remain fully supported.
 
-Controller navigation is available in:
-
-- main menu;
-- New Game ranch slots;
-- Load Game ranch slots;
-- overwrite confirmation;
-- Settings.
-
-D-pad or Left Stick navigates, A confirms and B returns. Keyboard and mouse remain fully supported.
-
-This is not yet a claim of Steam Deck Verified status. Physical-device testing, platform-specific graphical glyphs, 1280×800 readability, performance validation and Valve compatibility review remain required.
+This is not yet a claim of Steam Deck Verified status. Physical-device testing, graphical glyphs, 1280×800 readability, performance validation and Valve compatibility review remain required.
 
 ## Fixed-step gameplay
 
@@ -76,7 +83,7 @@ Version 1 and 2 ranches migrate to v3. Saves use temporary writes, disk flush, a
 
 ## Pushik / Пушик
 
-Pushik is the required completely black fluffy cat with fluffy black paws and almost silent footsteps. He can follow, sit, explore, sleep and greet the player. His affection and state survive restart.
+Pushik is the completely black fluffy cat with fluffy black paws and almost silent footsteps. He can follow, sit, explore, sleep and greet the player. His affection and state survive restart.
 
 ## Current gameplay
 
@@ -115,9 +122,11 @@ Pushik is the required completely black fluffy cat with fluffy black paws and al
         slot-1\save.hbs + save.bak
         slot-2\save.hbs + save.bak
         slot-3\save.hbs + save.bak
+    logs\
+        crash-*.log
 ```
 
-Ranch saves are prepared for Steam Auto-Cloud. Device-specific settings remain local.
+Ranch saves are prepared for Steam Auto-Cloud. Device-specific settings and crash logs remain local.
 
 ## Steam readiness
 
@@ -125,9 +134,8 @@ HORSEBOUND is developed against SteamPipe, Steam Cloud, offline single-player an
 
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 - [`docs/STEAM_RELEASE_READINESS.md`](docs/STEAM_RELEASE_READINESS.md)
-- [`docs/releases/0.4.2.md`](docs/releases/0.4.2.md)
-- [`docs/releases/0.4.3.md`](docs/releases/0.4.3.md)
-- [`docs/releases/0.4.4.md`](docs/releases/0.4.4.md)
+- [`docs/SUPPORT.md`](docs/SUPPORT.md)
+- [`docs/releases/0.4.5.md`](docs/releases/0.4.5.md)
 - [`steam/README.md`](steam/README.md)
 
 The planned Steam launch target is `HORSEBOUND.exe` directly, without a mandatory external launcher.
@@ -153,10 +161,11 @@ build/jpackage/HORSEBOUND/HORSEBOUND.exe
 
 The packaged game includes its Java runtime. CI verifies:
 
-- executable, application JAR and runtime;
+- executable, application JAR and bundled runtime;
+- exact packaged version and source commit;
 - standardized controller classes and `jamepad64.dll`;
 - third-party notices and exact license texts;
-- absence of mutable user data inside the install image;
+- absence of saves, settings, crash logs and local Steam data in the install image;
 - SHA-256 package hashes.
 
 ## Tech
