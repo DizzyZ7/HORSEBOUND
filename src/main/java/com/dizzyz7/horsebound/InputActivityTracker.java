@@ -15,7 +15,7 @@ final class InputActivityTracker {
         if (device == null) return;
         activeDevice = device;
         if (device == InputDeviceType.GAMEPAD || device == InputDeviceType.STEAM_INPUT) {
-            controllerFamily = GdxControllerGlyphResolver.currentFamily();
+            controllerFamily = resolveFamilySafely();
         }
     }
 
@@ -38,5 +38,13 @@ final class InputActivityTracker {
     static void reset() {
         activeDevice = InputDeviceType.KEYBOARD_MOUSE;
         controllerFamily = ControllerGlyphFamily.GENERIC;
+    }
+
+    private static ControllerGlyphFamily resolveFamilySafely() {
+        try {
+            return GdxControllerGlyphResolver.currentFamily();
+        } catch (RuntimeException | LinkageError ex) {
+            return ControllerGlyphFamily.GENERIC;
+        }
     }
 }
