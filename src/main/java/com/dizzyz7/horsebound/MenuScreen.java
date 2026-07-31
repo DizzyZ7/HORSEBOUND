@@ -55,7 +55,7 @@ final class MenuScreen implements Screen {
         buttons[EXIT].set(centerX - 150f, startY - 186f, 300f, 54f);
 
         MenuInputSnapshot input = menuInput.sample();
-        handleNavigation(input.command());
+        if (handleNavigation(input.command())) return;
         if (handlePointer(height)) return;
 
         Gdx.gl.glClearColor(0.055f, 0.075f, 0.10f, 1f);
@@ -104,11 +104,18 @@ final class MenuScreen implements Screen {
         batch.end();
     }
 
-    private void handleNavigation(MenuCommand command) {
+    private boolean handleNavigation(MenuCommand command) {
         if (command.upPressed()) selectedIndex = nextEnabled(selectedIndex, -1);
         if (command.downPressed()) selectedIndex = nextEnabled(selectedIndex, 1);
-        if (command.confirmPressed()) activateSelected();
-        if (command.backPressed()) Gdx.app.exit();
+        if (command.confirmPressed()) {
+            activateSelected();
+            return true;
+        }
+        if (command.backPressed()) {
+            Gdx.app.exit();
+            return true;
+        }
+        return false;
     }
 
     private int nextEnabled(int from, int direction) {
