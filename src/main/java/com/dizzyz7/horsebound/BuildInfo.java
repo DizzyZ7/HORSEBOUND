@@ -47,8 +47,12 @@ record BuildInfo(String version, String commit, String vendor) {
         );
     }
 
+    String displayLabel() {
+        return AuthorInfo.GAME_NAME + " " + version;
+    }
+
     String diagnosticLabel() {
-        return AuthorInfo.GAME_NAME + " " + version + " (" + commit + ")";
+        return displayLabel() + " (" + commit + ")";
     }
 
     private static String normalized(String value, String fallback) {
