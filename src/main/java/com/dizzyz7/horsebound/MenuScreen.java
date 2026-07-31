@@ -6,6 +6,7 @@ import com.badlogic.gdx.Screen;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
+import com.badlogic.gdx.graphics.g2d.GlyphLayout;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Rectangle;
@@ -22,6 +23,7 @@ final class MenuScreen implements Screen {
     private final SpriteBatch batch = new SpriteBatch();
     private final ShapeRenderer shapes = new ShapeRenderer();
     private final BitmapFont font = new BitmapFont();
+    private final GlyphLayout glyphLayout = new GlyphLayout();
     private final MenuInputMapper menuInput = new MenuInputMapper();
     private final Rectangle[] buttons = {
         new Rectangle(), new Rectangle(), new Rectangle(), new Rectangle(), new Rectangle()
@@ -45,14 +47,9 @@ final class MenuScreen implements Screen {
     public void render(float delta) {
         int width = Gdx.graphics.getWidth();
         int height = Gdx.graphics.getHeight();
-        float centerX = width * 0.5f;
-        float startY = height * 0.55f;
-
-        buttons[CONTINUE].set(centerX - 150f, startY + 78f, 300f, 54f);
-        buttons[NEW_GAME].set(centerX - 150f, startY + 12f, 300f, 54f);
-        buttons[LOAD_GAME].set(centerX - 150f, startY - 54f, 300f, 54f);
-        buttons[SETTINGS].set(centerX - 150f, startY - 120f, 300f, 54f);
-        buttons[EXIT].set(centerX - 150f, startY - 186f, 300f, 54f);
+        float ui = UiScale.effective(width, height, game.settings().uiScale());
+        float layoutScale = Math.min(ui, 1.25f);
+        layout(width, height, layoutScale);
 
         MenuInputSnapshot input = menuInput.sample();
         if (handleNavigation(input.command())) return;
@@ -75,33 +72,43 @@ final class MenuScreen implements Screen {
         batch.getProjectionMatrix().setToOrtho2D(0f, 0f, width, height);
         batch.begin();
         font.setColor(Color.WHITE);
-        font.getData().setScale(3.3f);
-        font.draw(batch, "HORSEBOUND", centerX - 175f, height * 0.86f);
+        font.getData().setScale(3.1f * ui);
+        drawCentered("HORSEBOUND", width * 0.5f, height * 0.88f);
 
-        font.getData().setScale(1.05f);
+        font.getData().setScale(1.02f * ui);
         font.setColor(new Color(0.80f, 0.90f, 0.82f, 1f));
-        font.draw(batch, "A cozy 3D horse sandbox", centerX - 115f, height * 0.86f - 55f);
+        drawCentered("A cozy 3D horse sandbox", width * 0.5f, height * 0.80f);
 
-        drawButtonLabel("CONTINUE", CONTINUE, 92f, canContinue);
-        drawButtonLabel("NEW GAME", NEW_GAME, 88f, true);
-        drawButtonLabel("LOAD GAME", LOAD_GAME, 84f, true);
-        drawButtonLabel("SETTINGS", SETTINGS, 94f, true);
-        drawButtonLabel("EXIT", EXIT, 120f, true);
+        drawButtonLabel("CONTINUE", CONTINUE, canContinue, ui);
+        drawButtonLabel("NEW GAME", NEW_GAME, true, ui);
+        drawButtonLabel("LOAD GAME", LOAD_GAME, true, ui);
+        drawButtonLabel("SETTINGS", SETTINGS, true, ui);
+        drawButtonLabel("EXIT", EXIT, true, ui);
 
-        font.getData().setScale(0.78f);
+        font.getData().setScale(0.78f * ui);
         font.setColor(new Color(0.66f, 0.74f, 0.68f, 1f));
-        font.draw(batch,
+        drawCentered(
             canContinue ? "Continue opens the most recently saved ranch." : "No ranch yet. Start a new world.",
-            centerX - 165f,
-            startY - 224f
+            width * 0.5f,
+            91f * layoutScale
         );
-        font.draw(batch, inputHint(input.activeDevice()), centerX - 165f, startY - 247f);
+        drawCentered(InputPromptCatalog.menuHint(input.activeDevice()), width * 0.5f, 67f * layoutScale);
 
-        font.getData().setScale(0.9f);
+        font.getData().setScale(0.78f * ui);
         font.setColor(new Color(0.75f, 0.80f, 0.76f, 1f));
-        font.draw(batch, "Created by Dimash Janibekov (DizZyZ7)", 22f, 38f);
-        font.draw(batch, "(c) 2026 DizZyZ7. All rights reserved.", 22f, 20f);
+        font.draw(batch, "Created by Dimash Janibekov (DizZyZ7)", 18f * layoutScale, 38f * layoutScale);
         batch.end();
+    }
+
+    private void layout(int width, int height, float scale) {
+        float buttonWidth = 320f * scale;
+        float buttonHeight = 52f * scale;
+        float gap = 62f * scale;
+        float x = (width - buttonWidth) * 0.5f;
+        float firstY = height * 0.61f;
+        for (int i = 0; i < buttons.length; i++) {
+            buttons[i].set(x, firstY - i * gap, buttonWidth, buttonHeight);
+        }
     }
 
     private boolean handleNavigation(MenuCommand command) {
@@ -145,12 +152,11 @@ final class MenuScreen implements Screen {
         float x = Gdx.input.getX();
         float y = height - Gdx.input.getY();
         for (int i = 0; i < ITEM_COUNT; i++) {
-            if (buttons[i].contains(x, y)) {
-                if (i == CONTINUE && !canContinue) return true;
-                selectedIndex = i;
-                activateSelected();
-                return true;
-            }
+            if (!buttons[i].contains(x, y)) continue;
+            if (i == CONTINUE && !canContinue) return true;
+            selectedIndex = i;
+            activateSelected();
+            return true;
         }
         return false;
     }
@@ -162,17 +168,22 @@ final class MenuScreen implements Screen {
         return new Color(0.17f, 0.31f, 0.23f, 1f);
     }
 
-    private void drawButtonLabel(String label, int index, float offsetX, boolean enabled) {
-        font.getData().setScale(1.16f);
+    private void drawButtonLabel(String label, int index, boolean enabled, float ui) {
+        font.getData().setScale(1.08f * ui);
         font.setColor(enabled ? Color.WHITE : new Color(0.48f, 0.52f, 0.49f, 1f));
         Rectangle button = buttons[index];
-        font.draw(batch, label, button.x + offsetX, button.y + 35f);
+        glyphLayout.setText(font, label);
+        font.draw(
+            batch,
+            label,
+            button.x + (button.width - glyphLayout.width) * 0.5f,
+            button.y + (button.height + glyphLayout.height) * 0.5f
+        );
     }
 
-    private static String inputHint(InputDeviceType device) {
-        return device == InputDeviceType.KEYBOARD_MOUSE
-            ? "Arrows/WASD navigate | Enter confirm | Esc exit"
-            : "D-pad/Left Stick navigate | A confirm | B back";
+    private void drawCentered(String text, float centerX, float baselineY) {
+        glyphLayout.setText(font, text);
+        font.draw(batch, text, centerX - glyphLayout.width * 0.5f, baselineY);
     }
 
     @Override public void resize(int width, int height) { }

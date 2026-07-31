@@ -13,26 +13,24 @@ import com.badlogic.gdx.math.Rectangle;
 import java.util.Locale;
 
 final class SettingsScreen implements Screen {
-    private static final int VSYNC = 0;
-    private static final int SENSITIVITY = 1;
-    private static final int AUTOSAVE = 2;
-    private static final int DEFAULTS = 3;
-    private static final int BACK = 4;
-    private static final int ITEM_COUNT = 5;
+    private static final int WINDOW_MODE = 0;
+    private static final int RESOLUTION = 1;
+    private static final int VSYNC = 2;
+    private static final int GRAPHICS = 3;
+    private static final int UI_SCALE = 4;
+    private static final int SENSITIVITY = 5;
+    private static final int PERFORMANCE = 6;
+    private static final int AUTOSAVE = 7;
+    private static final int DEFAULTS = 8;
+    private static final int BACK = 9;
+    private static final int ITEM_COUNT = 10;
 
     private final HorseboundGame game;
     private final SpriteBatch batch = new SpriteBatch();
     private final ShapeRenderer shapes = new ShapeRenderer();
     private final BitmapFont font = new BitmapFont();
     private final MenuInputMapper menuInput = new MenuInputMapper();
-
-    private final Rectangle vsyncButton = new Rectangle();
-    private final Rectangle sensitivityMinus = new Rectangle();
-    private final Rectangle sensitivityPlus = new Rectangle();
-    private final Rectangle autosaveMinus = new Rectangle();
-    private final Rectangle autosavePlus = new Rectangle();
-    private final Rectangle defaultsButton = new Rectangle();
-    private final Rectangle backButton = new Rectangle();
+    private final Rectangle[] rows = new Rectangle[ITEM_COUNT];
 
     private GameSettings settings;
     private int selectedIndex;
@@ -40,28 +38,23 @@ final class SettingsScreen implements Screen {
     SettingsScreen(HorseboundGame game) {
         this.game = game;
         this.settings = game.settings();
+        for (int i = 0; i < rows.length; i++) rows[i] = new Rectangle();
     }
 
     @Override
     public void show() {
         Gdx.input.setCursorCatched(false);
-        selectedIndex = VSYNC;
+        selectedIndex = WINDOW_MODE;
+        settings = game.settings();
     }
 
     @Override
     public void render(float delta) {
         int width = Gdx.graphics.getWidth();
         int height = Gdx.graphics.getHeight();
-        float centerX = width * 0.5f;
-        float top = height * 0.64f;
-
-        vsyncButton.set(centerX + 65f, top + 38f, 180f, 48f);
-        sensitivityMinus.set(centerX + 65f, top - 34f, 54f, 48f);
-        sensitivityPlus.set(centerX + 191f, top - 34f, 54f, 48f);
-        autosaveMinus.set(centerX + 65f, top - 106f, 54f, 48f);
-        autosavePlus.set(centerX + 191f, top - 106f, 54f, 48f);
-        defaultsButton.set(centerX - 210f, top - 205f, 190f, 52f);
-        backButton.set(centerX + 20f, top - 205f, 190f, 52f);
+        float ui = UiScale.effective(width, height, settings.uiScale());
+        float layoutScale = Math.min(ui, 1.15f);
+        layout(width, height, layoutScale);
 
         MenuInputSnapshot input = menuInput.sample();
         if (handleNavigation(input.command())) return;
@@ -74,60 +67,79 @@ final class SettingsScreen implements Screen {
         shapes.begin(ShapeRenderer.ShapeType.Filled);
         shapes.setColor(new Color(0.10f, 0.16f, 0.14f, 1f));
         shapes.rect(0f, 0f, width, height);
-
-        shapes.setColor(selectedIndex == VSYNC
-            ? selectedColor()
-            : settings.vsync() ? new Color(0.18f, 0.36f, 0.25f, 1f) : new Color(0.25f, 0.22f, 0.18f, 1f));
-        shapes.rect(vsyncButton.x, vsyncButton.y, vsyncButton.width, vsyncButton.height);
-
-        shapes.setColor(selectedIndex == SENSITIVITY ? selectedColor() : normalColor());
-        shapes.rect(sensitivityMinus.x, sensitivityMinus.y, sensitivityMinus.width, sensitivityMinus.height);
-        shapes.rect(sensitivityPlus.x, sensitivityPlus.y, sensitivityPlus.width, sensitivityPlus.height);
-
-        shapes.setColor(selectedIndex == AUTOSAVE ? selectedColor() : normalColor());
-        shapes.rect(autosaveMinus.x, autosaveMinus.y, autosaveMinus.width, autosaveMinus.height);
-        shapes.rect(autosavePlus.x, autosavePlus.y, autosavePlus.width, autosavePlus.height);
-
-        shapes.setColor(selectedIndex == DEFAULTS ? selectedColor() : normalColor());
-        shapes.rect(defaultsButton.x, defaultsButton.y, defaultsButton.width, defaultsButton.height);
-        shapes.setColor(selectedIndex == BACK ? selectedColor() : normalColor());
-        shapes.rect(backButton.x, backButton.y, backButton.width, backButton.height);
+        for (int i = 0; i < rows.length; i++) {
+            shapes.setColor(i == selectedIndex ? selectedColor() : normalColor());
+            Rectangle row = rows[i];
+            shapes.rect(row.x, row.y, row.width, row.height);
+        }
         shapes.end();
 
         batch.getProjectionMatrix().setToOrtho2D(0f, 0f, width, height);
         batch.begin();
         font.setColor(Color.WHITE);
-        font.getData().setScale(2.4f);
-        font.draw(batch, "SETTINGS", centerX - 120f, height * 0.82f);
+        font.getData().setScale(2.25f * ui);
+        font.draw(batch, "SETTINGS", width * 0.5f - 105f * layoutScale, height - 34f * layoutScale);
 
-        font.getData().setScale(1.05f);
-        font.setColor(new Color(0.84f, 0.90f, 0.85f, 1f));
-        font.draw(batch, "VSync", centerX - 220f, top + 72f);
-        font.draw(batch, "Mouse / camera sensitivity", centerX - 220f, top);
-        font.draw(batch, "Autosave interval", centerX - 220f, top - 72f);
+        font.getData().setScale(0.92f * ui);
+        for (int i = 0; i < rows.length; i++) drawRow(i, rows[i], ui, layoutScale);
 
-        font.setColor(Color.WHITE);
-        font.draw(batch, settings.vsync() ? "ON" : "OFF", vsyncButton.x + 72f, vsyncButton.y + 32f);
-        font.draw(batch, "-", sensitivityMinus.x + 22f, sensitivityMinus.y + 32f);
-        font.draw(batch, "+", sensitivityPlus.x + 20f, sensitivityPlus.y + 32f);
-        font.draw(batch, "-", autosaveMinus.x + 22f, autosaveMinus.y + 32f);
-        font.draw(batch, "+", autosavePlus.x + 20f, autosavePlus.y + 32f);
-
-        font.getData().setScale(0.95f);
-        font.setColor(new Color(1f, 0.88f, 0.58f, 1f));
-        font.draw(batch, String.format(Locale.ROOT, "%.2f", settings.mouseSensitivity()), centerX + 137f, top - 2f);
-        font.draw(batch, settings.autosaveSeconds() + " sec", centerX + 128f, top - 74f);
-
-        font.setColor(Color.WHITE);
-        font.draw(batch, "DEFAULTS", defaultsButton.x + 46f, defaultsButton.y + 34f);
-        font.draw(batch, "BACK", backButton.x + 72f, backButton.y + 34f);
-
-        font.getData().setScale(0.72f);
+        font.getData().setScale(0.72f * ui);
         font.setColor(new Color(0.68f, 0.73f, 0.69f, 1f));
-        font.draw(batch, "Settings are stored separately from ranch saves.", centerX - 155f, 58f);
-        font.draw(batch, inputHint(input.activeDevice()), centerX - 205f, 39f);
-        font.draw(batch, "Created by Dimash Janibekov (DizZyZ7)", 18f, 20f);
+        font.draw(batch, "Display settings are device-local and excluded from Steam Cloud.", 18f * layoutScale, 42f * layoutScale);
+        font.draw(batch, InputPromptCatalog.menuHint(input.activeDevice()), 18f * layoutScale, 23f * layoutScale);
         batch.end();
+    }
+
+    private void layout(int width, int height, float scale) {
+        float rowWidth = Math.min(width - 40f * scale, 680f * scale);
+        float rowHeight = 40f * scale;
+        float gap = 46f * scale;
+        float startY = height - 116f * scale;
+        float x = (width - rowWidth) * 0.5f;
+        for (int i = 0; i < rows.length; i++) {
+            rows[i].set(x, startY - i * gap, rowWidth, rowHeight);
+        }
+    }
+
+    private void drawRow(int index, Rectangle row, float ui, float layoutScale) {
+        font.setColor(index == selectedIndex ? Color.WHITE : new Color(0.84f, 0.90f, 0.85f, 1f));
+        font.draw(batch, label(index), row.x + 14f * layoutScale, row.y + 27f * layoutScale);
+        String value = value(index);
+        if (!value.isEmpty()) {
+            font.setColor(new Color(1f, 0.88f, 0.58f, 1f));
+            font.draw(batch, value, row.x + row.width - 245f * layoutScale, row.y + 27f * layoutScale);
+        }
+    }
+
+    private String label(int index) {
+        return switch (index) {
+            case WINDOW_MODE -> "Window mode";
+            case RESOLUTION -> "Windowed resolution";
+            case VSYNC -> "VSync";
+            case GRAPHICS -> "Graphics preset";
+            case UI_SCALE -> "UI / text scale";
+            case SENSITIVITY -> "Mouse / camera sensitivity";
+            case PERFORMANCE -> "Performance overlay";
+            case AUTOSAVE -> "Autosave interval";
+            case DEFAULTS -> "Restore Deck-safe defaults";
+            case BACK -> "Back";
+            default -> throw new IllegalArgumentException("Unknown settings index: " + index);
+        };
+    }
+
+    private String value(int index) {
+        return switch (index) {
+            case WINDOW_MODE -> settings.windowMode().displayName();
+            case RESOLUTION -> settings.displayResolution().displayName();
+            case VSYNC -> settings.vsync() ? "ON" : "OFF";
+            case GRAPHICS -> settings.graphicsPreset().displayName() + " | MSAA next launch";
+            case UI_SCALE -> Math.round(settings.uiScale() * 100f) + "%";
+            case SENSITIVITY -> String.format(Locale.ROOT, "%.2f", settings.mouseSensitivity());
+            case PERFORMANCE -> settings.showPerformanceStats() ? "ON" : "OFF";
+            case AUTOSAVE -> settings.autosaveSeconds() + " sec";
+            case DEFAULTS, BACK -> "";
+            default -> throw new IllegalArgumentException("Unknown settings index: " + index);
+        };
     }
 
     private boolean handleNavigation(MenuCommand command) {
@@ -136,16 +148,13 @@ final class SettingsScreen implements Screen {
         if (command.leftPressed()) adjustSelected(-1);
         if (command.rightPressed()) adjustSelected(1);
         if (command.confirmPressed()) {
-            switch (selectedIndex) {
-                case VSYNC -> apply(settings.withVsync(!settings.vsync()));
-                case SENSITIVITY -> adjustSelected(1);
-                case AUTOSAVE -> adjustSelected(1);
-                case DEFAULTS -> apply(GameSettings.defaults());
-                case BACK -> {
-                    game.returnToMenu();
-                    return true;
-                }
-                default -> throw new IllegalStateException("Unknown settings index: " + selectedIndex);
+            if (selectedIndex == DEFAULTS) {
+                apply(GameSettings.defaults());
+            } else if (selectedIndex == BACK) {
+                game.returnToMenu();
+                return true;
+            } else {
+                adjustSelected(1);
             }
         }
         if (command.backPressed()) {
@@ -156,11 +165,15 @@ final class SettingsScreen implements Screen {
     }
 
     private void adjustSelected(int direction) {
+        if (direction == 0) return;
         switch (selectedIndex) {
-            case VSYNC -> {
-                if (direction != 0) apply(settings.withVsync(!settings.vsync()));
-            }
+            case WINDOW_MODE -> apply(settings.withWindowMode(settings.windowMode().toggled()));
+            case RESOLUTION -> apply(settings.withResolution(settings.displayResolution().shifted(direction)));
+            case VSYNC -> apply(settings.withVsync(!settings.vsync()));
+            case GRAPHICS -> apply(settings.withGraphicsPreset(settings.graphicsPreset().shifted(direction)));
+            case UI_SCALE -> apply(settings.withUiScale(settings.uiScale() + 0.10f * Integer.signum(direction)));
             case SENSITIVITY -> apply(settings.withMouseSensitivity(settings.mouseSensitivity() + 0.01f * direction));
+            case PERFORMANCE -> apply(settings.withPerformanceStats(!settings.showPerformanceStats()));
             case AUTOSAVE -> apply(settings.withAutosaveSeconds(settings.autosaveSeconds() + 30 * direction));
             default -> { }
         }
@@ -171,35 +184,26 @@ final class SettingsScreen implements Screen {
         menuInput.markPointerActive();
         float x = Gdx.input.getX();
         float y = height - Gdx.input.getY();
-        if (vsyncButton.contains(x, y)) {
-            selectedIndex = VSYNC;
-            apply(settings.withVsync(!settings.vsync()));
-        } else if (sensitivityMinus.contains(x, y)) {
-            selectedIndex = SENSITIVITY;
-            adjustSelected(-1);
-        } else if (sensitivityPlus.contains(x, y)) {
-            selectedIndex = SENSITIVITY;
-            adjustSelected(1);
-        } else if (autosaveMinus.contains(x, y)) {
-            selectedIndex = AUTOSAVE;
-            adjustSelected(-1);
-        } else if (autosavePlus.contains(x, y)) {
-            selectedIndex = AUTOSAVE;
-            adjustSelected(1);
-        } else if (defaultsButton.contains(x, y)) {
-            selectedIndex = DEFAULTS;
-            apply(GameSettings.defaults());
-        } else if (backButton.contains(x, y)) {
-            selectedIndex = BACK;
-            game.returnToMenu();
-            return true;
+        for (int i = 0; i < rows.length; i++) {
+            Rectangle row = rows[i];
+            if (!row.contains(x, y)) continue;
+            selectedIndex = i;
+            if (i == DEFAULTS) {
+                apply(GameSettings.defaults());
+            } else if (i == BACK) {
+                game.returnToMenu();
+                return true;
+            } else {
+                adjustSelected(x < row.x + row.width * 0.5f ? -1 : 1);
+            }
+            break;
         }
         return false;
     }
 
     private void apply(GameSettings next) {
-        settings = next;
         game.updateSettings(next);
+        settings = game.settings();
     }
 
     private static Color selectedColor() {
@@ -208,12 +212,6 @@ final class SettingsScreen implements Screen {
 
     private static Color normalColor() {
         return new Color(0.16f, 0.23f, 0.19f, 1f);
-    }
-
-    private static String inputHint(InputDeviceType device) {
-        return device == InputDeviceType.KEYBOARD_MOUSE
-            ? "Up/Down select | Left/Right change | Enter confirm | Esc back"
-            : "D-pad/Left Stick select | Left/Right change | A confirm | B back";
     }
 
     @Override public void resize(int width, int height) { }

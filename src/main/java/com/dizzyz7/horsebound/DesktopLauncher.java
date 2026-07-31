@@ -22,14 +22,15 @@ public final class DesktopLauncher {
 
         SettingsRepository settingsRepository = new SettingsRepository();
         GameSettings settings = settingsRepository.load();
+        GraphicsPreset preset = settings.graphicsPreset();
 
         Lwjgl3ApplicationConfiguration config = new Lwjgl3ApplicationConfiguration();
         config.setTitle(buildInfo.displayLabel() + " | Created by DizZyZ7");
-        config.setWindowedMode(1280, 720);
+        DisplayController.configureStartup(config, settings);
         config.setResizable(true);
-        config.useVsync(settings.vsync());
-        config.setForegroundFPS(144);
-        config.setBackBufferConfig(8, 8, 8, 8, 24, 8, 4);
+        config.setForegroundFPS(preset.foregroundFps());
+        config.setIdleFPS(30);
+        config.setBackBufferConfig(8, 8, 8, 8, 24, 8, preset.msaaSamples());
         new Lwjgl3Application(new HorseboundGame(settingsRepository, settings), config);
     }
 }
