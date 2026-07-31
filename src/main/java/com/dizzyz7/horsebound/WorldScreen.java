@@ -17,17 +17,26 @@ import com.badlogic.gdx.graphics.g3d.environment.DirectionalLight;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector3;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Random;
+import java.util.Set;
+import java.util.UUID;
 
 final class WorldScreen implements Screen {
     private static final float PLAYER_WALK_SPEED = 5.2f;
     private static final float PLAYER_RUN_SPEED = 8.4f;
     private static final float WORLD_LIMIT = Terrain.WORLD_HALF_SIZE - 3f;
+    private static final float AUTOSAVE_INTERVAL_SECONDS = 60f;
 
     private final HorseboundGame game;
+    private final SaveService saveService;
+    private final long worldSeed;
+    private final Random random;
+
     private final Terrain terrain = new Terrain();
     private final GameModels models = new GameModels();
     private final ModelBatch modelBatch = new ModelBatch();
@@ -41,32 +50,37 @@ final class WorldScreen implements Screen {
     private final ModelInstance water = new ModelInstance(models.water);
     private final List<TreeNode> trees = new ArrayList<>();
     private final List<ModelInstance> rocks = new ArrayList<>();
-    private final List<ModelInstance> fences = new ArrayList<>();
+    private final List<FenceNode> fences = new ArrayList<>();
     private final List<Horse> horses = new ArrayList<>();
     private final Pushik pushik;
 
-    private final Vector3 playerPosition = new Vector3(0f, 0f, -18f);
+    private final Vector3 playerPosition = new Vector3();
     private final Vector3 tmpForward = new Vector3();
     private final Vector3 tmpRight = new Vector3();
     private final Vector3 tmpMove = new Vector3();
     private final Vector3 tmpTarget = new Vector3();
-    private final Random random = new Random(13072026L);
 
     private Horse mountedHorse;
     private float cameraYaw = 18f;
     private float cameraPitch = 27f;
     private float cameraDistance = 10f;
-    private float playerFacing = 0f;
-    private float playerJumpOffset = 0f;
-    private float playerJumpVelocity = 0f;
-    private float worldTime = 0.29f;
-    private int wood = 4;
-    private int apples = 5;
+    private float playerFacing;
+    private float playerJumpOffset;
+    private float playerJumpVelocity;
+    private float worldTime;
+    private float autosaveTimer;
+    private int wood;
+    private int apples;
     private String status = "Find a wild horse, earn its trust, and build your first paddock.";
     private float statusTimer = 8f;
+    private boolean disposed;
 
-    WorldScreen(HorseboundGame game) {
+    WorldScreen(HorseboundGame game, SaveService saveService, SaveGame initialState) {
         this.game = game;
+        this.saveService = saveService;
+        this.worldSeed = initialState.worldSeed();
+        this.random = new Random(worldSeed ^ 0x484F525345424F55L);
+
         camera = new PerspectiveCamera(67f, Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
         camera.near = 0.08f;
         camera.far = 420f;
@@ -75,12 +89,46 @@ final class WorldScreen implements Screen {
         sun.set(1f, 0.96f, 0.82f, -0.45f, -0.85f, -0.25f);
         environment.add(sun);
 
+        SaveGame.PlayerData savedPlayer = initialState.player();
+        playerPosition.set(
+            clampWorld(savedPlayer.x()),
+            0f,
+            clampWorld(savedPlayer.z())
+        );
+        if (Terrain.isInsideLake(playerPosition.x, playerPosition.z)) {
+            playerPosition.set(0f, 0f, -18f);
+        }
         playerPosition.y = Terrain.heightAt(playerPosition.x, playerPosition.z);
+        playerFacing = savedPlayer.facing();
+        wood = Math.max(0, savedPlayer.wood());
+        apples = Math.max(0, savedPlayer.apples());
+        worldTime = normalizeTime(initialState.worldTime());
+
         water.transform.setToTranslation(Terrain.LAKE_X, Terrain.WATER_LEVEL, Terrain.LAKE_Z);
 
         generateNature();
-        spawnHorses();
-        pushik = new Pushik(new ModelInstance(models.pushik), new Vector3(2f, Terrain.heightAt(2f, -16f), -16f));
+        applyHarvestedTrees(initialState.harvestedTreeIds());
+
+        if (initialState.horses().isEmpty()) {
+            spawnHorses();
+        } else {
+            loadHorses(initialState.horses());
+        }
+        loadFences(initialState.fences());
+
+        SaveGame.PushikData savedPushik = initialState.pushik();
+        float pushikX = clampWorld(savedPushik.x());
+        float pushikZ = clampWorld(savedPushik.z());
+        if (Terrain.isInsideLake(pushikX, pushikZ)) {
+            pushikX = playerPosition.x + 2f;
+            pushikZ = playerPosition.z + 1f;
+        }
+        pushik = new Pushik(
+            new ModelInstance(models.pushik),
+            new Vector3(pushikX, Terrain.heightAt(pushikX, pushikZ), pushikZ)
+        );
+        pushik.heading = savedPushik.heading();
+
         syncTransforms();
         updateCamera();
     }
@@ -93,7 +141,13 @@ final class WorldScreen implements Screen {
     @Override
     public void render(float delta) {
         float dt = Math.min(delta, 0.05f);
+
+        if (Gdx.input.isKeyJustPressed(Input.Keys.F5)) {
+            saveNow("Game saved.");
+        }
+
         if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
+            saveNow(null);
             Gdx.input.setCursorCatched(false);
             game.returnToMenu();
             return;
@@ -109,6 +163,7 @@ final class WorldScreen implements Screen {
         updatePushik(dt);
         handleInteractions();
         updateDayNight(dt);
+        updateAutosave(dt);
         syncTransforms();
         updateCamera();
         renderWorld();
@@ -132,7 +187,7 @@ final class WorldScreen implements Screen {
             tree.transform.setToTranslation(x, Terrain.heightAt(x, z), z)
                 .rotate(Vector3.Y, randomRange(0f, 360f))
                 .scale(scale, scale, scale);
-            trees.add(new TreeNode(tree, x, z));
+            trees.add(new TreeNode(i, tree, x, z));
         }
 
         for (int i = 0; i < 30; i++) {
@@ -151,14 +206,67 @@ final class WorldScreen implements Screen {
         }
     }
 
+    private void applyHarvestedTrees(List<Integer> harvestedIds) {
+        Set<Integer> ids = new HashSet<>(harvestedIds);
+        for (TreeNode tree : trees) {
+            tree.harvested = ids.contains(tree.id);
+        }
+    }
+
     private void spawnHorses() {
-        horses.add(new Horse("Ember", new ModelInstance(models.horse), new Vector3(16f, 0f, 8f), 25f));
-        horses.add(new Horse("Willow", new ModelInstance(models.horse), new Vector3(29f, 0f, -9f), 132f));
-        horses.add(new Horse("Comet", new ModelInstance(models.horse), new Vector3(-8f, 0f, 33f), 220f));
-        horses.add(new Horse("Hazel", new ModelInstance(models.horse), new Vector3(43f, 0f, 28f), 310f));
+        horses.add(newHorse("Ember", 16f, 8f, 25f));
+        horses.add(newHorse("Willow", 29f, -9f, 132f));
+        horses.add(newHorse("Comet", -8f, 33f, 220f));
+        horses.add(newHorse("Hazel", 43f, 28f, 310f));
         for (Horse horse : horses) {
-            horse.position.y = Terrain.heightAt(horse.position.x, horse.position.z);
             horse.wanderTimer = randomRange(1.5f, 5f);
+        }
+    }
+
+    private Horse newHorse(String name, float x, float z, float heading) {
+        UUID id = UUID.nameUUIDFromBytes((worldSeed + ":horse:" + name).getBytes(StandardCharsets.UTF_8));
+        return new Horse(
+            id,
+            name,
+            new ModelInstance(models.horse),
+            new Vector3(x, Terrain.heightAt(x, z), z),
+            heading
+        );
+    }
+
+    private void loadHorses(List<SaveGame.HorseData> savedHorses) {
+        for (SaveGame.HorseData data : savedHorses) {
+            float x = clampWorld(data.x());
+            float z = clampWorld(data.z());
+            if (Terrain.isInsideLake(x, z)) {
+                x = 0f;
+                z = 0f;
+            }
+            Horse horse = new Horse(
+                data.id(),
+                data.name(),
+                new ModelInstance(models.horse),
+                new Vector3(x, Terrain.heightAt(x, z), z),
+                data.heading()
+            );
+            horse.trust = MathUtils.clamp(data.trust(), 0f, 100f);
+            horse.stamina = MathUtils.clamp(data.stamina(), 0f, 100f);
+            horse.tamed = data.tamed();
+            horse.wanderTimer = randomRange(1.5f, 5f);
+            horses.add(horse);
+        }
+    }
+
+    private void loadFences(List<SaveGame.FenceData> savedFences) {
+        for (SaveGame.FenceData data : savedFences) {
+            float x = clampWorld(data.x());
+            float z = clampWorld(data.z());
+            if (Terrain.isInsideLake(x, z)) {
+                continue;
+            }
+            ModelInstance fence = new ModelInstance(models.fence);
+            fence.transform.setToTranslation(x, Terrain.heightAt(x, z), z).rotate(Vector3.Y, data.heading());
+            fences.add(new FenceNode(fence, x, z, data.heading()));
         }
     }
 
@@ -331,7 +439,8 @@ final class WorldScreen implements Screen {
                     if (horse.trust >= 100f) {
                         horse.tamed = true;
                         horse.trust = 100f;
-                        setStatus(horse.name + " trusts you now. Press F nearby to ride.");
+                        saveNow(null);
+                        setStatus(horse.name + " trusts you now. Progress saved. Press F nearby to ride.");
                     } else {
                         setStatus(horse.name + " accepted the apple. Trust: " + Math.round(horse.trust) + "%");
                     }
@@ -395,7 +504,7 @@ final class WorldScreen implements Screen {
             ModelInstance fence = new ModelInstance(models.fence);
             float heading = mountedHorse == null ? playerFacing : mountedHorse.heading;
             fence.transform.setToTranslation(x, Terrain.heightAt(x, z), z).rotate(Vector3.Y, heading);
-            fences.add(fence);
+            fences.add(new FenceNode(fence, x, z, heading));
             wood -= 2;
             setStatus("Fence placed. Your first paddock has begun.");
         }
@@ -415,6 +524,14 @@ final class WorldScreen implements Screen {
             0.16f + daylight * 0.42f,
             1f
         ));
+    }
+
+    private void updateAutosave(float dt) {
+        autosaveTimer += dt;
+        if (autosaveTimer >= AUTOSAVE_INTERVAL_SECONDS) {
+            autosaveTimer = 0f;
+            saveNow("Autosaved.");
+        }
     }
 
     private void syncTransforms() {
@@ -471,7 +588,7 @@ final class WorldScreen implements Screen {
             if (!tree.harvested) modelBatch.render(tree.instance, environment);
         }
         for (ModelInstance rock : rocks) modelBatch.render(rock, environment);
-        for (ModelInstance fence : fences) modelBatch.render(fence, environment);
+        for (FenceNode fence : fences) modelBatch.render(fence.instance, environment);
         for (Horse horse : horses) modelBatch.render(horse.instance, environment);
         modelBatch.render(pushik.instance, environment);
         modelBatch.render(player, environment);
@@ -490,8 +607,8 @@ final class WorldScreen implements Screen {
         font.draw(spriteBatch, "HORSEBOUND", 18f, height - 18f);
         font.getData().setScale(0.82f);
         font.setColor(new Color(0.88f, 0.91f, 0.86f, 1f));
-        font.draw(spriteBatch, "WASD move | Mouse camera | E interact | F mount | B build | Shift sprint/gallop | Space jump", 18f, height - 42f);
-        font.draw(spriteBatch, "Wood: " + wood + "    Apples: " + apples, 18f, height - 64f);
+        font.draw(spriteBatch, "WASD move | Mouse camera | E interact | F mount | B build | F5 save | Shift sprint/gallop | Space jump", 18f, height - 42f);
+        font.draw(spriteBatch, "Wood: " + wood + "    Apples: " + apples + "    Seed: " + worldSeed, 18f, height - 64f);
 
         if (mountedHorse != null) {
             font.setColor(new Color(1f, 0.87f, 0.57f, 1f));
@@ -564,10 +681,77 @@ final class WorldScreen implements Screen {
         return min + random.nextFloat() * (max - min);
     }
 
+    private void saveNow(String message) {
+        try {
+            saveService.save(captureSave());
+            if (message != null) {
+                setStatus(message);
+            }
+        } catch (SaveRepository.SaveException ex) {
+            Gdx.app.error("HORSEBOUND", "Save failed", ex);
+            setStatus("Save failed. Your current session is still running.");
+        }
+    }
+
+    private SaveGame captureSave() {
+        List<SaveGame.HorseData> horseData = new ArrayList<>(horses.size());
+        for (Horse horse : horses) {
+            horseData.add(new SaveGame.HorseData(
+                horse.id,
+                horse.name,
+                horse.position.x,
+                horse.position.z,
+                horse.heading,
+                horse.trust,
+                horse.stamina,
+                horse.tamed
+            ));
+        }
+
+        List<SaveGame.FenceData> fenceData = new ArrayList<>(fences.size());
+        for (FenceNode fence : fences) {
+            fenceData.add(new SaveGame.FenceData(fence.x, fence.z, fence.heading));
+        }
+
+        List<Integer> harvestedTrees = new ArrayList<>();
+        for (TreeNode tree : trees) {
+            if (tree.harvested) {
+                harvestedTrees.add(tree.id);
+            }
+        }
+
+        return new SaveGame(
+            SaveGame.CURRENT_VERSION,
+            worldSeed,
+            System.currentTimeMillis(),
+            worldTime,
+            new SaveGame.PlayerData(playerPosition.x, playerPosition.z, playerFacing, wood, apples),
+            new SaveGame.PushikData(pushik.position.x, pushik.position.z, pushik.heading),
+            horseData,
+            fenceData,
+            harvestedTrees
+        );
+    }
+
     private static float planarDistance(float ax, float az, float bx, float bz) {
         float dx = ax - bx;
         float dz = az - bz;
         return (float) Math.sqrt(dx * dx + dz * dz);
+    }
+
+    private static float clampWorld(float value) {
+        if (!Float.isFinite(value)) {
+            return 0f;
+        }
+        return MathUtils.clamp(value, -WORLD_LIMIT, WORLD_LIMIT);
+    }
+
+    private static float normalizeTime(float value) {
+        if (!Float.isFinite(value)) {
+            return 0.29f;
+        }
+        float normalized = value % 1f;
+        return normalized < 0f ? normalized + 1f : normalized;
     }
 
     private void setStatus(String message) {
@@ -584,6 +768,7 @@ final class WorldScreen implements Screen {
 
     @Override
     public void pause() {
+        saveNow(null);
     }
 
     @Override
@@ -597,6 +782,11 @@ final class WorldScreen implements Screen {
 
     @Override
     public void dispose() {
+        if (disposed) {
+            return;
+        }
+        disposed = true;
+        saveNow(null);
         Gdx.input.setCursorCatched(false);
         modelBatch.dispose();
         spriteBatch.dispose();
@@ -606,19 +796,36 @@ final class WorldScreen implements Screen {
     }
 
     private static final class TreeNode {
+        final int id;
         final ModelInstance instance;
         final float x;
         final float z;
         boolean harvested;
 
-        TreeNode(ModelInstance instance, float x, float z) {
+        TreeNode(int id, ModelInstance instance, float x, float z) {
+            this.id = id;
             this.instance = instance;
             this.x = x;
             this.z = z;
         }
     }
 
+    private static final class FenceNode {
+        final ModelInstance instance;
+        final float x;
+        final float z;
+        final float heading;
+
+        FenceNode(ModelInstance instance, float x, float z, float heading) {
+            this.instance = instance;
+            this.x = x;
+            this.z = z;
+            this.heading = heading;
+        }
+    }
+
     private static final class Horse {
+        final UUID id;
         final String name;
         final ModelInstance instance;
         final Vector3 position;
@@ -632,7 +839,8 @@ final class WorldScreen implements Screen {
         boolean tamed;
         boolean mounted;
 
-        Horse(String name, ModelInstance instance, Vector3 position, float heading) {
+        Horse(UUID id, String name, ModelInstance instance, Vector3 position, float heading) {
+            this.id = id;
             this.name = name;
             this.instance = instance;
             this.position = position;

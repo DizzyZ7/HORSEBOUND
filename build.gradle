@@ -4,7 +4,7 @@ plugins {
 }
 
 group = 'com.dizzyz7'
-version = '0.1.0'
+version = '0.2.0'
 
 ext {
     gdxVersion = '1.14.2'
@@ -25,6 +25,9 @@ dependencies {
     implementation "com.badlogicgames.gdx:gdx:${gdxVersion}"
     implementation "com.badlogicgames.gdx:gdx-backend-lwjgl3:${gdxVersion}"
     runtimeOnly "com.badlogicgames.gdx:gdx-platform:${gdxVersion}:natives-desktop"
+
+    testImplementation platform('org.junit:junit-bom:5.11.4')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
 }
 
 application {
@@ -33,6 +36,10 @@ application {
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
+}
+
+tasks.named('test', Test) {
+    useJUnitPlatform()
 }
 
 tasks.named('run', JavaExec) {

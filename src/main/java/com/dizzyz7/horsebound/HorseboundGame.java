@@ -5,13 +5,24 @@ import com.badlogic.gdx.Game;
 import com.badlogic.gdx.Screen;
 
 public final class HorseboundGame extends Game {
+    private SaveService saveService;
+
     @Override
     public void create() {
+        saveService = new SaveService();
         setScreen(new MenuScreen(this));
     }
 
-    public void startWorld() {
-        switchTo(new WorldScreen(this));
+    boolean hasContinue() {
+        return saveService.hasContinue();
+    }
+
+    public void startNewWorld() {
+        switchTo(new WorldScreen(this, saveService, saveService.createNewWorld()));
+    }
+
+    public void continueWorld() {
+        switchTo(new WorldScreen(this, saveService, saveService.loadContinue()));
     }
 
     public void returnToMenu() {
