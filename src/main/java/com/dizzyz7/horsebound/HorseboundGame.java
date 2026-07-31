@@ -9,8 +9,10 @@ import java.util.List;
 
 public final class HorseboundGame extends Game {
     private final SettingsRepository settingsRepository;
+    private final FrameMetrics frameMetrics = new FrameMetrics();
     private GameSettings settings;
     private SaveService saveService;
+    private PerformanceOverlay performanceOverlay;
 
     public HorseboundGame() {
         this(new SettingsRepository(), GameSettings.defaults());
@@ -24,8 +26,16 @@ public final class HorseboundGame extends Game {
     @Override
     public void create() {
         saveService = new SaveService();
+        performanceOverlay = new PerformanceOverlay();
         Gdx.graphics.setVSync(settings.vsync());
         setScreen(new MenuScreen(this));
+    }
+
+    @Override
+    public void render() {
+        frameMetrics.record(Gdx.graphics.getDeltaTime());
+        super.render();
+        if (performanceOverlay != null) performanceOverlay.render(frameMetrics, settings);
     }
 
     boolean hasContinue() {
@@ -38,6 +48,10 @@ public final class HorseboundGame extends Game {
 
     GameSettings settings() {
         return settings;
+    }
+
+    FrameMetrics frameMetrics() {
+        return frameMetrics;
     }
 
     void updateSettings(GameSettings next) {
@@ -87,5 +101,6 @@ public final class HorseboundGame extends Game {
     @Override
     public void dispose() {
         if (getScreen() != null) getScreen().dispose();
+        if (performanceOverlay != null) performanceOverlay.dispose();
     }
 }
