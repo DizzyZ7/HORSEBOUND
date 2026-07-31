@@ -2,14 +2,29 @@
 package com.dizzyz7.horsebound;
 
 import com.badlogic.gdx.Game;
+import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Screen;
 
+import java.util.List;
+
 public final class HorseboundGame extends Game {
+    private final SettingsRepository settingsRepository;
+    private GameSettings settings;
     private SaveService saveService;
+
+    public HorseboundGame() {
+        this(new SettingsRepository(), GameSettings.defaults());
+    }
+
+    HorseboundGame(SettingsRepository settingsRepository, GameSettings initialSettings) {
+        this.settingsRepository = settingsRepository;
+        this.settings = initialSettings;
+    }
 
     @Override
     public void create() {
         saveService = new SaveService();
+        Gdx.graphics.setVSync(settings.vsync());
         setScreen(new MenuScreen(this));
     }
 
@@ -17,12 +32,46 @@ public final class HorseboundGame extends Game {
         return saveService.hasContinue();
     }
 
-    public void startNewWorld() {
-        switchTo(new WorldScreen(this, saveService, saveService.createNewWorld()));
+    List<SaveSlotInfo> saveSlots() {
+        return saveService.listSlots();
+    }
+
+    GameSettings settings() {
+        return settings;
+    }
+
+    void updateSettings(GameSettings next) {
+        settings = next;
+        Gdx.graphics.setVSync(next.vsync());
+        try {
+            settingsRepository.save(next);
+        } catch (SettingsRepository.SettingsException ex) {
+            Gdx.app.error("HORSEBOUND", "Settings save failed", ex);
+        }
+    }
+
+    public void startNewWorld(String slotId) {
+        switchTo(new WorldScreen(this, saveService, saveService.createNewWorld(slotId)));
+    }
+
+    public void loadWorld(String slotId) {
+        switchTo(new WorldScreen(this, saveService, saveService.loadWorld(slotId)));
     }
 
     public void continueWorld() {
-        switchTo(new WorldScreen(this, saveService, saveService.loadContinue()));
+        switchTo(new WorldScreen(this, saveService, saveService.loadMostRecent()));
+    }
+
+    public void showNewGameSlots() {
+        switchTo(new SaveSlotsScreen(this, SaveSlotsScreen.Mode.NEW_GAME));
+    }
+
+    public void showLoadGameSlots() {
+        switchTo(new SaveSlotsScreen(this, SaveSlotsScreen.Mode.LOAD_GAME));
+    }
+
+    public void showSettings() {
+        switchTo(new SettingsScreen(this));
     }
 
     public void returnToMenu() {
