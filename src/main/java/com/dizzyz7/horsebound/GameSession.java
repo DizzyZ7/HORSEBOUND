@@ -5,9 +5,15 @@ final class GameSession {
     private final long worldSeed;
     private final Inventory inventory;
     private final PushikMind pushikMind;
+    private final FixedStepClock simulationClock;
     private float worldTime;
+    private long simulationTicks;
 
     GameSession(SaveGame initialState) {
+        this(initialState, new FixedStepClock());
+    }
+
+    GameSession(SaveGame initialState, FixedStepClock simulationClock) {
         this.worldSeed = initialState.worldSeed();
         this.worldTime = normalizeTime(initialState.worldTime());
         this.inventory = Inventory.restore(
@@ -16,6 +22,7 @@ final class GameSession {
             initialState.player().apples()
         );
         this.pushikMind = new PushikMind(initialState.pushik().state(), initialState.pushik().affection());
+        this.simulationClock = simulationClock;
     }
 
     long worldSeed() {
@@ -34,8 +41,21 @@ final class GameSession {
         return worldTime;
     }
 
-    void advanceWorldTime(float dt) {
-        worldTime = normalizeTime(worldTime + Math.max(0f, dt) / 1200f);
+    long simulationTicks() {
+        return simulationTicks;
+    }
+
+    float simulationInterpolationAlpha() {
+        return simulationClock.interpolationAlpha();
+    }
+
+    int advanceWorldTime(float frameDeltaSeconds) {
+        return simulationClock.advance(frameDeltaSeconds, this::updateFixed);
+    }
+
+    private void updateFixed(float fixedDeltaSeconds) {
+        simulationTicks++;
+        worldTime = normalizeTime(worldTime + fixedDeltaSeconds / 1200f);
     }
 
     private static float normalizeTime(float value) {
