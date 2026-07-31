@@ -8,7 +8,7 @@ version = '0.1.0'
 
 ext {
     gdxVersion = '1.14.2'
-    creatorName = 'Dimash Dzhanibekov (DizZyZ7)'
+    creatorName = 'Dimash Janibekov (DizZyZ7)'
 }
 
 repositories {
@@ -75,8 +75,8 @@ tasks.register('windowsImage', Exec) {
             '--name', 'HORSEBOUND',
             '--app-version', project.version.toString(),
             '--vendor', creatorName,
-            '--copyright', 'Copyright (c) 2026 Dimash Dzhanibekov (DizZyZ7). All rights reserved.',
-            '--description', 'HORSEBOUND - cozy 3D horse sandbox created by Dimash Dzhanibekov (DizZyZ7).',
+            '--copyright', 'Copyright (c) 2026 Dimash Janibekov (DizZyZ7). All rights reserved.',
+            '--description', 'HORSEBOUND - cozy 3D horse sandbox created by Dimash Janibekov (DizZyZ7).',
             '--dest', layout.buildDirectory.dir('jpackage').get().asFile.absolutePath
     }
 }
