@@ -51,15 +51,15 @@ public final class HorseboundGame extends Game {
     }
 
     public void startNewWorld(String slotId) {
-        switchTo(new WorldScreen(this, saveService, saveService.createNewWorld(slotId)));
+        switchTo(new LivingRanchScreen(this, saveService, saveService.createNewWorld(slotId)));
     }
 
     public void loadWorld(String slotId) {
-        switchTo(new WorldScreen(this, saveService, saveService.loadWorld(slotId)));
+        switchTo(new LivingRanchScreen(this, saveService, saveService.loadWorld(slotId)));
     }
 
     public void continueWorld() {
-        switchTo(new WorldScreen(this, saveService, saveService.loadMostRecent()));
+        switchTo(new LivingRanchScreen(this, saveService, saveService.loadMostRecent()));
     }
 
     public void showNewGameSlots() {
