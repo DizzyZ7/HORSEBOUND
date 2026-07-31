@@ -8,6 +8,7 @@ enum ControllerGlyphFamily {
     XBOX,
     PLAYSTATION,
     STEAM_DECK,
+    NINTENDO,
     GENERIC;
 
     static ControllerGlyphFamily fromControllerName(String name) {
@@ -18,6 +19,9 @@ enum ControllerGlyphFamily {
         }
         if (containsAny(normalized, "dualsense", "dualshock", "playstation", "ps4", "ps5", "sony")) {
             return PLAYSTATION;
+        }
+        if (containsAny(normalized, "nintendo", "switch pro", "joy-con", "joycon")) {
+            return NINTENDO;
         }
         if (containsAny(normalized, "xbox", "xinput", "microsoft", "series x", "series s")) {
             return XBOX;
