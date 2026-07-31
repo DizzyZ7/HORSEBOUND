@@ -12,11 +12,12 @@ final class FixedStepClock {
     static final float DEFAULT_MAX_FRAME_SECONDS = 0.25f;
     static final int DEFAULT_MAX_STEPS_PER_FRAME = 15;
 
-    private static final double EPSILON = 1e-9;
+    private static final double STEP_EPSILON_RATIO = 1e-4;
 
     private final double stepSeconds;
     private final double maxFrameSeconds;
     private final int maxStepsPerFrame;
+    private final double epsilon;
     private double accumulator;
 
     FixedStepClock() {
@@ -36,6 +37,7 @@ final class FixedStepClock {
         this.stepSeconds = stepSeconds;
         this.maxFrameSeconds = maxFrameSeconds;
         this.maxStepsPerFrame = maxStepsPerFrame;
+        this.epsilon = stepSeconds * STEP_EPSILON_RATIO;
     }
 
     int advance(float frameDeltaSeconds, SimulationStep simulationStep) {
@@ -46,16 +48,16 @@ final class FixedStepClock {
 
         accumulator += Math.min(frameDeltaSeconds, maxFrameSeconds);
         int steps = 0;
-        while (accumulator + EPSILON >= stepSeconds && steps < maxStepsPerFrame) {
+        while (accumulator + epsilon >= stepSeconds && steps < maxStepsPerFrame) {
             simulationStep.update((float) stepSeconds);
             accumulator -= stepSeconds;
             steps++;
         }
 
-        if (steps == maxStepsPerFrame && accumulator >= stepSeconds) {
+        if (steps == maxStepsPerFrame && accumulator + epsilon >= stepSeconds) {
             accumulator %= stepSeconds;
         }
-        if (accumulator < 0d && accumulator > -EPSILON) {
+        if (accumulator < 0d && accumulator > -epsilon) {
             accumulator = 0d;
         }
         return steps;
