@@ -1,7 +1,7 @@
 # HORSEBOUND
 
-**HORSEBOUND is created by Dimash Dzhanibekov (DizZyZ7).**  
-Copyright © 2026 Dimash Dzhanibekov (DizZyZ7). All rights reserved.
+**HORSEBOUND is created by Dimash Janibekov (DizZyZ7).**  
+Copyright © 2026 Dimash Janibekov (DizZyZ7). All rights reserved.
 
 A cozy stylized 3D Java sandbox about horses, exploration, taming, riding, gathering,
 and building a small ranch. The world is intentionally **not voxel/block based**:
@@ -78,6 +78,6 @@ build/jpackage/HORSEBOUND/HORSEBOUND.exe
 
 ## Ownership
 
-HORSEBOUND is an original project created by **Dimash Dzhanibekov (DizZyZ7)**.
+HORSEBOUND is an original project created by **Dimash Janibekov (DizZyZ7)**.
 See [LICENSE](LICENSE) and [NOTICE.md](NOTICE.md). The repository is public for
 visibility and development history; public access does not grant reuse rights.
