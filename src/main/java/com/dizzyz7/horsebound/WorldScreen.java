@@ -167,11 +167,6 @@ final class WorldScreen implements Screen {
         cameraYaw -= Gdx.input.getDeltaX() * sensitivity;
         cameraPitch += Gdx.input.getDeltaY() * sensitivity * 0.75f;
         cameraPitch = MathUtils.clamp(cameraPitch, 12f, 62f);
-
-        float wheel = Gdx.input.getScrollY();
-        if (wheel != 0f) {
-            cameraDistance = MathUtils.clamp(cameraDistance + wheel * 0.7f, 5.5f, 16f);
-        }
     }
 
     private void updatePlayer(float dt) {
