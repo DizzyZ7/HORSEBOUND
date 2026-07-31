@@ -63,10 +63,10 @@ jobs:
             "steam_dev.cfg"
           )
           $forbidden = Get-ChildItem $root -Recurse -File |
-            Where-Object { $forbiddenNames -contains $_.Name }
+            Where-Object { ($forbiddenNames -contains $_.Name) -or $_.Extension -eq ".log" }
           if ($forbidden) {
             $forbidden | Format-Table FullName
-            throw "Mutable user data or local Steam configuration leaked into the app image"
+            throw "Mutable user data, crash logs or local Steam configuration leaked into the app image"
           }
 
           $jarPath = Join-Path $root "app/HORSEBOUND.jar"
@@ -83,6 +83,14 @@ jobs:
             }
           }
 
+          $expectedCommit = $env:GITHUB_SHA.Substring(0, 12)
+          $versionOutput = & java -jar $jarPath --version
+          $expectedBuildLine = "HORSEBOUND 0.4.5 ($expectedCommit)"
+          if ($versionOutput -notcontains $expectedBuildLine) {
+            $versionOutput | Write-Host
+            throw "Packaged build identity mismatch. Expected: $expectedBuildLine"
+          }
+
           $hashTargets = @(
             (Join-Path $root "HORSEBOUND.exe"),
             $jarPath,
@@ -94,6 +102,7 @@ jobs:
           }
           $hashLines | Set-Content (Join-Path $root "SHA256SUMS.txt") -Encoding ascii
 
+          $versionOutput | Write-Host
           Get-Item (Join-Path $root "HORSEBOUND.exe") | Format-List Name,Length,FullName
           Get-Item $jarPath | Format-List Name,Length,FullName
           Get-Content (Join-Path $root "SHA256SUMS.txt")
