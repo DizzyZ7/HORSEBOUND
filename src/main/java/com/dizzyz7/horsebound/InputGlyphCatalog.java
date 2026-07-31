@@ -28,6 +28,7 @@ final class InputGlyphCatalog {
                 PromptAction.JUMP,
                 PromptAction.SPRINT,
                 PromptAction.BUILD,
+                PromptAction.SAVE,
                 PromptAction.PAUSE
             );
         }
