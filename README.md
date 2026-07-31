@@ -1,89 +1,82 @@
 # HORSEBOUND
 
-**HORSEBOUND is created by Dimash Janibekov (DizZyZ7).**  
+**Created and owned by Dimash Janibekov (DizZyZ7).**  
 Copyright © 2026 Dimash Janibekov. All rights reserved.
 
-A cozy stylized 3D Java sandbox about horses, exploration, taming, riding, gathering and building a small ranch. The world is intentionally **not voxel/block based**: terrain is a continuous procedural mesh and characters use stylized low-poly 3D forms.
+HORSEBOUND is a cozy stylized 3D Java sandbox about horses, exploration, taming, riding and building a ranch. The world uses continuous terrain and is intentionally not voxel/block based.
 
-## HORSEBOUND 0.4.1 Stabilization
+## 0.4.2 — Simulation & Input Foundation
 
-0.4.1 hardens the Living Ranch foundation before Homestead content expands.
+HORSEBOUND now has a pure Java boundary between render cadence, simulation time and physical input devices.
 
-### Runtime architecture
+### Fixed-step simulation
 
-- `GameSession` owns world seed, world clock, typed ranch inventory and Pushik's companion mind;
-- `Inventory` and `ItemId` are pure Java domain models;
-- `HorsePersonality` and `HorseRelationship` keep horse identity, trust, bond and fear outside rendering;
-- `PushikMind` owns companion behavior and affection;
-- `LivingRanchScreen` is the active libGDX presentation/input layer;
-- the superseded legacy `WorldScreen` has been removed;
-- a documented fixed-step simulation/system split is the next architecture milestone.
+- 60 deterministic simulation ticks per second;
+- equal world-clock results at 30, 60 and 144 render FPS;
+- capped frame stalls and bounded catch-up work;
+- interpolation alpha prepared for smooth rendering;
+- world time advances through the fixed-step clock.
 
-### Persistence v3
+### Device-neutral input
 
-The JDK-only `.hbs` save format is now version 3.
+- `PlayerCommand` models intent instead of key codes;
+- `InputSnapshot` tracks the active prompt device;
+- keyboard/mouse, gamepad and Steam Input device identities;
+- current keyboard/mouse adapter;
+- mixed-input command merging;
+- command buffer between render sampling and fixed simulation;
+- continuous movement persists while edge actions execute exactly once.
 
-Persistent state includes:
+The next integration moves player, horse, Pushik and interaction updates behind this boundary so gameplay no longer reads `Gdx.input` directly.
+
+## Persistent worlds
+
+Save format v3 stores:
 
 - player position and facing;
 - typed inventory stacks;
 - world seed and time;
-- harvested trees and built fences;
-- every horse UUID, position, personality, trust, bond, fear, stamina and taming state;
-- Pushik position, heading, affection and current companion state.
+- harvested resources and constructed fences;
+- horse UUID, position, personality, trust, bond, fear, stamina and taming state;
+- Pushik position, heading, affection and companion state.
 
-Version 1 and version 2 ranches remain readable. Compatibility migrations are covered by explicit binary fixture tests. Successful future saves rewrite migrated ranches as v3.
+Version 1 and 2 ranches migrate to v3. Saves use temporary writes, disk flush, atomic replacement where supported and `save.bak` recovery.
 
-Writes use a temporary file, disk flush, atomic replacement where supported and a recoverable `save.bak`. A corrupted primary save is never copied over a valid backup.
+## Pushik / Пушик
 
-### Pushik / Пушик
+Pushik is the required completely black fluffy cat with fluffy black paws and almost silent footsteps. He can follow, sit, explore, sleep and greet the player. His affection and state survive restart.
 
-Pushik remains the completely black fluffy cat with fluffy black paws and near-silent footsteps. His current states are:
+## Current gameplay
 
-- `FOLLOW`;
-- `SIT`;
-- `EXPLORE`;
-- `SLEEP`;
-- `GREET`.
-
-Petting raises affection, following and reunions affect behavior, and his persistent companion state survives restart.
-
-### Current gameplay foundation
-
-- third-person movement and mouse camera;
-- continuous procedural terrain, hills, lake, trees and rocks;
+- third-person movement and camera;
+- procedural continuous terrain, lake, trees and rocks;
 - gathering and persistent fence building;
-- wild horse wandering/fleeing behavior;
-- horse personality + trust/bond/fear;
+- horse personalities and trust/bond/fear;
 - relationship-based taming;
-- mounting, gallop stamina and jumping;
+- riding, gallop stamina and jumping;
 - day/night lighting;
 - Pushik companion AI;
-- Continue / New Game / Load Game / Settings / Exit flow;
-- three independent ranch save slots;
-- manual save with `F5`, configurable autosave, save on pause/exit;
-- persistent VSync and mouse sensitivity settings;
-- self-contained Windows packaging with `HORSEBOUND.exe` and bundled Java runtime.
+- Continue / New Game / Load Game / Settings / Exit;
+- three ranch save slots;
+- manual save, autosave and backup recovery.
 
 ## Controls
 
-| Key | Action |
+| Input | Action |
 |---|---|
-| W A S D | Move / steer horse |
-| Mouse | Third-person camera |
+| W A S D | Move / steer |
+| Mouse | Camera |
 | Shift | Sprint / gallop |
 | Space | Jump |
-| E | Interact, feed horse, pet Pushik, gather wood |
-| F | Mount / dismount a tamed horse |
-| B | Build a fence segment (2 wood) |
-| F5 | Save game |
-| Esc | Save and return to menu |
+| E | Interact |
+| F | Mount / dismount |
+| B | Build fence |
+| F5 | Save |
+| Esc | Save and menu |
 
-Controller-first input abstraction is scheduled before Homestead grows so all gameplay and menus can target Steam Deck/Steam Controller requirements without duplicating logic.
+Controller-complete menus and gameplay remain a Steam Deck target. Keyboard, controller and Steam Input will use the same command contract.
 
 ## User data
-
-On Windows:
 
 ```text
 %APPDATA%\HORSEBOUND\
@@ -94,22 +87,20 @@ On Windows:
         slot-3\save.hbs + save.bak
 ```
 
-World saves are designed for Steam Auto-Cloud. Device-specific settings remain local and must not be cloud-synced between desktop and Steam Deck.
+Ranch saves are prepared for Steam Auto-Cloud. Device-specific settings remain local.
 
 ## Steam readiness
 
-HORSEBOUND is being developed against Steam release, SteamPipe, Steam Cloud and Steam Deck expectations from the architecture stage.
-
-See:
+HORSEBOUND is developed against SteamPipe, Steam Cloud, offline single-player and Steam Deck requirements from the architecture stage.
 
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 - [`docs/STEAM_RELEASE_READINESS.md`](docs/STEAM_RELEASE_READINESS.md)
+- [`docs/releases/0.4.2.md`](docs/releases/0.4.2.md)
 - [`steam/README.md`](steam/README.md)
-- SteamPipe templates in [`steam/`](steam/)
 
-The planned Steam launch target is `HORSEBOUND.exe` directly, without a required external launcher. Single-player gameplay must remain available offline.
+The planned Steam launch target is `HORSEBOUND.exe` directly, without a mandatory external launcher.
 
-## Run and test
+## Build
 
 Requirements: JDK 21 and Gradle 8.x+.
 
@@ -118,32 +109,28 @@ gradle run
 gradle test
 ```
 
-## Windows build
-
-GitHub Actions runs all tests before packaging and verifies that `HORSEBOUND.exe` exists.
+Windows self-contained build:
 
 ```powershell
 gradle clean test windowsImage
 ```
 
-Output:
-
 ```text
 build/jpackage/HORSEBOUND/HORSEBOUND.exe
 ```
 
-No system Java installation is required by the packaged build because `jpackage` includes its own runtime image.
+The packaged game includes its Java runtime. CI verifies the executable, app JAR, runtime, absence of mutable user data and SHA-256 hashes.
 
 ## Tech
 
-- Java 21 gameplay/domain/application code
+- Java 21
 - libGDX 1.14.2
-- LWJGL3 desktop backend
+- LWJGL3
 - Gradle
-- JDK `java.nio` binary persistence
-- JDK `Properties` application settings
-- `jpackage` Windows app-image
+- JDK binary persistence
+- JDK Properties settings
+- jpackage Windows app image
 
 ## Ownership
 
-HORSEBOUND is an original project created by **Dimash Janibekov (DizZyZ7)**. See [LICENSE](LICENSE), [NOTICE.md](NOTICE.md) and repository history. Public repository access does not grant reuse rights.
+HORSEBOUND is an original project by **Dimash Janibekov (DizZyZ7)**. Public repository access does not grant reuse rights. See [LICENSE](LICENSE) and [NOTICE.md](NOTICE.md).
