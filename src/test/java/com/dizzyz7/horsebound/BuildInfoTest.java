@@ -13,6 +13,7 @@ class BuildInfoTest {
         assertEquals("development", info.version());
         assertEquals("local", info.commit());
         assertEquals(AuthorInfo.CREATOR, info.vendor());
+        assertEquals("HORSEBOUND development", info.displayLabel());
         assertEquals("HORSEBOUND development (local)", info.diagnosticLabel());
     }
 
@@ -20,6 +21,7 @@ class BuildInfoTest {
     void formatsPackagedVersionAndCommit() {
         BuildInfo info = new BuildInfo("0.4.5", "123456789abc", AuthorInfo.CREATOR);
 
+        assertEquals("HORSEBOUND 0.4.5", info.displayLabel());
         assertEquals("HORSEBOUND 0.4.5 (123456789abc)", info.diagnosticLabel());
     }
 }
