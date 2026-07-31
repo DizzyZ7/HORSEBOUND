@@ -1,2 +1,3 @@
 HORSEBOUND Windows build validation branch.
 Validates Java 21 + libGDX compilation and the self-contained HORSEBOUND.exe package.
+Validation pass: libGDX input compatibility fix applied.
