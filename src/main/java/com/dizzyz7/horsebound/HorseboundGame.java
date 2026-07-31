@@ -41,10 +41,10 @@ public final class HorseboundGame extends Game {
     }
 
     void updateSettings(GameSettings next) {
-        settings = next;
-        Gdx.graphics.setVSync(next.vsync());
+        GameSettings applied = DisplayController.applyRuntime(settings, next);
+        settings = applied;
         try {
-            settingsRepository.save(next);
+            settingsRepository.save(applied);
         } catch (SettingsRepository.SettingsException ex) {
             Gdx.app.error("HORSEBOUND", "Settings save failed", ex);
         }
@@ -81,15 +81,11 @@ public final class HorseboundGame extends Game {
     private void switchTo(Screen next) {
         Screen previous = getScreen();
         setScreen(next);
-        if (previous != null) {
-            previous.dispose();
-        }
+        if (previous != null) previous.dispose();
     }
 
     @Override
     public void dispose() {
-        if (getScreen() != null) {
-            getScreen().dispose();
-        }
+        if (getScreen() != null) getScreen().dispose();
     }
 }
