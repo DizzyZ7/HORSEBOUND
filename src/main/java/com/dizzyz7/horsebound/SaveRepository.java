@@ -147,16 +147,33 @@ final class SaveRepository {
             for (int i = 0; i < horseCount; i++) {
                 UUID id = new UUID(in.readLong(), in.readLong());
                 String name = in.readUTF();
-                horses.add(new SaveGame.HorseData(
-                    id,
-                    name,
-                    in.readFloat(),
-                    in.readFloat(),
-                    in.readFloat(),
-                    in.readFloat(),
-                    in.readFloat(),
-                    in.readBoolean()
-                ));
+                float x = in.readFloat();
+                float z = in.readFloat();
+                float heading = in.readFloat();
+                float trust = in.readFloat();
+                float stamina = in.readFloat();
+                boolean tamed = in.readBoolean();
+
+                if (version >= 2) {
+                    HorsePersonality personality = HorsePersonality.parseOrDefault(in.readUTF(), id);
+                    float bond = in.readFloat();
+                    float fear = in.readFloat();
+                    horses.add(new SaveGame.HorseData(
+                        id,
+                        name,
+                        x,
+                        z,
+                        heading,
+                        trust,
+                        stamina,
+                        tamed,
+                        personality,
+                        bond,
+                        fear
+                    ));
+                } else {
+                    horses.add(new SaveGame.HorseData(id, name, x, z, heading, trust, stamina, tamed));
+                }
             }
 
             int fenceCount = checkedCount(in.readInt(), MAX_FENCES, "fence");
@@ -172,7 +189,7 @@ final class SaveRepository {
             }
 
             return new SaveGame(
-                version,
+                SaveGame.CURRENT_VERSION,
                 worldSeed,
                 savedAt,
                 worldTime,
@@ -226,6 +243,9 @@ final class SaveRepository {
                 out.writeFloat(horse.trust());
                 out.writeFloat(horse.stamina());
                 out.writeBoolean(horse.tamed());
+                out.writeUTF(horse.personality().name());
+                out.writeFloat(horse.bond());
+                out.writeFloat(horse.fear());
             }
 
             out.writeInt(saveGame.fences().size());
