@@ -4,13 +4,18 @@ package com.dizzyz7.horsebound;
 final class GameSession {
     private final long worldSeed;
     private final Inventory inventory;
-    private final PushikMind pushikMind = new PushikMind();
+    private final PushikMind pushikMind;
     private float worldTime;
 
     GameSession(SaveGame initialState) {
         this.worldSeed = initialState.worldSeed();
         this.worldTime = normalizeTime(initialState.worldTime());
-        this.inventory = Inventory.starter(initialState.player().wood(), initialState.player().apples());
+        this.inventory = Inventory.restore(
+            initialState.player().inventoryItems(),
+            initialState.player().wood(),
+            initialState.player().apples()
+        );
+        this.pushikMind = new PushikMind(initialState.pushik().state(), initialState.pushik().affection());
     }
 
     long worldSeed() {
