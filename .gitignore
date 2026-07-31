@@ -7,3 +7,14 @@ out/
 saves/
 .DS_Store
 Thumbs.db
+
+# Local Steamworks / SteamPipe data
+steam/content/
+steam/output/
+steam/private/
+steam/sdk/
+steam/steamcmd/
+steam/*_LOCAL.vdf
+steam/*_PRIVATE.vdf
+steam_dev.cfg
+.env
