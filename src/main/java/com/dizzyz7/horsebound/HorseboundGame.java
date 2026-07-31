@@ -13,6 +13,7 @@ public final class HorseboundGame extends Game {
     private GameSettings settings;
     private SaveService saveService;
     private PerformanceOverlay performanceOverlay;
+    private PromptOverlay promptOverlay;
 
     public HorseboundGame() {
         this(new SettingsRepository(), GameSettings.defaults());
@@ -27,6 +28,8 @@ public final class HorseboundGame extends Game {
     public void create() {
         saveService = new SaveService();
         performanceOverlay = new PerformanceOverlay();
+        promptOverlay = new PromptOverlay();
+        InputActivityTracker.reset();
         Gdx.graphics.setVSync(settings.vsync());
         setScreen(new MenuScreen(this));
     }
@@ -35,6 +38,7 @@ public final class HorseboundGame extends Game {
     public void render() {
         frameMetrics.record(Gdx.graphics.getDeltaTime());
         super.render();
+        if (promptOverlay != null) promptOverlay.render(getScreen(), settings);
         if (performanceOverlay != null) performanceOverlay.render(frameMetrics, settings);
     }
 
@@ -101,6 +105,7 @@ public final class HorseboundGame extends Game {
     @Override
     public void dispose() {
         if (getScreen() != null) getScreen().dispose();
+        if (promptOverlay != null) promptOverlay.dispose();
         if (performanceOverlay != null) performanceOverlay.dispose();
     }
 }
