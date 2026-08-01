@@ -5,80 +5,73 @@ Copyright © 2026 Dimash Janibekov. All rights reserved.
 
 HORSEBOUND is a cozy stylized 3D Java sandbox about horses, exploration, taming, riding and building a ranch. Its world uses continuous terrain and is intentionally not voxel/block based.
 
-## 0.5.1 — Live Homestead Integration
+## 0.5.2 — Inventory, Physics & Building UX
 
-The persistent Homestead foundation is now connected to the playable ranch.
+The Homestead loop now includes persistent storage, editable construction and structure physics.
 
-### Hotbar and building
+### Inventory and Chest
 
-- visible eight-slot hotbar;
-- keyboard 1–8 / numpad 1–8 and controller D-pad selection;
-- remappable Build action enters and confirms placement;
-- keyboard brackets or D-pad Up/Down cycle blueprints;
-- R or D-pad Left/Right rotates in 15-degree steps;
-- placement snaps to a 0.5 metre grid;
-- lake, world-boundary, steep-ground, material and structure-overlap validation;
-- green valid preview and red invalid preview;
-- build cancel through Escape / controller Back without leaving the ranch.
+- the player backpack supports 24 visual stack slots;
+- Inventory is a rebindable keyboard action stored in device-local `input.properties`;
+- controller D-pad Up opens the backpack outside placement mode;
+- Chest provides 12 persistent item-stack slots;
+- the two-panel overlay keeps the ranch alive in memory;
+- Left/Right changes panel and Confirm transfers one item;
+- transfers are atomic, so a full destination never deletes or partially moves items;
+- old input profiles receive the default Inventory binding without losing prior settings.
 
-Playable provisional structures:
+### Gates and structure physics
 
-- Fence;
-- Gate;
-- Feeder;
-- Water Trough;
-- Hay Storage;
-- Chest;
-- Stable Stall.
+- Interact opens and closes nearby Gates;
+- Gate state survives save/load;
+- open Gates stop blocking movement;
+- closed Gates, fences and other structures block the player, mounted horse and autonomous horses;
+- swept-circle collision prevents tunnelling during large frame steps;
+- structure collision radii are owned by the typed structure catalog.
 
-Feeder, Water Trough and Hay Storage accept matching resources through the normal Interact action when the player stands nearby and selects the correct hotbar slot.
+### Building edit mode
 
-### Horse care
+- `M` or controller D-pad Down selects the nearest editable structure;
+- existing rotation controls remain active;
+- Build confirms relocation without charging the recipe again;
+- Mount/Y dismantles the selected structure;
+- dismantling refunds half the construction materials;
+- non-empty storage cannot be dismantled;
+- dismantling is refused when the backpack cannot accept the refund;
+- legacy fences remain stable collision participants but are not movable until their old renderer is retired.
 
-- live hunger, thirst and energy;
-- stronger drain during gallop;
-- tamed horses automatically consume nearby stored hay and water;
-- Stable Stall proximity improves rest recovery;
-- nearest-horse needs are visible in the HUD;
-- automatic care produces player feedback;
-- forgiving rates keep infrastructure useful without turning the game into harsh survival management.
+### Save format v5
 
-### Persistence
+Save v5 persists:
 
-Save format v4 stores:
+- Gate open/closed state;
+- Chest item contents;
+- moved structure transforms;
+- feeder/trough storage;
+- inventory, hotbar, horse needs and all earlier ranch state.
 
-- 24-slot aggregate inventory and multi-stack totals;
-- eight-slot hotbar and selected slot;
-- typed structures, transforms and stored resource units;
-- horse hunger, thirst and energy;
-- all previous player, world, Pushik and horse relationship state.
+Versions 1–4 continue to migrate. Real binary v4 coverage proves that old Gates load closed and old Chests load empty before being rewritten as v5. Manual save, autosave, pause save, application backgrounding and clean exit all capture current operational state.
 
-Manual save, autosave, pause save, backgrounding, Save & Main Menu and clean disposal all enrich the active ranch snapshot with current Homestead state. Versions 1–3 continue to migrate safely, including real binary v3 coverage and backup recovery.
+### Current presentation boundary
 
-### New-ranch materials
+Models remain provisional stylized primitives. The validated `LivingRanchScreen` still renders and controls the base world, while `HomesteadRanchScreen` owns the 0.5.2 inventory, edit and physics layer. Temporary actor-transform access remains isolated in `LivingRanchTelemetryAdapter`; it has not been falsely presented as already removed.
 
-New ranches start with Hay, Water Buckets and enough Stone for the first Water Trough after gathering additional Wood. Existing saves are never silently stripped or granted items.
-
-### Honest current limitations
-
-- Chest has no inventory window yet;
-- Gate does not open or close yet;
-- new structures do not yet block player/horse movement;
-- models are provisional stylized primitives rather than final GLB assets.
-
-These are explicit 0.5.2 tasks, not hidden promises in the current build.
-
-See [`docs/releases/0.5.1.md`](docs/releases/0.5.1.md) and [`docs/HOMESTEAD_RELEASE_CONTRACT.md`](docs/HOMESTEAD_RELEASE_CONTRACT.md).
+See [`docs/releases/0.5.2.md`](docs/releases/0.5.2.md) and [`docs/HOMESTEAD_RELEASE_CONTRACT.md`](docs/HOMESTEAD_RELEASE_CONTRACT.md).
 
 ## Current playable gameplay
 
 - third-person movement and camera;
 - procedural continuous terrain, lake, trees and rocks;
 - resource gathering and persistent construction;
+- visible hotbar and placement preview;
+- feeders, troughs, hay storage, Chests, Gates and Stalls;
+- persistent inventory and chest transfers;
+- movable and safely dismantled structures;
+- player and horse structure collisions;
 - horse personalities and trust/bond/fear;
 - relationship-based taming;
 - riding, gallop stamina and jumping;
-- horse care infrastructure;
+- hunger, thirst, energy and automatic ranch care;
 - day/night lighting;
 - Pushik companion AI;
 - Continue / New Game / Load Game / Settings / Exit;
@@ -94,13 +87,14 @@ Pushik is the completely black fluffy cat with fluffy black paws and almost sile
 HORSEBOUND has a true in-memory pause lifecycle and device-local input profile.
 
 - configurable keyboard bindings and conflict-safe key swapping;
+- dedicated Inventory binding with legacy-profile fallback;
 - invert vertical camera;
 - movement and camera stick dead zones;
 - Hold or Toggle sprint/gallop;
 - optional controller rumble and strength;
-- controller-accessible pause, settings and binding screens;
+- controller-accessible pause, settings, bindings, inventory and build/edit UX;
 - dynamic Xbox, PlayStation, Steam Deck, Nintendo and generic controller prompts;
-- Homestead D-pad actions update the active prompt family correctly.
+- context-aware D-pad actions avoid Inventory/blueprint conflicts.
 
 Input settings are stored in `%APPDATA%\HORSEBOUND\input.properties` and remain separate from ranch saves, Steam Cloud and the install depot.
 
@@ -113,25 +107,27 @@ Input settings are stored in `%APPDATA%\HORSEBOUND\input.properties` and remain 
 - Low / Medium / High startup presets;
 - optional rolling FPS/frame-time overlay;
 - global scalable action-prompt strip;
-- controller-readable menus, save slots, hotbar and build feedback.
+- controller-readable menus, save slots, hotbar, inventory and build feedback.
 
 This is **not** a Steam Deck Verified claim. Physical Deck, Proton, controller-family and Valve compatibility testing remain required.
 
 ## Architecture
 
-The 0.5.1 integration keeps the validated legacy ranch renderer while moving new responsibility into a dedicated wrapper:
+The 0.5.x integration keeps the validated legacy ranch renderer while new responsibility lives in a dedicated wrapper:
 
 ```text
 HomesteadRanchScreen
 ├── LivingRanchScreen presentation delegate
 ├── captured pure-Java GameSession
+├── InventoryOverlay
+├── HomesteadCollisionSystem
 ├── HomesteadRenderer / provisional models
-├── hotbar + build input adapter
+├── hotbar + build/edit input adapter
 ├── HorseCareSystem
 └── owner-scoped save transformer
 ```
 
-Temporary access to legacy camera/actor data is isolated in `LivingRanchTelemetryAdapter`; reflection does not enter domain code. This bridge will be removed as the legacy screen is split into explicit controllers and renderers.
+Domain code does not use reflection or libGDX rendering. Temporary access to legacy camera/actor data is isolated in `LivingRanchTelemetryAdapter` and remains scheduled for replacement by explicit ranch-access interfaces.
 
 ## User data
 
@@ -156,7 +152,7 @@ Steam Auto-Cloud is planned for ranch `save.hbs` and `save.bak` only. Display/in
 - bundled Java runtime;
 - exact packaged version/commit and SHA-256 manifest;
 - no mutable user files inside the depot;
-- controller-only and Homestead packaged smoke-test contracts;
+- controller-only, migration, storage and Homestead packaged gates;
 - honest store-feature discipline;
 - third-party notices and exact license texts.
 
@@ -166,7 +162,7 @@ Key documents:
 - [`docs/STEAM_RELEASE_READINESS.md`](docs/STEAM_RELEASE_READINESS.md)
 - [`docs/STEAM_CONTROLLER_SMOKE_TEST.md`](docs/STEAM_CONTROLLER_SMOKE_TEST.md)
 - [`docs/HOMESTEAD_RELEASE_CONTRACT.md`](docs/HOMESTEAD_RELEASE_CONTRACT.md)
-- [`docs/releases/0.5.1.md`](docs/releases/0.5.1.md)
+- [`docs/releases/0.5.2.md`](docs/releases/0.5.2.md)
 - [`steam/README.md`](steam/README.md)
 
 ## Build
@@ -190,7 +186,7 @@ Output:
 build/jpackage/HORSEBOUND/HORSEBOUND.exe
 ```
 
-CI verifies the complete controller, accessibility, save migration, Homestead domain and live integration runtime inside the packaged JAR.
+CI verifies the controller, accessibility, save migration, inventory/storage, collision and live Homestead runtime inside the packaged JAR.
 
 ## Tech
 
