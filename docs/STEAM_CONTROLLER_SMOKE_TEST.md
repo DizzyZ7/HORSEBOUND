@@ -12,6 +12,7 @@ Run the complete route with each available family:
 - Xbox / XInput controller;
 - PlayStation DualShock or DualSense controller;
 - Steam Deck built-in controls or Steam Virtual Gamepad;
+- Nintendo Switch Pro / Joy-Con controller;
 - one generic SDL-compatible controller when available.
 
 Unavailable physical devices must remain marked **not tested**, never assumed passing.
@@ -26,6 +27,7 @@ Unavailable physical devices must remain marked **not tested**, never assumed pa
 6. Use only D-pad/Left Stick and controller buttons from this point.
 7. Verify the prompt strip switches to the correct controller family after the first meaningful input.
 8. Confirm no keyboard glyphs remain in the active bottom prompt strip.
+9. On Nintendo devices, verify prompts use physical B/A/Y/X labels rather than Xbox A/B/X/Y labels.
 
 ## Main menu and settings
 
@@ -63,7 +65,7 @@ Unavailable physical devices must remain marked **not tested**, never assumed pa
 9. Steer, gallop and jump while mounted.
 10. Gather wood.
 11. Build a fence.
-12. Trigger manual save.
+12. Trigger manual save and verify the visible View / Share / Minus prompt matches the controller family.
 13. Return to the menu using Pause/Back.
 14. Verify the prompt family remains correct after every screen transition.
 
