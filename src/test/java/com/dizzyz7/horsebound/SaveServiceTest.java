@@ -27,15 +27,22 @@ class SaveServiceTest {
     }
 
     @Test
-    void newWorldActivatesRequestedSlotAndAppearsInMetadata() {
+    void newWorldActivatesRequestedSlotAndIncludesStarterHomesteadMaterials() {
         SaveService service = new SaveService(new SaveRepository(tempDir.resolve("HORSEBOUND")));
 
         SaveGame created = service.createNewWorld("slot-2");
         SaveSlotInfo slot = service.listSlots().get(1);
+        Inventory inventory = Inventory.restore(
+            created.player().inventoryItems(),
+            created.player().wood(),
+            created.player().apples()
+        );
 
         assertEquals("slot-2", service.activeSlot());
         assertEquals(SaveSlotInfo.State.READY, slot.state());
         assertEquals(created.worldSeed(), slot.worldSeed());
+        assertEquals(created.structures().size(), slot.structureCount());
+        assertEquals(8, inventory.count(ItemId.STONE));
         assertTrue(service.hasContinue());
     }
 
@@ -62,6 +69,8 @@ class SaveServiceTest {
             source.pushik(),
             source.horses(),
             source.fences(),
+            source.structures(),
+            source.hotbar(),
             source.harvestedTreeIds()
         );
     }
