@@ -108,8 +108,8 @@ final class SaveRepository {
             Files.createDirectories(directory);
             writeAndSync(primaryTemporary, saveGame);
             writeAndSync(backupTemporary, saveGame);
-            moveAtomically(primaryTemporary, primary);
             moveAtomically(backupTemporary, backup);
+            moveAtomically(primaryTemporary, primary);
         } catch (IOException ex) {
             deleteQuietly(primaryTemporary);
             deleteQuietly(backupTemporary);
