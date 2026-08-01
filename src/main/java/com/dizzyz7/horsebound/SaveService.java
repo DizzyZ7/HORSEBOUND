@@ -4,7 +4,9 @@ package com.dizzyz7.horsebound;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.function.UnaryOperator;
 
 final class SaveService {
     static final String DEFAULT_SLOT = "slot-1";
@@ -12,6 +14,8 @@ final class SaveService {
 
     private final SaveRepository repository;
     private String activeSlot = DEFAULT_SLOT;
+    private Object transformerOwner;
+    private UnaryOperator<SaveGame> saveTransformer = UnaryOperator.identity();
 
     SaveService() {
         this(new SaveRepository());
@@ -43,11 +47,7 @@ final class SaveService {
                 }
                 SaveGame save = loaded.get();
                 int tamed = 0;
-                for (SaveGame.HorseData horse : save.horses()) {
-                    if (horse.tamed()) {
-                        tamed++;
-                    }
-                }
+                for (SaveGame.HorseData horse : save.horses()) if (horse.tamed()) tamed++;
                 slots.add(new SaveSlotInfo(
                     slotId,
                     label,
@@ -56,7 +56,7 @@ final class SaveService {
                     save.worldSeed(),
                     save.horses().size(),
                     tamed,
-                    save.fences().size()
+                    save.structures().size()
                 ));
             } catch (SaveRepository.SaveException ex) {
                 slots.add(new SaveSlotInfo(slotId, label, SaveSlotInfo.State.CORRUPT, 0L, 0L, 0, 0, 0));
@@ -94,7 +94,19 @@ final class SaveService {
     }
 
     void save(SaveGame saveGame) {
-        repository.save(activeSlot, saveGame);
+        SaveGame transformed = saveTransformer.apply(Objects.requireNonNull(saveGame, "saveGame"));
+        repository.save(activeSlot, Objects.requireNonNull(transformed, "transformed saveGame"));
+    }
+
+    void setSaveTransformer(Object owner, UnaryOperator<SaveGame> transformer) {
+        transformerOwner = Objects.requireNonNull(owner, "owner");
+        saveTransformer = Objects.requireNonNull(transformer, "transformer");
+    }
+
+    void clearSaveTransformer(Object owner) {
+        if (transformerOwner != owner) return;
+        transformerOwner = null;
+        saveTransformer = UnaryOperator.identity();
     }
 
     String activeSlot() {
