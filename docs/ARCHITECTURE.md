@@ -29,13 +29,13 @@ The domain must not depend on libGDX input, rendering, controller, audio or wind
 - Pushik companion mind;
 - `HomesteadStructureType`, `PlacedStructure` and `HomesteadState`;
 - item definitions, recipes and operational structure state;
-- `HomesteadCollisionSystem` and `GateAnimationState` pure calculation contracts.
+- `HomesteadCollisionSystem`, `RanchUndoManager`, `RanchCameraCollisionSystem` and `GateAnimationState` pure calculation contracts.
 
 ### Application
 
 - device-neutral `PlayerCommand` and menu commands;
 - fixed-step `GameSimulationLoop`;
-- generic `RanchSessionScreen` pause/save lifecycle;
+- generic `RanchSessionScreen` pause/save/undo lifecycle;
 - owner-scoped save enrichment;
 - semantic Homestead action routing;
 - delayed directional `NavigationRepeater` with edge-only actions.
@@ -44,8 +44,8 @@ The domain must not depend on libGDX input, rendering, controller, audio or wind
 
 - `HomesteadRanchScreen` live integration wrapper;
 - `LivingRanchScreen` base world renderer/controller implementing `RanchWorldAccess`;
-- `LivingRanchTelemetryAdapter` typed compatibility facade;
 - provisional `HomesteadModels` and `HomesteadRenderer`;
+- selected-structure overlay and placement ghost;
 - `RanchPresentationObserver` and procedural `RanchAudio`;
 - keyboard/mouse/controller adapters;
 - HUD, scalable prompts, menus and performance/support overlays.
@@ -58,22 +58,20 @@ The domain must not depend on libGDX input, rendering, controller, audio or wind
 - validation and bounded collection sizes;
 - temporary writes, disk flush and atomic replacement;
 - backup recovery;
-- device-local display/input settings.
+- device-local display, SFX and input settings.
 
 ## Fixed-step simulation
 
 Simulation uses a bounded accumulator at 60 ticks per second. Rendering may run at a different frame rate and later interpolate visual transforms. Domain systems receive commands/context rather than reading `Gdx.input` directly.
 
-Horse needs and Homestead care use fixed-step clocks. Gate visual interpolation is presentation-only; persistent collision truth changes immediately.
+Horse needs and Homestead care use fixed-step clocks. Gate visual interpolation and camera smoothing are presentation-only; persistent collision truth changes immediately.
 
-## Typed ranch access
+## Direct typed ranch access
 
-The Homestead wrapper no longer reads private fields through reflection.
+The Homestead wrapper talks directly to the base renderer through one typed boundary.
 
 ```text
 HomesteadRanchScreen
-        ↓
-LivingRanchTelemetryAdapter (compatibility facade)
         ↓
 RanchWorldAccess
         ↓
@@ -82,24 +80,23 @@ LivingRanchScreen
 
 `RanchWorldAccess` exposes only:
 
-- camera reference required by the renderer;
+- camera reference required by the Homestead renderer;
 - immutable actor pose;
 - immutable horse telemetry list;
 - safe active-actor correction;
-- safe horse correction by UUID.
+- safe horse correction by UUID;
+- immutable camera-obstacle snapshots.
 
-Mutable `Vector3`, HorseActor and renderer-owned collections never cross the boundary. Tests and CI reject `java.lang.reflect`, `setAccessible` or `getDeclaredField` returning to the facade.
+Mutable `Vector3`, HorseActor and renderer-owned collections never cross the boundary. The former `LivingRanchTelemetryAdapter` compatibility facade is deleted. Tests and CI fail if its source or packaged class returns.
 
-The compatibility facade may be removed later when `HomesteadRanchScreen` directly consumes `RanchWorldAccess`; this is cleanup rather than a safety blocker.
-
-## Building and interaction flow
+## Building, interaction and undo flow
 
 ```text
 remappable command / controller edge
         ↓
-HomesteadActionBus
+HomesteadActionBus or session undo request
         ↓
-placement, edit, Gate or inventory use case
+placement, edit, Gate, inventory or undo use case
         ↓
 pure-Java validation / exact Inventory transaction
         ↓
@@ -111,6 +108,34 @@ Save v5 enrichment
 ```
 
 Placement validates world bounds, lake, slope, recipe and structure overlap. Swept collision protects player, mounted horse and autonomous horses, including actors initially embedded by a newly placed or closed structure.
+
+`RanchUndoManager` holds one session-local operation:
+
+- unchanged placement can be removed with its full recipe returned;
+- relocation can restore the old transform after current placement validation;
+- changed/opened/filled structures invalidate unsafe placement undo;
+- blocked relocation restore remains pending instead of mutating the world;
+- inventory preflight prevents refund loss.
+
+Undo history is deliberately excluded from save v5 and Steam Cloud.
+
+## Camera collision flow
+
+```text
+Homestead blocking structures
+        ↓
+immutable RanchCameraCollisionSystem.Obstacle records
+        ↓
+RanchWorldAccess.setCameraObstacles(...)
+        ↓
+segment sampling from actor target to desired camera
+        ↓
+terrain / cylinder collision distance
+        ↓
+fast pull-in + slower visual recovery
+```
+
+Open Gates are omitted because their persistent collision truth no longer blocks movement. The current pass covers terrain and Homestead structures; legacy trees and rocks remain future presentation work.
 
 ## Inventory transfer flow
 
@@ -164,7 +189,7 @@ A stale screen cannot clear a transformer installed by a newer ranch session. Th
 
 `RanchPresentationObserver` compares immutable structure snapshots and emits semantic cues. `RanchAudio` generates short mono waveforms at runtime and streams them through one optional shared libGDX AudioDevice.
 
-No audio asset is required for boot or packaging. Unsupported audio becomes a no-op. Domain and save code never reference audio classes.
+The device-local `sfxVolume` setting scales output only at dispatch time, so cached waveform data remains immutable. No audio asset is required for boot or packaging. Unsupported audio becomes a no-op. Domain and save code never reference audio classes.
 
 ## Version sequence
 
@@ -202,6 +227,14 @@ No audio asset is required for boot or packaging. Unsupported audio becomes a no
 - procedural interaction audio;
 - stronger package assertions.
 
+### 0.5.4 — Ranch Interaction Polish
+
+- direct RanchWorldAccess consumption and facade deletion;
+- selected-structure highlight and origin-to-ghost move feedback;
+- transactional one-level placement/relocation undo;
+- terrain and Homestead camera collision;
+- device-local procedural SFX volume.
+
 ### 0.6 — Living World
 
 - region/chunk streaming;
@@ -214,7 +247,7 @@ No audio asset is required for boot or packaging. Unsupported audio becomes a no
 
 - GLTF/GLB asset pipeline;
 - horse/player/Pushik animation state machines;
-- camera collision and gait feel;
+- authored camera feel and gait polish;
 - authored spatial audio and ambient layers;
 - grass, lighting, shaders and LOD.
 
