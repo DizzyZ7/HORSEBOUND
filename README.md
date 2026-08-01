@@ -3,145 +3,60 @@
 **Created and owned by Dimash Janibekov (DizZyZ7).**  
 Copyright © 2026 Dimash Janibekov. All rights reserved.
 
-HORSEBOUND is a cozy stylized 3D Java sandbox about horses, exploration, taming, riding and building a ranch. The world uses continuous terrain and is intentionally not voxel/block based.
+HORSEBOUND is a cozy stylized 3D Java sandbox about horses, exploration, taming, riding and building a ranch. Its world uses continuous terrain and is intentionally not voxel/block based.
 
-## 0.4.8 — Input & Accessibility
+## 0.5.0 — Homestead Domain Foundation
 
-HORSEBOUND now has a true in-memory pause lifecycle and a device-local input profile independent of ranch progress.
+0.5.0 establishes the final persistent contract for the playable Homestead loop before its large rendering/input integration.
 
-### True pause
+### Inventory and hotbar
 
-- Pause opens a dedicated screen instead of immediately returning to the main menu;
-- ranch simulation stops while the current world remains alive in memory;
-- Resume returns to the same session without regeneration or reload;
-- Save Game persists without leaving the session;
-- Save & Main Menu persists and disposes the world cleanly;
-- backgrounding from pause or input screens saves the suspended ranch.
+- stack limits no longer cap the total amount owned;
+- 150 wood, 45 apples and other multi-stack totals survive save/load intact;
+- aggregate inventory can be split into immutable UI stack views;
+- resources now include Wood, Stone, Apple, Carrot, Hay and Water Bucket;
+- persistent eight-slot hotbar with selected slot, empty slots and safe unknown-ID handling;
+- fresh ranches receive starter hay and water.
 
-### Input and accessibility settings
+### Homestead structures
 
-- invert vertical camera;
-- configurable movement and camera stick dead zones;
-- Hold or Toggle sprint/gallop;
-- optional controller rumble and strength;
-- controller-accessible Settings Hub, pause and input screens;
-- changes apply to live input adapters without recreating the ranch.
+The typed structure catalog includes:
 
-### Keyboard rebinding
+- Fence;
+- Gate;
+- Feeder;
+- Water Trough;
+- Hay Storage;
+- Chest;
+- Stable Stall.
 
-The player can rebind movement, jump, interact, mount, build, sprint, manual save and pause. Assigning an already-used key swaps the two actions instead of creating an invisible conflict. Dynamic HUD prompts immediately show the active bindings.
+Structures have persistent UUIDs, transforms, build costs, optional storage capacity and stored resource units. Placement checks the full recipe before consuming materials, so failed builds cannot partially charge the player.
 
-Input settings are stored separately:
+### Horse needs and automatic care
 
-```text
-%APPDATA%\HORSEBOUND\input.properties
-```
+Each horse has persistent hunger, thirst and energy. The pure-Java care system supports passive/activity drain, stronger gallop drain, autonomous feeding from nearby hay storage/feeders, autonomous watering from troughs and energy recovery near a stable stall.
 
-The file uses temporary writes and atomic replacement where supported. Invalid fields fall back safely without resetting valid fields.
+The design is deliberately forgiving: building a good ranch automates routine care instead of creating a punishing survival chore loop.
 
-## HUD & controller glyphs
+### Save format v4
 
-HORSEBOUND has a centralized scalable action-prompt layer across gameplay and the core menu flow.
+Save v4 persists:
 
-- prompts follow the last meaningfully used device;
-- small stick drift does not switch the prompt family;
-- keyboard prompts use active rebound keys;
-- stable labels such as `SHIFT`, `CTRL`, `ESC` and `SPACE` are independent of backend naming;
-- Xbox, PlayStation, Steam Deck, Nintendo and generic controller families;
-- vector-rendered prompt chips scale with the 1280×800 UI system;
-- save-slot cards remain readable at 150% UI scale.
+- typed inventory totals;
+- hotbar slots and selection;
+- horse hunger, thirst and energy;
+- typed placed structures and stored resources;
+- all previous world, player, Pushik and horse relationship data.
 
-Every future Steam candidate must pass the packaged controller-only route in [`docs/STEAM_CONTROLLER_SMOKE_TEST.md`](docs/STEAM_CONTROLLER_SMOKE_TEST.md).
+Versions 1–3 migrate to v4. Legacy fences receive deterministic UUIDs, old horses receive healthy need defaults and old worlds receive the default hotbar. A real binary v3 fixture is migrated and rewritten in tests.
 
-This is not a Steam Deck Verified claim. Physical Deck testing, Proton validation and Valve compatibility review remain required.
+### Honest scope boundary
 
-## Display & Deck UX
+The new Homestead domain is packaged and validated, but the current live ranch renderer still presents the 0.4.8 gameplay set. **0.5.1** connects visible hotbar selection, placement preview/snapping, feeders, troughs, gates, stalls, resource deposits and live horse-need feedback without another save-format rewrite.
 
-HORSEBOUND has device-local display configuration, scalable 1280×800-oriented UI and measurable performance diagnostics.
+See [`docs/releases/0.5.0.md`](docs/releases/0.5.0.md).
 
-- Deck-safe 1280×800 default window;
-- windowed and fullscreen modes;
-- 1280×720, 1280×800, 1600×900 and 1920×1080 windowed profiles;
-- runtime resolution changes with safe fallback;
-- VSync;
-- UI/text scale from 100% to 150%;
-- optional global performance overlay.
-
-| Preset | MSAA | Foreground cap |
-|---|---:|---:|
-| Low | Off | 60 FPS |
-| Medium | 2× | 90 FPS |
-| High | 4× | 144 FPS |
-
-The FPS cap changes immediately. MSAA changes on the next launch because the OpenGL backbuffer must be recreated.
-
-The performance overlay reports rolling FPS, average and worst frame time, current resolution/preset and an explicit 800p/30 target status.
-
-## Support diagnostics
-
-Privacy-conscious crash reports are stored only on the player's device:
-
-```text
-%APPDATA%\HORSEBOUND\logs\
-```
-
-- no automatic telemetry or uploads;
-- build, OS, architecture, Java runtime, memory, thread and stack trace;
-- home and AppData path prefixes are redacted;
-- only the 10 newest reports remain;
-- logs are excluded from the Steam install image and Steam Cloud policy.
-
-See [`docs/SUPPORT.md`](docs/SUPPORT.md).
-
-## Controller foundation
-
-HORSEBOUND uses the official `gdx-controllers` desktop backend and standardized mappings.
-
-| Controller input | Action |
-|---|---|
-| Left Stick | Move / steer |
-| Right Stick | Camera |
-| A / Cross | Jump |
-| X / Square | Interact |
-| Y / Triangle | Mount / dismount |
-| L1 / LB | Build |
-| R1 / RB | Sprint / gallop |
-| Back / View / Share | Manual save |
-| Start / Menu or B / Circle | Pause / back |
-
-D-pad or Left Stick navigates menus. Confirm and Back labels follow the active controller family. Unsupported rumble devices fail safely without affecting gameplay.
-
-## Fixed-step gameplay
-
-At 60 deterministic simulation ticks per second HORSEBOUND updates:
-
-- player movement and jumping;
-- mounted horse acceleration, steering, stamina and jumping;
-- wild horse personality, fear, wandering and fleeing;
-- Pushik companion behavior;
-- interaction, taming, mounting and building;
-- world time.
-
-Render stalls are capped, catch-up work is bounded and tests compare behavior at 30, 60 and 144 render FPS.
-
-## Persistent worlds
-
-Save format v3 stores:
-
-- player position and facing;
-- typed inventory stacks;
-- world seed and time;
-- harvested resources and constructed fences;
-- horse UUID, position, personality, trust, bond, fear, stamina and taming state;
-- Pushik position, heading, affection and companion state.
-
-Version 1 and 2 ranches migrate to v3. Saves use temporary writes, disk flush, atomic replacement where supported and `save.bak` recovery.
-
-## Pushik / Пушик
-
-Pushik is the completely black fluffy cat with fluffy black paws and almost silent footsteps. He can follow, sit, explore, sleep and greet the player. His affection and state survive restart.
-
-## Current gameplay
+## Current playable gameplay
 
 - third-person movement and camera;
 - procedural continuous terrain, lake, trees and rocks;
@@ -152,25 +67,53 @@ Pushik is the completely black fluffy cat with fluffy black paws and almost sile
 - day/night lighting;
 - Pushik companion AI;
 - Continue / New Game / Load Game / Settings / Exit;
-- true pause and resume;
 - three ranch save slots;
 - manual save, autosave and backup recovery.
 
-## Default keyboard controls
+## Pushik / Пушик
 
-All gameplay keys may be rebound.
+Pushik is the completely black fluffy cat with fluffy black paws and almost silent footsteps. He can follow, sit, explore, sleep and greet the player. His affection and state survive restart.
 
-| Input | Action |
-|---|---|
-| W A S D | Move / steer |
-| Mouse | Camera |
-| Shift | Sprint / gallop |
-| Space | Jump |
-| E | Interact |
-| F | Mount / dismount |
-| B | Build fence |
-| F5 | Save |
-| Esc | Pause |
+## Input and accessibility
+
+HORSEBOUND has a true in-memory pause lifecycle and a device-local input profile.
+
+- configurable keyboard bindings;
+- conflict-safe key swapping;
+- invert vertical camera;
+- movement and camera stick dead zones;
+- Hold or Toggle sprint/gallop;
+- optional controller rumble and strength;
+- controller-accessible pause, Settings Hub and input screens;
+- dynamic keyboard/controller prompts;
+- Xbox, PlayStation, Steam Deck, Nintendo and generic controller label families.
+
+Input settings are stored separately:
+
+```text
+%APPDATA%\HORSEBOUND\input.properties
+```
+
+They are intentionally excluded from ranch saves, Steam Cloud and the install depot.
+
+## Display and Deck-oriented UX
+
+- 1280×800 default window;
+- windowed and fullscreen modes;
+- 1280×720, 1280×800, 1600×900 and 1920×1080 profiles;
+- UI scale from 100% to 150%;
+- Low / Medium / High startup presets;
+- optional rolling FPS/frame-time overlay;
+- global scalable action-prompt strip;
+- controller-readable save slots and menus.
+
+This is **not** a Steam Deck Verified claim. Physical Deck, Proton, controller-family and Valve compatibility testing remain required.
+
+## Fixed-step simulation
+
+Gameplay runs at 60 deterministic simulation ticks per second. Render stalls and catch-up work are bounded, and tests compare behavior at 30, 60 and 144 render FPS.
+
+The domain layer does not depend on render cadence and increasingly avoids direct physical-input queries.
 
 ## User data
 
@@ -186,20 +129,41 @@ All gameplay keys may be rebound.
         crash-*.log
 ```
 
-Ranch saves are prepared for Steam Auto-Cloud. Display settings, input profiles and crash logs remain device-local.
+Steam Auto-Cloud is planned for ranch `save.hbs` and `save.bak` files only. Display/input settings and diagnostics remain device-local.
+
+## Support diagnostics
+
+Privacy-conscious crash reports are stored locally under `%APPDATA%\HORSEBOUND\logs`.
+
+- no automatic telemetry or upload;
+- exact version and commit;
+- OS, architecture, Java runtime, memory, thread and stack trace;
+- user home/AppData path redaction;
+- only the ten newest reports retained.
+
+See [`docs/SUPPORT.md`](docs/SUPPORT.md).
 
 ## Steam readiness
 
-HORSEBOUND is developed against SteamPipe, Steam Cloud, offline single-player and Steam Deck requirements from the architecture stage.
+HORSEBOUND is developed against SteamPipe, Steam Cloud, offline single-player and controller/Steam Deck requirements from the architecture stage.
+
+- self-contained Windows x64 `jpackage` image;
+- direct `HORSEBOUND.exe` launch with no mandatory external launcher;
+- bundled Java runtime;
+- no administrator requirement;
+- user data outside the install depot;
+- exact packaged build identity and SHA-256 manifest;
+- third-party license bundle;
+- controller-only packaged smoke-test contract;
+- honest store-feature discipline.
+
+Key documents:
 
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 - [`docs/STEAM_RELEASE_READINESS.md`](docs/STEAM_RELEASE_READINESS.md)
 - [`docs/STEAM_CONTROLLER_SMOKE_TEST.md`](docs/STEAM_CONTROLLER_SMOKE_TEST.md)
-- [`docs/SUPPORT.md`](docs/SUPPORT.md)
-- [`docs/releases/0.4.8.md`](docs/releases/0.4.8.md)
+- [`docs/releases/0.5.0.md`](docs/releases/0.5.0.md)
 - [`steam/README.md`](steam/README.md)
-
-The planned Steam launch target is `HORSEBOUND.exe` directly, without a mandatory external launcher.
 
 ## Build
 
@@ -210,36 +174,30 @@ gradle run
 gradle test
 ```
 
-Windows self-contained build:
+Windows self-contained image:
 
 ```powershell
 gradle clean test windowsImage
 ```
 
+Output:
+
 ```text
 build/jpackage/HORSEBOUND/HORSEBOUND.exe
 ```
 
-The packaged game includes its Java runtime. CI verifies:
-
-- executable, application JAR and bundled runtime;
-- exact packaged version and source commit;
-- standardized controller classes and `jamepad64.dll`;
-- prompt, pause, input-profile and rebinding runtime classes;
-- third-party notices and exact license texts;
-- absence of saves, display/input settings, crash logs and local Steam data in the install image;
-- SHA-256 package hashes.
+CI verifies tests, executable, JAR, bundled runtime, controller native runtime, Homestead domain runtime, licenses, exact version/commit and absence of mutable user data in the install image.
 
 ## Tech
 
 - Java 21
 - libGDX 1.14.2
 - LWJGL3
-- gdx-controllers 2.2.4 / Jamepad desktop backend
+- gdx-controllers 2.2.4 / Jamepad
 - Gradle
 - JDK binary persistence
 - JDK Properties settings
-- jpackage Windows app image
+- Windows `jpackage`
 
 ## Licensing and ownership
 
