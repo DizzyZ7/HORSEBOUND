@@ -117,6 +117,7 @@ final class InventoryOverlay implements Disposable {
         ItemId item,
         int moved
     ) {
+        RanchAudio.play(RanchAudio.Cue.INVENTORY_TRANSFER);
         String verb = chestPanel ? "Took " : "Stored ";
         String amount = mode == InventoryTransferService.TransferMode.ONE
             ? "1"
