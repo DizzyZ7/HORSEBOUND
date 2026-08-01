@@ -28,6 +28,8 @@ final class HomesteadRenderer implements Disposable {
     private ModelInstance preview;
     private HomesteadStructureType previewType;
     private boolean previewValidity;
+    private ModelInstance selectedOverlay;
+    private HomesteadStructureType selectedType;
 
     HomesteadRenderer() {
         environment.set(ColorAttribute.createAmbientLight(0.62f, 0.64f, 0.58f, 1f));
@@ -40,17 +42,30 @@ final class HomesteadRenderer implements Disposable {
         Set<UUID> hiddenStructureIds,
         PlacementPreview placement
     ) {
+        render(camera, state, hiddenStructureIds, placement, null);
+    }
+
+    void render(
+        PerspectiveCamera camera,
+        HomesteadState state,
+        Set<UUID> hiddenStructureIds,
+        PlacementPreview placement,
+        UUID selectedStructureId
+    ) {
         float frameDelta = Math.min(
             Math.max(0f, Gdx.graphics.getDeltaTime()),
             FixedStepClock.DEFAULT_MAX_FRAME_SECONDS
         );
         for (RanchAudio.Cue cue : presentationObserver.observe(state.structures())) RanchAudio.play(cue);
-        sync(state, hiddenStructureIds == null ? Set.of() : hiddenStructureIds, frameDelta);
+        Set<UUID> hidden = hiddenStructureIds == null ? Set.of() : hiddenStructureIds;
+        sync(state, hidden, frameDelta);
+        syncSelected(state, hidden, selectedStructureId);
         Gdx.gl.glEnable(GL20.GL_DEPTH_TEST);
         Gdx.gl.glEnable(GL20.GL_BLEND);
         Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
         modelBatch.begin(camera);
         for (ModelInstance instance : instances.values()) modelBatch.render(instance, environment);
+        if (selectedOverlay != null) modelBatch.render(selectedOverlay, environment);
         if (placement != null && placement.visible()) {
             syncPreview(placement);
             modelBatch.render(preview, environment);
@@ -82,6 +97,26 @@ final class HomesteadRenderer implements Disposable {
         gateAnimation.retain(aliveGates);
     }
 
+    private void syncSelected(HomesteadState state, Set<UUID> hiddenStructureIds, UUID selectedStructureId) {
+        if (selectedStructureId == null || hiddenStructureIds.contains(selectedStructureId)) {
+            selectedOverlay = null;
+            selectedType = null;
+            return;
+        }
+        PlacedStructure selected = state.find(selectedStructureId).orElse(null);
+        ModelInstance base = instances.get(selectedStructureId);
+        if (selected == null || base == null) {
+            selectedOverlay = null;
+            selectedType = null;
+            return;
+        }
+        if (selectedOverlay == null || selectedType != selected.type()) {
+            selectedType = selected.type();
+            selectedOverlay = new ModelInstance(models.preview(selectedType, true));
+        }
+        selectedOverlay.transform.set(base.transform).scale(1.035f, 1.035f, 1.035f);
+    }
+
     private void syncPreview(PlacementPreview placement) {
         if (preview == null || previewType != placement.type() || previewValidity != placement.valid()) {
             previewType = placement.type();
@@ -95,11 +130,12 @@ final class HomesteadRenderer implements Disposable {
 
     @Override
     public void dispose() {
-        RanchAudio.shutdown();
         modelBatch.dispose();
         models.dispose();
         instances.clear();
         gateAnimation.retain(Set.of());
+        selectedOverlay = null;
+        selectedType = null;
         preview = null;
     }
 
