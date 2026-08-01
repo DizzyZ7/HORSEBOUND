@@ -52,7 +52,8 @@ final class GamepadInputMapper implements InputMapper {
         boolean interactPressed = justPressed(current.buttonX(), previous.buttonX());
         boolean mountPressed = justPressed(current.buttonY(), previous.buttonY());
         boolean buildPressed = justPressed(current.buttonL1(), previous.buttonL1());
-        boolean inventoryPressed = justPressed(current.dpadUp(), previous.dpadUp());
+        boolean inventoryPressed = !HomesteadInputContext.capturesPauseAsCancel()
+            && justPressed(current.dpadUp(), previous.dpadUp());
         boolean savePressed = justPressed(current.buttonBack(), previous.buttonBack());
         boolean pausePressed = justPressed(current.buttonStart(), previous.buttonStart())
             || justPressed(current.buttonB(), previous.buttonB());
