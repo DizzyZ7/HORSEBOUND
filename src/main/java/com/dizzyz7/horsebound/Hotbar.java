@@ -2,6 +2,7 @@
 package com.dizzyz7.horsebound;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 final class Hotbar {
@@ -40,9 +41,7 @@ final class Hotbar {
     static Hotbar restore(SaveGame.HotbarData data) {
         if (data == null) return defaults();
         List<ItemId> items = new ArrayList<>();
-        for (String raw : data.itemIds()) {
-            items.add(ItemId.parse(raw).orElse(null));
-        }
+        for (String raw : data.itemIds()) items.add(ItemId.parse(raw).orElse(null));
         return new Hotbar(items, data.selectedIndex());
     }
 
@@ -73,7 +72,7 @@ final class Hotbar {
     }
 
     List<ItemId> slots() {
-        return List.copyOf(slots);
+        return Collections.unmodifiableList(new ArrayList<>(slots));
     }
 
     SaveGame.HotbarData toSaveData() {
