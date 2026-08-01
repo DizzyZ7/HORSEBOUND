@@ -3,7 +3,11 @@ package com.dizzyz7.horsebound;
 
 import com.badlogic.gdx.Screen;
 
-/** A live ranch session that can be paused, resumed and saved without reconstruction. */
+/** A live ranch session that can be paused, resumed, saved and safely edited without reconstruction. */
 interface RanchSessionScreen extends Screen {
     void saveSession();
+
+    default String undoLastRanchEdit() {
+        return "Nothing to undo in this ranch session.";
+    }
 }
