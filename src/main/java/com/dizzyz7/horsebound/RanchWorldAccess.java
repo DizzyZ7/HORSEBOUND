@@ -22,7 +22,7 @@ interface RanchWorldAccess {
     boolean setHorsePosition(UUID horseId, float x, float z);
 
     record ActorPose(float x, float z, float heading, boolean mounted) {
-        ActorPose {
+        public ActorPose {
             x = finiteOrZero(x);
             z = finiteOrZero(z);
             heading = finiteOrZero(heading);
@@ -30,7 +30,7 @@ interface RanchWorldAccess {
     }
 
     record HorseTelemetry(UUID id, float x, float z, float speed, boolean mounted, boolean tamed) {
-        HorseTelemetry {
+        public HorseTelemetry {
             if (id == null) throw new IllegalArgumentException("horse id is required");
             x = finiteOrZero(x);
             z = finiteOrZero(z);
