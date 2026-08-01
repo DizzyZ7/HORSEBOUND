@@ -19,7 +19,7 @@ final class PauseScreen implements Screen {
     private static final int ITEM_COUNT = 4;
 
     private final HorseboundGame game;
-    private final LivingRanchScreen world;
+    private final RanchSessionScreen world;
     private final SpriteBatch batch = new SpriteBatch();
     private final ShapeRenderer shapes = new ShapeRenderer();
     private final BitmapFont font = new BitmapFont();
@@ -28,7 +28,7 @@ final class PauseScreen implements Screen {
     private int selectedIndex;
     private String message = "Ranch simulation is paused.";
 
-    PauseScreen(HorseboundGame game, LivingRanchScreen world) {
+    PauseScreen(HorseboundGame game, RanchSessionScreen world) {
         this.game = game;
         this.world = world;
     }
@@ -104,7 +104,7 @@ final class PauseScreen implements Screen {
             case RESUME -> game.resumePausedWorld(world);
             case INPUT -> game.showInputSettings(world);
             case SAVE -> {
-                world.pause();
+                world.saveSession();
                 ControllerRumble.pulse(game.inputProfile(), 55, 0.45f);
                 message = "Ranch saved without leaving the session.";
             }
@@ -131,7 +131,7 @@ final class PauseScreen implements Screen {
 
     @Override
     public void pause() {
-        world.pause();
+        world.saveSession();
     }
 
     @Override public void resume() { }
