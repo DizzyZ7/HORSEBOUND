@@ -48,9 +48,7 @@ final class PauseScreen implements Screen {
         float rowHeight = 54f * geometry;
         float x = (width - rowWidth) * 0.5f;
         float startY = height * 0.57f;
-        for (int i = 0; i < rows.length; i++) {
-            rows[i].set(x, startY - i * 68f * geometry, rowWidth, rowHeight);
-        }
+        for (int i = 0; i < rows.length; i++) rows[i].set(x, startY - i * 68f * geometry, rowWidth, rowHeight);
 
         MenuInputSnapshot input = menuInput.sample();
         if (input.command().upPressed()) selectedIndex = Math.floorMod(selectedIndex - 1, ITEM_COUNT);
@@ -130,7 +128,12 @@ final class PauseScreen implements Screen {
     }
 
     @Override public void resize(int width, int height) { }
-    @Override public void pause() { }
+
+    @Override
+    public void pause() {
+        world.pause();
+    }
+
     @Override public void resume() { }
     @Override public void hide() { }
 
