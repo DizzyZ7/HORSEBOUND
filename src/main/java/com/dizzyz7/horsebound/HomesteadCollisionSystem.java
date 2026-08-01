@@ -7,6 +7,7 @@ import java.util.List;
 final class HomesteadCollisionSystem {
     private static final float MAX_STEP = 0.22f;
     private static final float SCORE_EPSILON = 0.0001f;
+    private static final float PUSH_MARGIN = 0.015f;
 
     Position resolve(
         float previousX,
@@ -26,10 +27,16 @@ final class HomesteadCollisionSystem {
         float dx = endX - startX;
         float dz = endZ - startZ;
         float distance = (float) Math.sqrt(dx * dx + dz * dz);
+        float startScore = penetrationScore(startX, startZ, safeRadius, safeStructures);
+        if (distance <= SCORE_EPSILON && startScore > SCORE_EPSILON) {
+            Position pushed = pushOut(startX, startZ, safeRadius, safeStructures);
+            return new Position(pushed.x(), pushed.z(), true);
+        }
+
         int steps = Math.max(1, (int) Math.ceil(distance / MAX_STEP));
         float lastX = startX;
         float lastZ = startZ;
-        float lastScore = penetrationScore(startX, startZ, safeRadius, safeStructures);
+        float lastScore = startScore;
         boolean escapingInitialOverlap = lastScore > SCORE_EPSILON;
 
         for (int i = 1; i <= steps; i++) {
@@ -65,6 +72,45 @@ final class HomesteadCollisionSystem {
         ) > SCORE_EPSILON;
     }
 
+    private static Position pushOut(
+        float startX,
+        float startZ,
+        float actorRadius,
+        List<PlacedStructure> structures
+    ) {
+        float x = startX;
+        float z = startZ;
+        for (int pass = 0; pass < 4; pass++) {
+            boolean moved = false;
+            for (PlacedStructure structure : structures) {
+                if (structure == null || !structure.blocksMovement()) continue;
+                float required = actorRadius + structure.type().collisionRadius();
+                float dx = x - structure.x();
+                float dz = z - structure.z();
+                float distanceSquared = dx * dx + dz * dz;
+                if (distanceSquared >= required * required) continue;
+                float distance = (float) Math.sqrt(distanceSquared);
+                if (distance <= SCORE_EPSILON) {
+                    dx = deterministicDirection(structure.id().getLeastSignificantBits());
+                    dz = deterministicDirection(structure.id().getMostSignificantBits());
+                    float length = (float) Math.sqrt(dx * dx + dz * dz);
+                    dx /= length;
+                    dz /= length;
+                    distance = 0f;
+                } else {
+                    dx /= distance;
+                    dz /= distance;
+                }
+                float correction = required - distance + PUSH_MARGIN;
+                x += dx * correction;
+                z += dz * correction;
+                moved = true;
+            }
+            if (!moved) break;
+        }
+        return new Position(x, z, true);
+    }
+
     private static float penetrationScore(
         float x,
         float z,
@@ -81,6 +127,10 @@ final class HomesteadCollisionSystem {
             if (overlap > 0f) score += overlap;
         }
         return score;
+    }
+
+    private static float deterministicDirection(long bits) {
+        return (bits & 1L) == 0L ? 1f : -1f;
     }
 
     private static float finite(float value) {
