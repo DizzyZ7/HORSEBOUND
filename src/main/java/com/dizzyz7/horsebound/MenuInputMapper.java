@@ -5,6 +5,7 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
 
 import java.util.Objects;
+import java.util.function.DoubleSupplier;
 import java.util.function.Supplier;
 
 /**
@@ -15,16 +16,31 @@ final class MenuInputMapper {
 
     private final ControllerStateSource controllerSource;
     private final Supplier<MenuCommand> keyboardSource;
+    private final DoubleSupplier frameDeltaSupplier;
+    private final NavigationRepeater navigationRepeater = new NavigationRepeater();
     private ControllerFrame previousController = ControllerFrame.disconnected();
     private InputDeviceType activeDevice = InputDeviceType.KEYBOARD_MOUSE;
 
     MenuInputMapper() {
-        this(new GdxControllerStateSource(), MenuInputMapper::keyboardCommand);
+        this(
+            new GdxControllerStateSource(),
+            MenuInputMapper::keyboardCommand,
+            MenuInputMapper::currentFrameDelta
+        );
     }
 
     MenuInputMapper(ControllerStateSource controllerSource, Supplier<MenuCommand> keyboardSource) {
+        this(controllerSource, keyboardSource, MenuInputMapper::currentFrameDelta);
+    }
+
+    MenuInputMapper(
+        ControllerStateSource controllerSource,
+        Supplier<MenuCommand> keyboardSource,
+        DoubleSupplier frameDeltaSupplier
+    ) {
         this.controllerSource = Objects.requireNonNull(controllerSource, "controllerSource");
         this.keyboardSource = Objects.requireNonNull(keyboardSource, "keyboardSource");
+        this.frameDeltaSupplier = Objects.requireNonNull(frameDeltaSupplier, "frameDeltaSupplier");
     }
 
     MenuInputSnapshot sample() {
@@ -33,7 +49,7 @@ final class MenuInputMapper {
             controllerSource.poll(),
             ControllerFrame.disconnected()
         );
-        MenuCommand controller = controllerCommand(current, previousController);
+        MenuCommand controller = controllerCommand(current, previousController, safeFrameDelta());
         previousController = current;
 
         if (keyboard.hasActivity() && !controller.hasActivity()) {
@@ -69,28 +85,45 @@ final class MenuInputMapper {
         );
     }
 
-    private static MenuCommand controllerCommand(ControllerFrame current, ControllerFrame previous) {
-        if (!current.connected()) return MenuCommand.idle();
+    private MenuCommand controllerCommand(ControllerFrame current, ControllerFrame previous, float delta) {
+        if (!current.connected()) {
+            navigationRepeater.reset();
+            return MenuCommand.idle();
+        }
 
-        boolean currentUp = current.dpadUp() || current.leftStick().y() < -STICK_NAVIGATION_THRESHOLD;
-        boolean previousUp = previous.dpadUp() || previous.leftStick().y() < -STICK_NAVIGATION_THRESHOLD;
-        boolean currentDown = current.dpadDown() || current.leftStick().y() > STICK_NAVIGATION_THRESHOLD;
-        boolean previousDown = previous.dpadDown() || previous.leftStick().y() > STICK_NAVIGATION_THRESHOLD;
-        boolean currentLeft = current.dpadLeft() || current.leftStick().x() < -STICK_NAVIGATION_THRESHOLD;
-        boolean previousLeft = previous.dpadLeft() || previous.leftStick().x() < -STICK_NAVIGATION_THRESHOLD;
-        boolean currentRight = current.dpadRight() || current.leftStick().x() > STICK_NAVIGATION_THRESHOLD;
-        boolean previousRight = previous.dpadRight() || previous.leftStick().x() > STICK_NAVIGATION_THRESHOLD;
+        boolean upHeld = current.dpadUp() || current.leftStick().y() < -STICK_NAVIGATION_THRESHOLD;
+        boolean downHeld = current.dpadDown() || current.leftStick().y() > STICK_NAVIGATION_THRESHOLD;
+        boolean leftHeld = current.dpadLeft() || current.leftStick().x() < -STICK_NAVIGATION_THRESHOLD;
+        boolean rightHeld = current.dpadRight() || current.leftStick().x() > STICK_NAVIGATION_THRESHOLD;
+        NavigationRepeater.Directions directions = navigationRepeater.update(
+            upHeld,
+            downHeld,
+            leftHeld,
+            rightHeld,
+            delta
+        );
 
         return new MenuCommand(
-            justPressed(currentUp, previousUp),
-            justPressed(currentDown, previousDown),
-            justPressed(currentLeft, previousLeft),
-            justPressed(currentRight, previousRight),
+            directions.up(),
+            directions.down(),
+            directions.left(),
+            directions.right(),
             justPressed(current.buttonA(), previous.buttonA())
                 || justPressed(current.buttonStart(), previous.buttonStart()),
             justPressed(current.buttonB(), previous.buttonB())
                 || justPressed(current.buttonBack(), previous.buttonBack())
         );
+    }
+
+    private float safeFrameDelta() {
+        double value = frameDeltaSupplier.getAsDouble();
+        if (!Double.isFinite(value) || value <= 0d) return 0f;
+        return (float) Math.min(value, 0.10d);
+    }
+
+    private static double currentFrameDelta() {
+        if (Gdx.graphics == null) return 1d / 60d;
+        return Gdx.graphics.getDeltaTime();
     }
 
     private static boolean anyJustPressed(int first, int second) {
