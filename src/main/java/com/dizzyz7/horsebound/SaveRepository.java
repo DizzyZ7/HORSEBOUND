@@ -24,6 +24,8 @@ final class SaveRepository {
     private static final int MAX_INVENTORY_ITEMS = 256;
     private static final int MAX_HORSES = 10_000;
     private static final int MAX_FENCES = 100_000;
+    private static final int MAX_STRUCTURES = 100_000;
+    private static final int MAX_HOTBAR_ITEMS = 32;
     private static final int MAX_HARVESTED_TREES = 1_000_000;
 
     private final Path root;
@@ -43,9 +45,7 @@ final class SaveRepository {
     Optional<SaveGame> load(String slot) {
         Path primary = savePath(slot);
         Path backup = backupPath(slot);
-        if (!Files.isRegularFile(primary) && !Files.isRegularFile(backup)) {
-            return Optional.empty();
-        }
+        if (!Files.isRegularFile(primary) && !Files.isRegularFile(backup)) return Optional.empty();
 
         IOException primaryFailure = null;
         if (Files.isRegularFile(primary)) {
@@ -180,9 +180,28 @@ final class SaveRepository {
                     HorsePersonality personality = HorsePersonality.parseOrDefault(in.readUTF(), id);
                     float bond = in.readFloat();
                     float fear = in.readFloat();
-                    horses.add(new SaveGame.HorseData(
-                        id, name, x, z, heading, trust, stamina, tamed, personality, bond, fear
-                    ));
+                    if (version >= 4) {
+                        horses.add(new SaveGame.HorseData(
+                            id,
+                            name,
+                            x,
+                            z,
+                            heading,
+                            trust,
+                            stamina,
+                            tamed,
+                            personality,
+                            bond,
+                            fear,
+                            in.readFloat(),
+                            in.readFloat(),
+                            in.readFloat()
+                        ));
+                    } else {
+                        horses.add(new SaveGame.HorseData(
+                            id, name, x, z, heading, trust, stamina, tamed, personality, bond, fear
+                        ));
+                    }
                 } else {
                     horses.add(new SaveGame.HorseData(id, name, x, z, heading, trust, stamina, tamed));
                 }
@@ -198,6 +217,47 @@ final class SaveRepository {
             List<Integer> harvestedTrees = new ArrayList<>(treeCount);
             for (int i = 0; i < treeCount; i++) harvestedTrees.add(in.readInt());
 
+            List<SaveGame.StructureData> structures;
+            SaveGame.HotbarData hotbar;
+            if (version >= 4) {
+                int structureCount = checkedCount(in.readInt(), MAX_STRUCTURES, "homestead structure");
+                structures = new ArrayList<>(structureCount);
+                for (int i = 0; i < structureCount; i++) {
+                    UUID id = new UUID(in.readLong(), in.readLong());
+                    String rawType = in.readUTF();
+                    HomesteadStructureType type = HomesteadStructureType.parse(rawType)
+                        .orElseThrow(() -> new IOException("Unknown homestead structure type: " + rawType));
+                    structures.add(new SaveGame.StructureData(
+                        id,
+                        type,
+                        in.readFloat(),
+                        in.readFloat(),
+                        in.readFloat(),
+                        in.readInt()
+                    ));
+                }
+
+                int selectedIndex = in.readInt();
+                int hotbarCount = checkedCount(in.readInt(), MAX_HOTBAR_ITEMS, "hotbar item");
+                List<String> hotbarItems = new ArrayList<>(hotbarCount);
+                for (int i = 0; i < hotbarCount; i++) hotbarItems.add(in.readUTF());
+                hotbar = new SaveGame.HotbarData(selectedIndex, hotbarItems);
+            } else {
+                SaveGame compatibility = new SaveGame(
+                    SaveGame.CURRENT_VERSION,
+                    worldSeed,
+                    savedAt,
+                    worldTime,
+                    player,
+                    pushik,
+                    horses,
+                    fences,
+                    harvestedTrees
+                );
+                structures = compatibility.structures();
+                hotbar = compatibility.hotbar();
+            }
+
             return new SaveGame(
                 SaveGame.CURRENT_VERSION,
                 worldSeed,
@@ -207,6 +267,8 @@ final class SaveRepository {
                 pushik,
                 horses,
                 fences,
+                structures,
+                hotbar,
                 harvestedTrees
             );
         } catch (EOFException ex) {
@@ -263,6 +325,9 @@ final class SaveRepository {
                 out.writeUTF(horse.personality().name());
                 out.writeFloat(horse.bond());
                 out.writeFloat(horse.fear());
+                out.writeFloat(horse.hunger());
+                out.writeFloat(horse.thirst());
+                out.writeFloat(horse.energy());
             }
 
             out.writeInt(saveGame.fences().size());
@@ -274,6 +339,21 @@ final class SaveRepository {
 
             out.writeInt(saveGame.harvestedTreeIds().size());
             for (int treeId : saveGame.harvestedTreeIds()) out.writeInt(treeId);
+
+            out.writeInt(saveGame.structures().size());
+            for (SaveGame.StructureData structure : saveGame.structures()) {
+                out.writeLong(structure.id().getMostSignificantBits());
+                out.writeLong(structure.id().getLeastSignificantBits());
+                out.writeUTF(structure.type().name());
+                out.writeFloat(structure.x());
+                out.writeFloat(structure.z());
+                out.writeFloat(structure.heading());
+                out.writeInt(structure.storedUnits());
+            }
+
+            out.writeInt(saveGame.hotbar().selectedIndex());
+            out.writeInt(saveGame.hotbar().itemIds().size());
+            for (String itemId : saveGame.hotbar().itemIds()) out.writeUTF(itemId);
 
             out.flush();
             channel.force(true);
