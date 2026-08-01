@@ -15,22 +15,10 @@ class HomesteadCollisionSystemTest {
 
     @Test
     void sweptMovementStopsBeforeClosedGate() {
-        PlacedStructure gate = new PlacedStructure(
-            UUID.randomUUID(),
-            HomesteadStructureType.GATE,
-            2f,
-            0f,
-            0f,
-            0
-        );
+        PlacedStructure gate = structure(HomesteadStructureType.GATE, 2f, 0f);
 
         HomesteadCollisionSystem.Position result = collisions.resolve(
-            0f,
-            0f,
-            4f,
-            0f,
-            0.45f,
-            List.of(gate)
+            0f, 0f, 4f, 0f, 0.45f, List.of(gate)
         );
 
         assertTrue(result.blocked());
@@ -39,23 +27,11 @@ class HomesteadCollisionSystemTest {
 
     @Test
     void openGateAllowsMovementThrough() {
-        PlacedStructure gate = new PlacedStructure(
-            UUID.randomUUID(),
-            HomesteadStructureType.GATE,
-            2f,
-            0f,
-            0f,
-            0
-        );
+        PlacedStructure gate = structure(HomesteadStructureType.GATE, 2f, 0f);
         gate.toggleOpen();
 
         HomesteadCollisionSystem.Position result = collisions.resolve(
-            0f,
-            0f,
-            4f,
-            0f,
-            0.45f,
-            List.of(gate)
+            0f, 0f, 4f, 0f, 0.45f, List.of(gate)
         );
 
         assertFalse(result.blocked());
@@ -64,25 +40,34 @@ class HomesteadCollisionSystemTest {
 
     @Test
     void largeFrameStepCannotTunnelThroughFence() {
-        PlacedStructure fence = new PlacedStructure(
-            UUID.randomUUID(),
-            HomesteadStructureType.FENCE,
-            5f,
-            0f,
-            0f,
-            0
-        );
+        PlacedStructure fence = structure(HomesteadStructureType.FENCE, 5f, 0f);
 
         HomesteadCollisionSystem.Position result = collisions.resolve(
-            -10f,
-            0f,
-            10f,
-            0f,
-            0.5f,
-            List.of(fence)
+            -10f, 0f, 10f, 0f, 0.5f, List.of(fence)
         );
 
         assertTrue(result.blocked());
         assertTrue(result.x() < 4f);
+    }
+
+    @Test
+    void actorInitiallyInsideClosedGateCanMoveOutButNotDeeper() {
+        PlacedStructure gate = structure(HomesteadStructureType.GATE, 0f, 0f);
+
+        HomesteadCollisionSystem.Position escape = collisions.resolve(
+            0.2f, 0f, 3f, 0f, 0.45f, List.of(gate)
+        );
+        assertFalse(escape.blocked());
+        assertEquals(3f, escape.x());
+
+        HomesteadCollisionSystem.Position deeper = collisions.resolve(
+            0.8f, 0f, 0f, 0f, 0.45f, List.of(gate)
+        );
+        assertTrue(deeper.blocked());
+        assertTrue(deeper.x() > 0f);
+    }
+
+    private static PlacedStructure structure(HomesteadStructureType type, float x, float z) {
+        return new PlacedStructure(UUID.randomUUID(), type, x, z, 0f, 0);
     }
 }
