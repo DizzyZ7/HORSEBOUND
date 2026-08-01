@@ -14,6 +14,7 @@ import com.badlogic.gdx.math.Matrix4;
 import com.badlogic.gdx.utils.Disposable;
 
 import java.util.EnumMap;
+import java.util.List;
 import java.util.Map;
 
 /** Provisional stylized primitives; production GLB assets replace these in the presentation pass. */
