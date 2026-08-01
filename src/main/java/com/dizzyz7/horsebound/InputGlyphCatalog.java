@@ -71,35 +71,19 @@ final class InputGlyphCatalog {
     }
 
     private static String faceA(ControllerGlyphFamily family) {
-        return switch (family) {
-            case PLAYSTATION -> "CROSS";
-            case NINTENDO -> "B";
-            default -> "A";
-        };
+        return family == ControllerGlyphFamily.PLAYSTATION ? "CROSS" : "A";
     }
 
     private static String faceB(ControllerGlyphFamily family) {
-        return switch (family) {
-            case PLAYSTATION -> "CIRCLE";
-            case NINTENDO -> "A";
-            default -> "B";
-        };
+        return family == ControllerGlyphFamily.PLAYSTATION ? "CIRCLE" : "B";
     }
 
     private static String faceX(ControllerGlyphFamily family) {
-        return switch (family) {
-            case PLAYSTATION -> "SQUARE";
-            case NINTENDO -> "Y";
-            default -> "X";
-        };
+        return family == ControllerGlyphFamily.PLAYSTATION ? "SQUARE" : "X";
     }
 
     private static String faceY(ControllerGlyphFamily family) {
-        return switch (family) {
-            case PLAYSTATION -> "TRIANGLE";
-            case NINTENDO -> "X";
-            default -> "Y";
-        };
+        return family == ControllerGlyphFamily.PLAYSTATION ? "TRIANGLE" : "Y";
     }
 
     private static String shoulderLeft(ControllerGlyphFamily family) {
