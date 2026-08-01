@@ -67,6 +67,18 @@ class HomesteadCollisionSystemTest {
         assertTrue(deeper.x() > 0f);
     }
 
+    @Test
+    void stationaryActorInsideNewStructureIsPushedToSafety() {
+        PlacedStructure chest = structure(HomesteadStructureType.CHEST, 0f, 0f);
+
+        HomesteadCollisionSystem.Position result = collisions.resolve(
+            0f, 0f, 0f, 0f, 0.45f, List.of(chest)
+        );
+
+        assertTrue(result.blocked());
+        assertFalse(collisions.collides(result.x(), result.z(), 0.45f, List.of(chest)));
+    }
+
     private static PlacedStructure structure(HomesteadStructureType type, float x, float z) {
         return new PlacedStructure(UUID.randomUUID(), type, x, z, 0f, 0);
     }
