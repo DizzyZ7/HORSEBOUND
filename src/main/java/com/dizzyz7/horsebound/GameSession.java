@@ -30,6 +30,7 @@ final class GameSession {
         this.homestead = HomesteadState.restore(initialState.structures());
         this.pushikMind = new PushikMind(initialState.pushik().state(), initialState.pushik().affection());
         this.simulationClock = Objects.requireNonNull(simulationClock, "simulationClock");
+        GameSessionCapture.offer(this);
     }
 
     long worldSeed() {
