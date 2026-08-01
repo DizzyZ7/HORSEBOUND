@@ -12,7 +12,8 @@ enum BindableAction {
     JUMP("Jump", Input.Keys.SPACE),
     INTERACT("Interact", Input.Keys.E),
     MOUNT("Mount / dismount", Input.Keys.F),
-    BUILD("Build", Input.Keys.B),
+    BUILD("Build / edit", Input.Keys.B),
+    INVENTORY("Inventory", Input.Keys.I),
     SPRINT("Sprint / gallop", Input.Keys.SHIFT_LEFT),
     SAVE("Manual save", Input.Keys.F5),
     PAUSE("Pause", Input.Keys.ESCAPE);
