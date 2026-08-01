@@ -1,4 +1,4 @@
-// HORSEBOUND — Created by Dimash Janibekov (DizZ7), © 2026. All rights reserved.
+// HORSEBOUND — Created by Dimash Janibekov (DizZyZ7), © 2026. All rights reserved.
 package com.dizzyz7.horsebound;
 
 import org.junit.jupiter.api.Test;
