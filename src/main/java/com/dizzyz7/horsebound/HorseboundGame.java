@@ -17,7 +17,7 @@ public final class HorseboundGame extends Game {
     private SaveService saveService;
     private PerformanceOverlay performanceOverlay;
     private PromptOverlay promptOverlay;
-    private LivingRanchScreen suspendedWorld;
+    private RanchSessionScreen suspendedWorld;
 
     public HorseboundGame() {
         this(
@@ -51,6 +51,8 @@ public final class HorseboundGame extends Game {
         promptOverlay = new PromptOverlay();
         InputActivityTracker.reset();
         PauseRequestBus.reset();
+        HomesteadActionBus.reset();
+        HomesteadInputContext.reset();
         InputProfileContext.set(inputProfile);
         Gdx.graphics.setVSync(settings.vsync());
         setScreen(new MenuScreen(this));
@@ -60,7 +62,7 @@ public final class HorseboundGame extends Game {
     public void render() {
         frameMetrics.record(Gdx.graphics.getDeltaTime());
         super.render();
-        if (PauseRequestBus.consume() && getScreen() instanceof LivingRanchScreen world) {
+        if (PauseRequestBus.consume() && getScreen() instanceof RanchSessionScreen world) {
             showPause(world);
             return;
         }
@@ -110,17 +112,20 @@ public final class HorseboundGame extends Game {
 
     public void startNewWorld(String slotId) {
         suspendedWorld = null;
-        switchTo(new LivingRanchScreen(this, saveService, saveService.createNewWorld(slotId)));
+        SaveGame save = saveService.createNewWorld(slotId);
+        switchTo(new HomesteadRanchScreen(this, saveService, save));
     }
 
     public void loadWorld(String slotId) {
         suspendedWorld = null;
-        switchTo(new LivingRanchScreen(this, saveService, saveService.loadWorld(slotId)));
+        SaveGame save = saveService.loadWorld(slotId);
+        switchTo(new HomesteadRanchScreen(this, saveService, save));
     }
 
     public void continueWorld() {
         suspendedWorld = null;
-        switchTo(new LivingRanchScreen(this, saveService, saveService.loadMostRecent()));
+        SaveGame save = saveService.loadMostRecent();
+        switchTo(new HomesteadRanchScreen(this, saveService, save));
     }
 
     public void showNewGameSlots() {
@@ -139,29 +144,25 @@ public final class HorseboundGame extends Game {
         switchTo(new SettingsScreen(this));
     }
 
-    void showInputSettings(LivingRanchScreen pausedWorld) {
+    void showInputSettings(RanchSessionScreen pausedWorld) {
         if (pausedWorld != null) suspendedWorld = pausedWorld;
         switchTo(new InputSettingsScreen(this, pausedWorld));
     }
 
-    void showKeyBindings(LivingRanchScreen pausedWorld) {
+    void showKeyBindings(RanchSessionScreen pausedWorld) {
         if (pausedWorld != null) suspendedWorld = pausedWorld;
         switchTo(new KeyBindingsScreen(this, pausedWorld));
     }
 
-    void showPause(LivingRanchScreen world) {
+    void showPause(RanchSessionScreen world) {
         if (world == null) return;
         suspendedWorld = world;
         Screen current = getScreen();
         PauseScreen pauseScreen = new PauseScreen(this, world);
-        if (current == world) {
-            setScreen(pauseScreen);
-        } else {
-            switchTo(pauseScreen);
-        }
+        if (current == world) setScreen(pauseScreen); else switchTo(pauseScreen);
     }
 
-    void resumePausedWorld(LivingRanchScreen world) {
+    void resumePausedWorld(RanchSessionScreen world) {
         if (world == null) {
             returnToMenu();
             return;
@@ -171,20 +172,18 @@ public final class HorseboundGame extends Game {
         if (previous != null && previous != world) previous.dispose();
         suspendedWorld = null;
         PauseRequestBus.reset();
+        HomesteadActionBus.reset();
     }
 
-    void leavePausedWorldToMenu(LivingRanchScreen world) {
+    void leavePausedWorldToMenu(RanchSessionScreen world) {
         if (world != null) world.dispose();
         suspendedWorld = null;
         switchTo(new MenuScreen(this));
     }
 
     public void returnToMenu() {
-        if (getScreen() instanceof SettingsScreen) {
-            switchTo(new SettingsHubScreen(this));
-        } else {
-            switchTo(new MenuScreen(this));
-        }
+        if (getScreen() instanceof SettingsScreen) switchTo(new SettingsHubScreen(this));
+        else switchTo(new MenuScreen(this));
     }
 
     private void switchTo(Screen next) {
@@ -202,5 +201,7 @@ public final class HorseboundGame extends Game {
         if (performanceOverlay != null) performanceOverlay.dispose();
         InputProfileContext.reset();
         PauseRequestBus.reset();
+        HomesteadActionBus.reset();
+        HomesteadInputContext.reset();
     }
 }

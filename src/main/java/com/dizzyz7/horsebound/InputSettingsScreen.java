@@ -25,7 +25,7 @@ final class InputSettingsScreen implements Screen {
     private static final int ITEM_COUNT = 9;
 
     private final HorseboundGame game;
-    private final LivingRanchScreen pausedWorld;
+    private final RanchSessionScreen pausedWorld;
     private final SpriteBatch batch = new SpriteBatch();
     private final ShapeRenderer shapes = new ShapeRenderer();
     private final BitmapFont font = new BitmapFont();
@@ -34,7 +34,7 @@ final class InputSettingsScreen implements Screen {
     private InputProfile profile;
     private int selectedIndex;
 
-    InputSettingsScreen(HorseboundGame game, LivingRanchScreen pausedWorld) {
+    InputSettingsScreen(HorseboundGame game, RanchSessionScreen pausedWorld) {
         this.game = game;
         this.pausedWorld = pausedWorld;
         this.profile = game.inputProfile();
@@ -200,7 +200,7 @@ final class InputSettingsScreen implements Screen {
 
     @Override
     public void pause() {
-        if (pausedWorld != null) pausedWorld.pause();
+        if (pausedWorld != null) pausedWorld.saveSession();
     }
 
     @Override public void resume() { }

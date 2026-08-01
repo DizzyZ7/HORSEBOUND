@@ -203,7 +203,7 @@ final class SaveSlotsScreen implements Screen {
         String saved = DATE_FORMAT.format(Instant.ofEpochMilli(slot.savedAtEpochMillis()));
         font.draw(batch,
             "Saved " + saved + " | horses " + slot.horseCount() + " | tamed " + slot.tamedHorseCount()
-                + " | fences " + slot.fenceCount(),
+                + " | structures " + slot.structureCount(),
             left,
             rect.y + 28f * geometryScale
         );
