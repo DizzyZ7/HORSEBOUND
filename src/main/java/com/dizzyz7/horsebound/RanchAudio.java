@@ -12,30 +12,53 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadFactory;
 
 /**
- * Shared procedural interaction audio. It requires no external asset files and degrades to no-op
- * when the platform has no usable audio device.
+ * Shared procedural ranch audio with independent SFX and ambience buses. It requires no external
+ * assets and degrades to no-op when the platform has no usable audio device.
  */
 final class RanchAudio {
     static final int SAMPLE_RATE = 22_050;
     private static final Object LOCK = new Object();
-    private static volatile float masterVolume = GameSettings.DEFAULT_SFX_VOLUME;
+    private static volatile float sfxVolume = GameSettings.DEFAULT_SFX_VOLUME;
+    private static volatile float ambienceVolume = GameSettings.DEFAULT_AMBIENCE_VOLUME;
     private static Engine shared;
     private static boolean unavailable;
 
     private RanchAudio() {
     }
 
-    static void setMasterVolume(float value) {
-        if (!Float.isFinite(value)) value = GameSettings.DEFAULT_SFX_VOLUME;
-        masterVolume = Math.max(GameSettings.MIN_SFX_VOLUME, Math.min(GameSettings.MAX_SFX_VOLUME, value));
+    static void setVolumes(float sfx, float ambience) {
+        setSfxVolume(sfx);
+        setAmbienceVolume(ambience);
     }
 
+    static void setSfxVolume(float value) {
+        sfxVolume = clamp(value, GameSettings.DEFAULT_SFX_VOLUME);
+    }
+
+    static void setAmbienceVolume(float value) {
+        ambienceVolume = clamp(value, GameSettings.DEFAULT_AMBIENCE_VOLUME);
+    }
+
+    /** Compatibility alias retained for 0.5.4 tests and call sites. */
+    static void setMasterVolume(float value) {
+        setSfxVolume(value);
+    }
+
+    static float sfxVolume() {
+        return sfxVolume;
+    }
+
+    static float ambienceVolume() {
+        return ambienceVolume;
+    }
+
+    /** Compatibility alias retained for 0.5.4 tests and call sites. */
     static float masterVolume() {
-        return masterVolume;
+        return sfxVolume;
     }
 
     static void play(Cue cue) {
-        if (cue == null || masterVolume <= 0f) return;
+        if (cue == null || volumeFor(cue.bus()) <= 0f) return;
         Engine engine = engine();
         if (engine != null) engine.play(cue);
     }
@@ -67,7 +90,8 @@ final class RanchAudio {
             float noise = ((noiseState >>> 40) / (float) (1 << 23)) * 2f - 1f;
             float envelope = attackRelease(progress, cue.attackFraction());
             float tonal = (float) Math.sin(phase);
-            float sample = (tonal * (1f - cue.noiseMix()) + noise * cue.noiseMix())
+            float harmonic = (float) Math.sin(phase * cue.harmonicMultiplier()) * 0.30f;
+            float sample = ((tonal + harmonic) * (1f - cue.noiseMix()) + noise * cue.noiseMix())
                 * envelope
                 * cue.volume();
             samples[i] = Math.max(-1f, Math.min(1f, sample));
@@ -75,15 +99,33 @@ final class RanchAudio {
         return samples;
     }
 
-    static float[] applyMasterVolume(float[] samples, float volume) {
+    static float[] applyBusVolume(float[] samples, float volume, float fallback) {
         if (samples == null || samples.length == 0) return new float[0];
-        float safeVolume = Float.isFinite(volume)
-            ? Math.max(GameSettings.MIN_SFX_VOLUME, Math.min(GameSettings.MAX_SFX_VOLUME, volume))
-            : GameSettings.DEFAULT_SFX_VOLUME;
+        float safeVolume = clamp(volume, fallback);
         if (safeVolume == 1f) return samples;
         float[] scaled = new float[samples.length];
         for (int i = 0; i < samples.length; i++) scaled[i] = samples[i] * safeVolume;
         return scaled;
+    }
+
+    /** Compatibility alias retained for 0.5.4 tests. */
+    static float[] applyMasterVolume(float[] samples, float volume) {
+        return applyBusVolume(samples, volume, GameSettings.DEFAULT_SFX_VOLUME);
+    }
+
+    private static float volumeFor(Bus bus) {
+        return bus == Bus.AMBIENCE ? ambienceVolume : sfxVolume;
+    }
+
+    private static float fallbackFor(Bus bus) {
+        return bus == Bus.AMBIENCE
+            ? GameSettings.DEFAULT_AMBIENCE_VOLUME
+            : GameSettings.DEFAULT_SFX_VOLUME;
+    }
+
+    private static float clamp(float value, float fallback) {
+        if (!Float.isFinite(value)) value = fallback;
+        return Math.max(0f, Math.min(1f, value));
     }
 
     private static Engine engine() {
@@ -102,43 +144,61 @@ final class RanchAudio {
     }
 
     private static float attackRelease(float progress, float attackFraction) {
-        float safeAttack = Math.max(0.01f, Math.min(0.40f, attackFraction));
+        float safeAttack = Math.max(0.01f, Math.min(0.45f, attackFraction));
         float attack = Math.min(1f, progress / safeAttack);
         float releaseProgress = (progress - safeAttack) / (1f - safeAttack);
         float release = 1f - Math.max(0f, Math.min(1f, releaseProgress));
         return attack * release * release;
     }
 
-    enum Cue {
-        BUILD(170f, 285f, 0.18f, 0.30f, 0.22f, 0.15f),
-        MOVE(235f, 180f, 0.12f, 0.23f, 0.18f, 0.10f),
-        DISMANTLE(210f, 85f, 0.20f, 0.31f, 0.42f, 0.08f),
-        GATE_OPEN(125f, 205f, 0.22f, 0.27f, 0.34f, 0.12f),
-        GATE_CLOSE(195f, 105f, 0.20f, 0.29f, 0.38f, 0.10f),
-        INVENTORY_TRANSFER(440f, 540f, 0.08f, 0.20f, 0.08f, 0.20f),
-        UNDO(310f, 190f, 0.14f, 0.25f, 0.14f, 0.12f);
+    enum Bus {
+        SFX,
+        AMBIENCE
+    }
 
+    enum Cue {
+        BUILD(Bus.SFX, 170f, 285f, 0.18f, 0.30f, 0.22f, 0.15f, 2f),
+        MOVE(Bus.SFX, 235f, 180f, 0.12f, 0.23f, 0.18f, 0.10f, 2f),
+        DISMANTLE(Bus.SFX, 210f, 85f, 0.20f, 0.31f, 0.42f, 0.08f, 2f),
+        GATE_OPEN(Bus.SFX, 125f, 205f, 0.22f, 0.27f, 0.34f, 0.12f, 2f),
+        GATE_CLOSE(Bus.SFX, 195f, 105f, 0.20f, 0.29f, 0.38f, 0.10f, 2f),
+        INVENTORY_TRANSFER(Bus.SFX, 440f, 540f, 0.08f, 0.20f, 0.08f, 0.20f, 2f),
+        UNDO(Bus.SFX, 310f, 190f, 0.14f, 0.25f, 0.14f, 0.12f, 2f),
+        DISMANTLE_ARM(Bus.SFX, 155f, 155f, 0.10f, 0.18f, 0.15f, 0.10f, 3f),
+        MEADOW_BREEZE(Bus.AMBIENCE, 92f, 128f, 1.55f, 0.13f, 0.78f, 0.28f, 1.5f),
+        NIGHT_CRICKETS(Bus.AMBIENCE, 1850f, 2350f, 1.20f, 0.10f, 0.34f, 0.08f, 1.75f);
+
+        private final Bus bus;
         private final float startFrequency;
         private final float endFrequency;
         private final float durationSeconds;
         private final float volume;
         private final float noiseMix;
         private final float attackFraction;
+        private final float harmonicMultiplier;
 
         Cue(
+            Bus bus,
             float startFrequency,
             float endFrequency,
             float durationSeconds,
             float volume,
             float noiseMix,
-            float attackFraction
+            float attackFraction,
+            float harmonicMultiplier
         ) {
+            this.bus = bus;
             this.startFrequency = startFrequency;
             this.endFrequency = endFrequency;
             this.durationSeconds = durationSeconds;
             this.volume = volume;
             this.noiseMix = noiseMix;
             this.attackFraction = attackFraction;
+            this.harmonicMultiplier = harmonicMultiplier;
+        }
+
+        Bus bus() {
+            return bus;
         }
 
         float startFrequency() {
@@ -164,6 +224,10 @@ final class RanchAudio {
         float attackFraction() {
             return attackFraction;
         }
+
+        float harmonicMultiplier() {
+            return harmonicMultiplier;
+        }
     }
 
     private static final class Engine {
@@ -188,12 +252,12 @@ final class RanchAudio {
         private void play(Cue cue) {
             float[] cueSamples = samples.get(cue);
             if (cueSamples == null || cueSamples.length == 0) return;
-            float volumeAtDispatch = masterVolume;
+            float volumeAtDispatch = volumeFor(cue.bus());
             if (volumeAtDispatch <= 0f) return;
             try {
                 executor.execute(() -> {
                     try {
-                        float[] output = applyMasterVolume(cueSamples, volumeAtDispatch);
+                        float[] output = applyBusVolume(cueSamples, volumeAtDispatch, fallbackFor(cue.bus()));
                         if (output.length > 0) device.writeSamples(output, 0, output.length);
                     } catch (RuntimeException ex) {
                         if (Gdx.app != null) Gdx.app.debug("HORSEBOUND", "Ranch audio playback skipped.");

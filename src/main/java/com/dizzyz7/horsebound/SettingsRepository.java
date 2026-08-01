@@ -48,6 +48,10 @@ final class SettingsRepository {
                 properties.getProperty("showPerformanceStats", Boolean.toString(defaults.showPerformanceStats()))
             );
             float sfxVolume = parseFloat(properties.getProperty("sfxVolume"), defaults.sfxVolume());
+            float ambienceVolume = parseFloat(
+                properties.getProperty("ambienceVolume"),
+                defaults.ambienceVolume()
+            );
             return new GameSettings(
                 vsync,
                 sensitivity,
@@ -58,7 +62,8 @@ final class SettingsRepository {
                 uiScale,
                 graphicsPreset,
                 performanceStats,
-                sfxVolume
+                sfxVolume,
+                ambienceVolume
             );
         } catch (IOException | RuntimeException ex) {
             return GameSettings.defaults();
@@ -79,6 +84,7 @@ final class SettingsRepository {
         properties.setProperty("graphicsPreset", settings.graphicsPreset().name());
         properties.setProperty("showPerformanceStats", Boolean.toString(settings.showPerformanceStats()));
         properties.setProperty("sfxVolume", Float.toString(settings.sfxVolume()));
+        properties.setProperty("ambienceVolume", Float.toString(settings.ambienceVolume()));
 
         try {
             if (parent != null) Files.createDirectories(parent);

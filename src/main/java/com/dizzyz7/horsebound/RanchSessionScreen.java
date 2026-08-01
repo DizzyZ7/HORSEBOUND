@@ -7,6 +7,10 @@ import com.badlogic.gdx.Screen;
 interface RanchSessionScreen extends Screen {
     void saveSession();
 
+    default boolean hasUndoableRanchEdit() {
+        return false;
+    }
+
     default String undoLastRanchEdit() {
         return "Nothing to undo in this ranch session.";
     }

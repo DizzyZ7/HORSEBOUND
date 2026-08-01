@@ -9,9 +9,13 @@ import com.badlogic.gdx.graphics.PerspectiveCamera;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g3d.Environment;
+import com.badlogic.gdx.graphics.g3d.Material;
 import com.badlogic.gdx.graphics.g3d.ModelBatch;
 import com.badlogic.gdx.graphics.g3d.ModelInstance;
+import com.badlogic.gdx.graphics.g3d.attributes.BlendingAttribute;
 import com.badlogic.gdx.graphics.g3d.attributes.ColorAttribute;
+import com.badlogic.gdx.graphics.g3d.model.Node;
+import com.badlogic.gdx.graphics.g3d.model.NodePart;
 import com.badlogic.gdx.graphics.g3d.environment.DirectionalLight;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector3;
@@ -19,8 +23,10 @@ import com.badlogic.gdx.math.Vector3;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
@@ -50,11 +56,12 @@ final class LivingRanchScreen implements Screen, RanchWorldAccess {
     private final Environment environment = new Environment();
     private final DirectionalLight sun = new DirectionalLight();
     private final RanchCameraCollisionSystem cameraCollisionSystem = new RanchCameraCollisionSystem();
+    private final RanchCameraFadeSystem cameraFadeSystem = new RanchCameraFadeSystem();
 
     private final ModelInstance player = new ModelInstance(models.player);
     private final ModelInstance water = new ModelInstance(models.water);
     private final List<TreeNode> trees = new ArrayList<>();
-    private final List<ModelInstance> rocks = new ArrayList<>();
+    private final List<RockNode> rocks = new ArrayList<>();
     private final List<FenceNode> fences = new ArrayList<>();
     private final List<HorseActor> horses = new ArrayList<>();
     private final PushikActor pushik;
@@ -68,7 +75,7 @@ final class LivingRanchScreen implements Screen, RanchWorldAccess {
 
     private HorseActor mountedHorse;
     private InputDeviceType activeInputDevice = InputDeviceType.KEYBOARD_MOUSE;
-    private List<RanchCameraCollisionSystem.Obstacle> cameraObstacles = List.of();
+    private List<RanchCameraCollisionSystem.Obstacle> homesteadCameraObstacles = List.of();
     private float cameraYaw = 18f;
     private float cameraPitch = 27f;
     private float cameraDistance = 10f;
@@ -193,10 +200,17 @@ final class LivingRanchScreen implements Screen, RanchWorldAccess {
             }
             float scale = randomRange(0.72f, 1.35f);
             ModelInstance tree = new ModelInstance(models.tree);
+            isolateMaterials(tree);
             tree.transform.setToTranslation(x, Terrain.heightAt(x, z), z)
                 .rotate(Vector3.Y, randomRange(0f, 360f))
                 .scale(scale, scale, scale);
-            trees.add(new TreeNode(i, tree, x, z));
+            trees.add(new TreeNode(
+                i,
+                tree,
+                x,
+                z,
+                RanchNatureCameraObstacle.tree(x, z, scale)
+            ));
         }
 
         for (int i = 0; i < 30; i++) {
@@ -208,10 +222,17 @@ final class LivingRanchScreen implements Screen, RanchWorldAccess {
             }
             float scale = randomRange(0.55f, 1.75f);
             ModelInstance rock = new ModelInstance(models.rock);
+            isolateMaterials(rock);
             rock.transform.setToTranslation(x, Terrain.heightAt(x, z) + 0.35f * scale, z)
                 .rotate(Vector3.Y, randomRange(0f, 360f))
                 .scale(scale, scale, scale);
-            rocks.add(rock);
+            rocks.add(new RockNode(
+                i,
+                rock,
+                x,
+                z,
+                RanchNatureCameraObstacle.rock(x, z, scale)
+            ));
         }
     }
 
@@ -649,7 +670,7 @@ final class LivingRanchScreen implements Screen, RanchWorldAccess {
             tmpDesiredCamera.y,
             tmpDesiredCamera.z,
             MIN_CAMERA_DISTANCE,
-            cameraObstacles,
+            combinedCameraObstacles(),
             Terrain::heightAt
         );
         float frameDelta = Math.min(
@@ -673,6 +694,56 @@ final class LivingRanchScreen implements Screen, RanchWorldAccess {
         camera.update();
     }
 
+    private List<RanchCameraCollisionSystem.Obstacle> combinedCameraObstacles() {
+        int capacity = homesteadCameraObstacles.size() + trees.size() + rocks.size();
+        List<RanchCameraCollisionSystem.Obstacle> result = new ArrayList<>(capacity);
+        result.addAll(homesteadCameraObstacles);
+        for (TreeNode tree : trees) if (!tree.harvested) result.add(tree.obstacle);
+        for (RockNode rock : rocks) result.add(rock.obstacle);
+        return List.copyOf(result);
+    }
+
+    private float fadeAlpha(RanchCameraCollisionSystem.Obstacle obstacle) {
+        return cameraFadeSystem.alphaFor(
+            obstacle,
+            Terrain.heightAt(obstacle.x(), obstacle.z()),
+            tmpTarget.x,
+            tmpTarget.y,
+            tmpTarget.z,
+            camera.position.x,
+            camera.position.y,
+            camera.position.z
+        );
+    }
+
+    private static void isolateMaterials(ModelInstance instance) {
+        Map<Material, Material> copies = new IdentityHashMap<>();
+        for (Node node : instance.nodes) isolateNodeMaterials(node, copies);
+        instance.materials.clear();
+        for (Material material : copies.values()) instance.materials.add(material);
+    }
+
+    private static void isolateNodeMaterials(Node node, Map<Material, Material> copies) {
+        for (NodePart part : node.parts) {
+            Material source = part.material;
+            part.material = copies.computeIfAbsent(source, Material::new);
+        }
+        for (Node child : node.getChildren()) isolateNodeMaterials(child, copies);
+    }
+
+    private static void applyOpacity(ModelInstance instance, float alpha) {
+        float safeAlpha = Float.isFinite(alpha) ? MathUtils.clamp(alpha, RanchCameraFadeSystem.MIN_ALPHA, 1f) : 1f;
+        for (Material material : instance.materials) {
+            ColorAttribute diffuse = (ColorAttribute) material.get(ColorAttribute.Diffuse);
+            if (diffuse != null) diffuse.color.a = safeAlpha;
+            if (safeAlpha < 0.999f) {
+                material.set(new BlendingAttribute(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA, safeAlpha));
+            } else {
+                material.remove(BlendingAttribute.Type);
+            }
+        }
+    }
+
     private void renderWorld() {
         float solarAngle = session.worldTime() * 360f - 90f;
         float daylight = MathUtils.clamp(
@@ -692,8 +763,15 @@ final class LivingRanchScreen implements Screen, RanchWorldAccess {
         modelBatch.begin(camera);
         modelBatch.render(terrain.instance, environment);
         modelBatch.render(water, environment);
-        for (TreeNode tree : trees) if (!tree.harvested) modelBatch.render(tree.instance, environment);
-        for (ModelInstance rock : rocks) modelBatch.render(rock, environment);
+        for (TreeNode tree : trees) {
+            if (tree.harvested) continue;
+            applyOpacity(tree.instance, fadeAlpha(tree.obstacle));
+            modelBatch.render(tree.instance, environment);
+        }
+        for (RockNode rock : rocks) {
+            applyOpacity(rock.instance, fadeAlpha(rock.obstacle));
+            modelBatch.render(rock.instance, environment);
+        }
         for (FenceNode fence : fences) modelBatch.render(fence.instance, environment);
         for (HorseActor horse : horses) modelBatch.render(horse.instance, environment);
         modelBatch.render(pushik.instance, environment);
@@ -977,14 +1055,14 @@ final class LivingRanchScreen implements Screen, RanchWorldAccess {
     @Override
     public void setCameraObstacles(List<RanchCameraCollisionSystem.Obstacle> obstacles) {
         if (obstacles == null || obstacles.isEmpty()) {
-            cameraObstacles = List.of();
+            homesteadCameraObstacles = List.of();
             return;
         }
         List<RanchCameraCollisionSystem.Obstacle> safe = new ArrayList<>(obstacles.size());
         for (RanchCameraCollisionSystem.Obstacle obstacle : obstacles) {
             if (obstacle != null && obstacle.radius() > 0f && obstacle.height() > 0f) safe.add(obstacle);
         }
-        cameraObstacles = List.copyOf(safe);
+        homesteadCameraObstacles = List.copyOf(safe);
     }
 
     private static void setHorseCoordinates(HorseActor horse, float x, float z) {
@@ -1033,13 +1111,43 @@ final class LivingRanchScreen implements Screen, RanchWorldAccess {
         final ModelInstance instance;
         final float x;
         final float z;
+        final RanchCameraCollisionSystem.Obstacle obstacle;
         boolean harvested;
 
-        TreeNode(int id, ModelInstance instance, float x, float z) {
+        TreeNode(
+            int id,
+            ModelInstance instance,
+            float x,
+            float z,
+            RanchCameraCollisionSystem.Obstacle obstacle
+        ) {
             this.id = id;
             this.instance = instance;
             this.x = x;
             this.z = z;
+            this.obstacle = obstacle;
+        }
+    }
+
+    private static final class RockNode {
+        final int id;
+        final ModelInstance instance;
+        final float x;
+        final float z;
+        final RanchCameraCollisionSystem.Obstacle obstacle;
+
+        RockNode(
+            int id,
+            ModelInstance instance,
+            float x,
+            float z,
+            RanchCameraCollisionSystem.Obstacle obstacle
+        ) {
+            this.id = id;
+            this.instance = instance;
+            this.x = x;
+            this.z = z;
+            this.obstacle = obstacle;
         }
     }
 

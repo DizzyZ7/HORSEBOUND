@@ -92,7 +92,12 @@ final class PauseScreen implements Screen {
         font.draw(batch, "PAUSED", width * 0.5f - 92f * ui, height * 0.84f);
         font.getData().setScale(0.98f * ui);
         drawLabel("RESUME", rows[RESUME], ui);
-        drawLabel("UNDO LAST RANCH EDIT", rows[UNDO], ui);
+        drawLabel(
+            world.hasUndoableRanchEdit() ? "UNDO LAST RANCH EDIT" : "NO RANCH EDIT TO UNDO",
+            rows[UNDO],
+            ui,
+            world.hasUndoableRanchEdit()
+        );
         drawLabel("INPUT & ACCESSIBILITY", rows[INPUT], ui);
         drawLabel("SAVE GAME", rows[SAVE], ui);
         drawLabel("SAVE & MAIN MENU", rows[MAIN_MENU], ui);
@@ -103,7 +108,11 @@ final class PauseScreen implements Screen {
     }
 
     private void drawLabel(String text, Rectangle row, float ui) {
-        font.setColor(Color.WHITE);
+        drawLabel(text, row, ui, true);
+    }
+
+    private void drawLabel(String text, Rectangle row, float ui, boolean enabled) {
+        font.setColor(enabled ? Color.WHITE : new Color(0.48f, 0.54f, 0.49f, 1f));
         font.draw(batch, text, row.x + 18f * ui, row.y + 32f * ui);
     }
 
@@ -111,6 +120,10 @@ final class PauseScreen implements Screen {
         switch (selectedIndex) {
             case RESUME -> game.resumePausedWorld(world);
             case UNDO -> {
+                if (!world.hasUndoableRanchEdit()) {
+                    message = "No ranch edit is currently safe to undo.";
+                    return;
+                }
                 message = world.undoLastRanchEdit();
                 ControllerRumble.pulse(game.inputProfile(), 45, 0.34f);
             }

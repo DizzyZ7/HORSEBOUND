@@ -42,8 +42,10 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
     private final InventoryOverlay inventoryOverlay = new InventoryOverlay();
     private final HomesteadCollisionSystem collisionSystem = new HomesteadCollisionSystem();
     private final RanchUndoManager undoManager = new RanchUndoManager();
+    private final RanchDismantleConfirmation dismantleConfirmation = new RanchDismantleConfirmation();
     private final HorseCareSystem careSystem = new HorseCareSystem();
     private final FixedStepClock careClock = new FixedStepClock();
+    private final RanchAmbience ambience;
     private final Map<UUID, HorseNeeds> horseNeeds = new LinkedHashMap<>();
     private final Map<UUID, Position> previousHorsePositions = new HashMap<>();
     private final Set<UUID> hiddenLegacyStructureIds;
@@ -79,6 +81,7 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
         delegate = created;
         worldAccess = created;
         session = captured;
+        ambience = new RanchAmbience(initialState.worldSeed());
 
         for (SaveGame.HorseData horse : initialState.horses()) {
             horseNeeds.put(horse.id(), horse.needs());
@@ -104,6 +107,7 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
             return;
         }
 
+        dismantleConfirmation.tick(frameDelta);
         RanchWorldAccess.ActorPose beforePose = worldAccess.actorPose();
         PlacedStructure nearby = nearestInteractiveStructure(beforePose.x(), beforePose.z(), INTERACTION_RADIUS);
         boolean placementMode = buildMode || editMode;
@@ -132,6 +136,7 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
         nearby = nearestInteractiveStructure(currentPose.x(), currentPose.z(), INTERACTION_RADIUS);
         handleSemanticActions(nearby, input.editPressed(), input.undoPressed());
         careClock.advance(frameDelta, this::updateHorseCare);
+        ambience.update(frameDelta, session.worldTime());
         placement = buildMode || editMode ? calculatePlacement(worldAccess.actorPose()) : null;
         UUID selected = editMode && editedStructureId != null
             ? editedStructureId
@@ -205,11 +210,12 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
             else confirmPlacement();
         }
 
-        if (HomesteadActionBus.consumeDismantle() && editMode) dismantleEditedStructure();
+        if (HomesteadActionBus.consumeDismantle() && editMode) requestDismantleEditedStructure();
         if (HomesteadActionBus.consumeInteract()) interactWith(nearby);
     }
 
     private void startBuildMode() {
+        dismantleConfirmation.cancel();
         buildMode = true;
         editMode = false;
         editedStructureId = null;
@@ -219,6 +225,7 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
     }
 
     private void startEditMode() {
+        dismantleConfirmation.cancel();
         RanchWorldAccess.ActorPose pose = worldAccess.actorPose();
         PlacedStructure nearest = session.homestead().nearest(pose.x(), pose.z(), INTERACTION_RADIUS)
             .filter(value -> !hiddenLegacyStructureIds.contains(value.id()))
@@ -236,6 +243,7 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
     }
 
     private void cancelPlacement(String message) {
+        dismantleConfirmation.cancel();
         buildMode = false;
         editMode = false;
         editedStructureId = null;
@@ -300,7 +308,25 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
         cancelPlacement("Structure moved. U/Ctrl+Z or Pause can restore its previous position.");
     }
 
-    private void dismantleEditedStructure() {
+    private void requestDismantleEditedStructure() {
+        if (editedStructureId == null) return;
+        PlacedStructure structure = session.homestead().find(editedStructureId).orElse(null);
+        RanchDismantleConfirmation.Decision decision = dismantleConfirmation.request(structure);
+        switch (decision) {
+            case ARMED -> {
+                RanchAudio.play(RanchAudio.Cue.DISMANTLE_ARM);
+                ControllerRumble.pulse(game.inputProfile(), 32, 0.25f);
+                setStatus(
+                    "Dismantle armed: press Mount/Y again within "
+                        + Math.round(dismantleConfirmation.remainingSeconds()) + " seconds."
+                );
+            }
+            case CONFIRMED -> performDismantleEditedStructure();
+            case INVALID -> cancelPlacement("That structure is no longer available.");
+        }
+    }
+
+    private void performDismantleEditedStructure() {
         if (editedStructureId == null) return;
         HomesteadState.DismantleResult result = session.homestead().dismantle(editedStructureId, session.inventory());
         switch (result) {
@@ -309,8 +335,14 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
                 ControllerRumble.pulse(game.inputProfile(), 70, 0.45f);
                 cancelPlacement("Structure dismantled; half materials returned.");
             }
-            case STORAGE_NOT_EMPTY -> setStatus("Empty the structure before dismantling it.");
-            case INVENTORY_FULL -> setStatus("Not enough backpack space for the refund.");
+            case STORAGE_NOT_EMPTY -> {
+                dismantleConfirmation.cancel();
+                setStatus("Empty the structure before dismantling it.");
+            }
+            case INVENTORY_FULL -> {
+                dismantleConfirmation.cancel();
+                setStatus("Not enough backpack space for the refund.");
+            }
             case NOT_FOUND -> cancelPlacement("That structure is no longer available.");
         }
     }
@@ -621,6 +653,30 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
                 height - 70f * geometry
             );
         }
+        if (undoManager.hasPending()) {
+            String undoLabel = undoManager.pendingKind() == RanchUndoManager.Kind.PLACEMENT
+                ? "UNDO READY: LAST BUILD"
+                : "UNDO READY: LAST MOVE";
+            font.getData().setScale(0.64f * ui);
+            font.setColor(new Color(0.62f, 0.88f, 1f, 1f));
+            font.draw(
+                batch,
+                undoLabel + " | U / Ctrl+Z / Pause",
+                Math.max(16f * geometry, width - 330f * geometry),
+                startY + slotSize + 25f * geometry
+            );
+        }
+        if (dismantleConfirmation.isArmed()) {
+            font.getData().setScale(0.72f * ui);
+            font.setColor(new Color(1f, 0.54f, 0.34f, 1f));
+            font.draw(
+                batch,
+                "CONFIRM DISMANTLE: Mount/Y again | "
+                    + String.format(Locale.ROOT, "%.1fs", dismantleConfirmation.remainingSeconds()),
+                16f * geometry,
+                height - 98f * geometry
+            );
+        }
         if (statusTimer > 0f) {
             font.getData().setScale(0.67f * ui);
             font.setColor(new Color(1f, 0.94f, 0.73f, 1f));
@@ -698,7 +754,13 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
     }
 
     @Override
+    public boolean hasUndoableRanchEdit() {
+        return undoManager.hasPending();
+    }
+
+    @Override
     public String undoLastRanchEdit() {
+        dismantleConfirmation.cancel();
         RanchUndoManager.UndoResult result = undoManager.undo(
             session.homestead(),
             session.inventory(),
@@ -755,6 +817,7 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
         HomesteadInputContext.reset();
         HomesteadActionBus.reset();
         undoManager.clear();
+        dismantleConfirmation.cancel();
         inventoryOverlay.dispose();
         delegate.dispose();
         saveService.clearSaveTransformer(this);

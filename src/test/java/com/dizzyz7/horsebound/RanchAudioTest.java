@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class RanchAudioTest {
     @AfterEach
     void cleanup() {
-        RanchAudio.setMasterVolume(GameSettings.DEFAULT_SFX_VOLUME);
+        RanchAudio.setVolumes(GameSettings.DEFAULT_SFX_VOLUME, GameSettings.DEFAULT_AMBIENCE_VOLUME);
         RanchAudio.shutdown();
     }
 
@@ -46,25 +46,32 @@ class RanchAudioTest {
     }
 
     @Test
-    void masterVolumeScalesWithoutMutatingCachedWaveform() {
+    void busVolumeScalesWithoutMutatingCachedWaveform() {
         float[] source = {1f, -0.5f, 0.25f};
-        float[] half = RanchAudio.applyMasterVolume(source, 0.5f);
+        float[] half = RanchAudio.applyBusVolume(source, 0.5f, GameSettings.DEFAULT_SFX_VOLUME);
 
         assertNotSame(source, half);
         assertEquals(0.5f, half[0]);
         assertEquals(-0.25f, half[1]);
         assertEquals(0.125f, half[2]);
         assertEquals(1f, source[0]);
-        assertSame(source, RanchAudio.applyMasterVolume(source, 1f));
+        assertSame(source, RanchAudio.applyBusVolume(source, 1f, GameSettings.DEFAULT_SFX_VOLUME));
     }
 
     @Test
-    void masterVolumeNormalizesInvalidAndOutOfRangeValues() {
-        RanchAudio.setMasterVolume(-2f);
-        assertEquals(0f, RanchAudio.masterVolume());
-        RanchAudio.setMasterVolume(4f);
-        assertEquals(1f, RanchAudio.masterVolume());
-        RanchAudio.setMasterVolume(Float.NaN);
-        assertEquals(GameSettings.DEFAULT_SFX_VOLUME, RanchAudio.masterVolume());
+    void busesNormalizeIndependently() {
+        RanchAudio.setVolumes(-2f, 4f);
+        assertEquals(0f, RanchAudio.sfxVolume());
+        assertEquals(1f, RanchAudio.ambienceVolume());
+        RanchAudio.setVolumes(Float.NaN, Float.NaN);
+        assertEquals(GameSettings.DEFAULT_SFX_VOLUME, RanchAudio.sfxVolume());
+        assertEquals(GameSettings.DEFAULT_AMBIENCE_VOLUME, RanchAudio.ambienceVolume());
+    }
+
+    @Test
+    void authoredAmbienceAndInteractionCuesUseSeparateBuses() {
+        assertEquals(RanchAudio.Bus.SFX, RanchAudio.Cue.BUILD.bus());
+        assertEquals(RanchAudio.Bus.AMBIENCE, RanchAudio.Cue.MEADOW_BREEZE.bus());
+        assertEquals(RanchAudio.Bus.AMBIENCE, RanchAudio.Cue.NIGHT_CRICKETS.bus());
     }
 }

@@ -32,7 +32,8 @@ class SettingsRepositoryTest {
             1.30f,
             GraphicsPreset.HIGH,
             true,
-            0.35f
+            0.35f,
+            0.25f
         );
 
         repository.save(expected);
@@ -48,6 +49,7 @@ class SettingsRepositoryTest {
 
         assertEquals(new GameSettings(false, 0.20f, 120), repository.load());
         assertEquals(GameSettings.DEFAULT_SFX_VOLUME, repository.load().sfxVolume());
+        assertEquals(GameSettings.DEFAULT_AMBIENCE_VOLUME, repository.load().ambienceVolume());
     }
 
     @Test
@@ -63,6 +65,7 @@ class SettingsRepositoryTest {
                 + "uiScale=NaN\n"
                 + "graphicsPreset=cinematic\n"
                 + "sfxVolume=broken\n"
+                + "ambienceVolume=broken\n"
         );
         SettingsRepository repository = new SettingsRepository(path);
 
@@ -70,10 +73,12 @@ class SettingsRepositoryTest {
     }
 
     @Test
-    void sfxVolumeIsClampedOnLoad() throws Exception {
+    void audioBusVolumesAreClampedOnLoad() throws Exception {
         Path path = tempDir.resolve("settings.properties");
-        Files.writeString(path, "sfxVolume=5.0\n");
+        Files.writeString(path, "sfxVolume=5.0\nambienceVolume=-3.0\n");
 
-        assertEquals(1f, new SettingsRepository(path).load().sfxVolume());
+        GameSettings loaded = new SettingsRepository(path).load();
+        assertEquals(1f, loaded.sfxVolume());
+        assertEquals(0f, loaded.ambienceVolume());
     }
 }
