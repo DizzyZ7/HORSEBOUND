@@ -118,7 +118,12 @@ final class InputProfileRepository {
             defaults.saveKey(),
             defaults.pauseKey()
         );
+
+        // Apply the newly introduced action first. Existing user actions are applied afterward and
+        // therefore keep priority if an old profile already used the default Inventory key.
+        normalized = normalized.withBinding(BindableAction.INVENTORY, raw.inventoryKey());
         for (BindableAction action : BindableAction.values()) {
+            if (action == BindableAction.INVENTORY) continue;
             normalized = normalized.withBinding(action, raw.keyFor(action));
         }
         return normalized;
