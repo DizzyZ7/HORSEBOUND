@@ -27,7 +27,7 @@ Unavailable physical devices must remain marked **not tested**, never assumed pa
 6. Use only D-pad/Left Stick and controller buttons from this point.
 7. Verify the prompt strip switches to the correct controller family after the first meaningful input.
 8. Confirm no keyboard glyphs remain in the active bottom prompt strip.
-9. On Nintendo devices, verify prompts use physical B/A/Y/X labels rather than Xbox A/B/X/Y labels.
+9. On Nintendo devices, compare every A/B/X/Y prompt against the physical button that actually triggers the action; do not assume an Xbox-style positional swap.
 
 ## Main menu and settings
 
