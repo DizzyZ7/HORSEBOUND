@@ -1,8 +1,6 @@
 // HORSEBOUND — Created by Dimash Janibekov (DizZyZ7), © 2026. All rights reserved.
 package com.dizzyz7.horsebound;
 
-import com.badlogic.gdx.Input;
-
 import java.util.List;
 
 /** Maps semantic actions to the currently active keyboard or controller glyph family. */
@@ -43,19 +41,14 @@ final class InputGlyphCatalog {
             case ADJUST -> "A / D";
             case CONFIRM -> "ENTER";
             case BACK -> "ESC";
-            case PAUSE -> keyName(profile.pauseKey());
-            case INTERACT -> keyName(profile.interactKey());
-            case MOUNT -> keyName(profile.mountKey());
-            case BUILD -> keyName(profile.buildKey());
-            case JUMP -> keyName(profile.jumpKey());
-            case SPRINT -> keyName(profile.sprintKey());
-            case SAVE -> keyName(profile.saveKey());
+            case PAUSE -> KeyLabel.of(profile.pauseKey());
+            case INTERACT -> KeyLabel.of(profile.interactKey());
+            case MOUNT -> KeyLabel.of(profile.mountKey());
+            case BUILD -> KeyLabel.of(profile.buildKey());
+            case JUMP -> KeyLabel.of(profile.jumpKey());
+            case SPRINT -> KeyLabel.of(profile.sprintKey());
+            case SAVE -> KeyLabel.of(profile.saveKey());
         };
-    }
-
-    private static String keyName(int keyCode) {
-        String name = Input.Keys.toString(keyCode);
-        return name == null || name.isBlank() ? "KEY " + keyCode : name.toUpperCase();
     }
 
     private static String controllerGlyph(PromptAction action, ControllerGlyphFamily family) {
