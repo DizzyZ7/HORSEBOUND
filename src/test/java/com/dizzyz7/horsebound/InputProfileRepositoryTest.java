@@ -9,6 +9,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 class InputProfileRepositoryTest {
     @TempDir
@@ -58,5 +59,24 @@ class InputProfileRepositoryTest {
         assertEquals(false, profile.rumbleEnabled());
         assertEquals(InputProfile.defaults().rumbleStrength(), profile.rumbleStrength());
         assertEquals(BindableAction.JUMP.defaultKey(), profile.jumpKey());
+    }
+
+    @Test
+    void duplicateKeysFromEditedFileAreNormalized() throws Exception {
+        Path path = tempDir.resolve("input.properties");
+        Files.writeString(
+            path,
+            "key.jump=" + Input.Keys.E + "\n"
+                + "key.interact=" + Input.Keys.E + "\n"
+        );
+
+        InputProfile profile = new InputProfileRepository(path).load();
+
+        assertNotEquals(profile.jumpKey(), profile.interactKey());
+        for (BindableAction first : BindableAction.values()) {
+            for (BindableAction second : BindableAction.values()) {
+                if (first != second) assertNotEquals(profile.keyFor(first), profile.keyFor(second));
+            }
+        }
     }
 }
