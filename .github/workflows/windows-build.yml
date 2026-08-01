@@ -70,6 +70,14 @@ jobs:
             throw "Mutable user data, crash logs or local Steam configuration leaked into the app image"
           }
 
+          $telemetrySource = Get-Content "src/main/java/com/dizzyz7/horsebound/LivingRanchTelemetryAdapter.java" -Raw
+          $reflectionTokens = @("java.lang.reflect", "setAccessible", "getDeclaredField")
+          foreach ($token in $reflectionTokens) {
+            if ($telemetrySource.Contains($token)) {
+              throw "Reflection bridge returned to LivingRanchTelemetryAdapter: $token"
+            }
+          }
+
           $jarPath = Join-Path $root "app/HORSEBOUND.jar"
           $jarEntries = & jar tf $jarPath
           $requiredJarEntries = @(
@@ -93,6 +101,8 @@ jobs:
             "com/dizzyz7/horsebound/ControllerRumble.class",
             "com/dizzyz7/horsebound/InventoryStack.class",
             "com/dizzyz7/horsebound/InventoryOverlay.class",
+            "com/dizzyz7/horsebound/InventoryTransferService.class",
+            "com/dizzyz7/horsebound/NavigationRepeater.class",
             "com/dizzyz7/horsebound/Hotbar.class",
             "com/dizzyz7/horsebound/HomesteadStructureType.class",
             "com/dizzyz7/horsebound/PlacedStructure.class",
@@ -101,6 +111,10 @@ jobs:
             "com/dizzyz7/horsebound/HorseNeeds.class",
             "com/dizzyz7/horsebound/HorseCareSystem.class",
             "com/dizzyz7/horsebound/RanchSessionScreen.class",
+            "com/dizzyz7/horsebound/RanchWorldAccess.class",
+            "com/dizzyz7/horsebound/RanchAudio.class",
+            "com/dizzyz7/horsebound/RanchPresentationObserver.class",
+            "com/dizzyz7/horsebound/GateAnimationState.class",
             "com/dizzyz7/horsebound/GameSessionCapture.class",
             "com/dizzyz7/horsebound/HomesteadInputContext.class",
             "com/dizzyz7/horsebound/HomesteadActionBus.class",
