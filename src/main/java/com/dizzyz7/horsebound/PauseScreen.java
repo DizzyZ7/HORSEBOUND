@@ -120,6 +120,10 @@ final class PauseScreen implements Screen {
         switch (selectedIndex) {
             case RESUME -> game.resumePausedWorld(world);
             case UNDO -> {
+                if (!world.hasUndoableRanchEdit()) {
+                    message = "No ranch edit is currently safe to undo.";
+                    return;
+                }
                 message = world.undoLastRanchEdit();
                 ControllerRumble.pulse(game.inputProfile(), 45, 0.34f);
             }
