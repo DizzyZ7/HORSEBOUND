@@ -22,6 +22,9 @@ public final class DesktopLauncher {
 
         SettingsRepository settingsRepository = new SettingsRepository();
         GameSettings settings = settingsRepository.load();
+        InputProfileRepository inputProfileRepository = new InputProfileRepository();
+        InputProfile inputProfile = inputProfileRepository.load();
+        InputProfileContext.set(inputProfile);
         GraphicsPreset preset = settings.graphicsPreset();
 
         Lwjgl3ApplicationConfiguration config = new Lwjgl3ApplicationConfiguration();
@@ -31,6 +34,9 @@ public final class DesktopLauncher {
         config.setForegroundFPS(preset.foregroundFps());
         config.setIdleFPS(30);
         config.setBackBufferConfig(8, 8, 8, 8, 24, 8, preset.msaaSamples());
-        new Lwjgl3Application(new HorseboundGame(settingsRepository, settings), config);
+        new Lwjgl3Application(
+            new HorseboundGame(settingsRepository, settings, inputProfileRepository, inputProfile),
+            config
+        );
     }
 }
