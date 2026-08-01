@@ -55,15 +55,19 @@ final class KeyBindingsScreen implements Screen {
         float startY = height - 84f * geometry;
         for (int i = 0; i < rows.length; i++) rows[i].set(x, startY - i * gap, rowWidth, rowHeight);
 
+        MenuInputSnapshot input = menuInput.sample();
         if (capturing != null) {
-            if (captureKey()) return;
+            if (input.command().backPressed()) {
+                capturing = null;
+                message = "Binding cancelled. Select another action or go back.";
+            } else {
+                captureKey();
+            }
         } else {
-            MenuInputSnapshot input = menuInput.sample();
             if (input.command().upPressed()) selectedIndex = Math.floorMod(selectedIndex - 1, ITEM_COUNT);
             if (input.command().downPressed()) selectedIndex = Math.floorMod(selectedIndex + 1, ITEM_COUNT);
             if (input.command().confirmPressed()) {
-                activate();
-                if (getDisposedScreenGuard()) return;
+                if (activate()) return;
             }
             if (input.command().backPressed()) {
                 goBack();
@@ -79,8 +83,7 @@ final class KeyBindingsScreen implements Screen {
         shapes.setColor(new Color(0.10f, 0.16f, 0.14f, 1f));
         shapes.rect(0f, 0f, width, height);
         for (int i = 0; i < rows.length; i++) {
-            boolean selected = i == selectedIndex;
-            shapes.setColor(selected
+            shapes.setColor(i == selectedIndex
                 ? new Color(0.28f, 0.52f, 0.36f, 1f)
                 : new Color(0.16f, 0.23f, 0.19f, 1f));
             Rectangle row = rows[i];
@@ -112,34 +115,31 @@ final class KeyBindingsScreen implements Screen {
         batch.end();
     }
 
-    private boolean captureKey() {
-        if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
-            capturing = null;
-            message = "Binding cancelled. Select another action or go back.";
-            return false;
-        }
+    private void captureKey() {
         for (int keyCode = 1; keyCode <= 255; keyCode++) {
             if (!Gdx.input.isKeyJustPressed(keyCode)) continue;
             profile = profile.withBinding(capturing, keyCode);
             game.updateInputProfile(profile);
             message = capturing.displayName() + " is now bound to " + keyName(keyCode) + ".";
             capturing = null;
-            return false;
+            return;
         }
-        return false;
     }
 
-    private void activate() {
+    private boolean activate() {
         if (selectedIndex < ACTIONS.length) {
             capturing = ACTIONS[selectedIndex];
-            message = "Press a keyboard key for " + capturing.displayName() + ". Esc cancels.";
-        } else if (selectedIndex == DEFAULTS_INDEX) {
+            message = "Press a keyboard key for " + capturing.displayName() + ". Esc / Back cancels.";
+            return false;
+        }
+        if (selectedIndex == DEFAULTS_INDEX) {
             profile = InputProfile.defaults();
             game.updateInputProfile(profile);
             message = "Default keyboard bindings restored.";
-        } else {
-            goBack();
+            return false;
         }
+        goBack();
+        return true;
     }
 
     private void drawFooterRow(int index, String text, float ui) {
@@ -156,8 +156,7 @@ final class KeyBindingsScreen implements Screen {
         for (int i = 0; i < rows.length; i++) {
             if (!rows[i].contains(x, y)) continue;
             selectedIndex = i;
-            activate();
-            return selectedIndex == BACK_INDEX;
+            return activate();
         }
         return false;
     }
@@ -166,17 +165,18 @@ final class KeyBindingsScreen implements Screen {
         game.showInputSettings(pausedWorld);
     }
 
-    private boolean getDisposedScreenGuard() {
-        return selectedIndex == BACK_INDEX;
-    }
-
     private static String keyName(int keyCode) {
         String value = Input.Keys.toString(keyCode);
         return value == null || value.isBlank() ? "KEY " + keyCode : value.toUpperCase();
     }
 
     @Override public void resize(int width, int height) { }
-    @Override public void pause() { }
+
+    @Override
+    public void pause() {
+        if (pausedWorld != null) pausedWorld.pause();
+    }
+
     @Override public void resume() { }
     @Override public void hide() { }
 
