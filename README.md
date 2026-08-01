@@ -11,8 +11,11 @@ HORSEBOUND is a cozy stylized 3D Java sandbox about horses, exploration, taming,
 
 ### Inventory and hotbar
 
+- the player inventory has 24 stack slots;
+- partial stacks fill before another slot is consumed;
 - stack limits no longer cap the total amount owned;
 - 150 wood, 45 apples and other multi-stack totals survive save/load intact;
+- legacy inventories larger than 24 slots are preserved without deletion and temporarily block new stacks until space is freed;
 - aggregate inventory can be split into immutable UI stack views;
 - resources now include Wood, Stone, Apple, Carrot, Hay and Water Bucket;
 - persistent eight-slot hotbar with selected slot, empty slots and safe unknown-ID handling;
@@ -30,7 +33,7 @@ The typed structure catalog includes:
 - Chest;
 - Stable Stall.
 
-Structures have persistent UUIDs, transforms, build costs, optional storage capacity and stored resource units. Placement checks the full recipe before consuming materials, so failed builds cannot partially charge the player.
+Structures have persistent UUIDs, transforms, build costs, optional storage capacity and stored resource units. Placement checks the full recipe before consuming materials, so failed builds cannot partially charge the player. Duplicate persistent UUIDs are ignored during restoration to prevent ambiguous world objects.
 
 ### Horse needs and automatic care
 
@@ -48,13 +51,13 @@ Save v4 persists:
 - typed placed structures and stored resources;
 - all previous world, player, Pushik and horse relationship data.
 
-Versions 1–3 migrate to v4. Legacy fences receive deterministic UUIDs, old horses receive healthy need defaults and old worlds receive the default hotbar. A real binary v3 fixture is migrated and rewritten in tests.
+Versions 1–3 migrate to v4. Legacy fences receive deterministic UUIDs, old horses receive healthy need defaults and old worlds receive the default hotbar. A real binary v3 fixture is migrated, rewritten and loaded again in tests.
 
 ### Honest scope boundary
 
 The new Homestead domain is packaged and validated, but the current live ranch renderer still presents the 0.4.8 gameplay set. **0.5.1** connects visible hotbar selection, placement preview/snapping, feeders, troughs, gates, stalls, resource deposits and live horse-need feedback without another save-format rewrite.
 
-See [`docs/releases/0.5.0.md`](docs/releases/0.5.0.md).
+See [`docs/releases/0.5.0.md`](docs/releases/0.5.0.md) and [`docs/HOMESTEAD_RELEASE_CONTRACT.md`](docs/HOMESTEAD_RELEASE_CONTRACT.md).
 
 ## Current playable gameplay
 
@@ -155,6 +158,7 @@ HORSEBOUND is developed against SteamPipe, Steam Cloud, offline single-player an
 - exact packaged build identity and SHA-256 manifest;
 - third-party license bundle;
 - controller-only packaged smoke-test contract;
+- separate Homestead persistence/gameplay release contract;
 - honest store-feature discipline.
 
 Key documents:
@@ -162,6 +166,7 @@ Key documents:
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 - [`docs/STEAM_RELEASE_READINESS.md`](docs/STEAM_RELEASE_READINESS.md)
 - [`docs/STEAM_CONTROLLER_SMOKE_TEST.md`](docs/STEAM_CONTROLLER_SMOKE_TEST.md)
+- [`docs/HOMESTEAD_RELEASE_CONTRACT.md`](docs/HOMESTEAD_RELEASE_CONTRACT.md)
 - [`docs/releases/0.5.0.md`](docs/releases/0.5.0.md)
 - [`steam/README.md`](steam/README.md)
 
