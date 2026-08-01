@@ -17,7 +17,7 @@ final class KeyBindingsScreen implements Screen {
     private static final int ITEM_COUNT = ACTIONS.length + 2;
 
     private final HorseboundGame game;
-    private final LivingRanchScreen pausedWorld;
+    private final RanchSessionScreen pausedWorld;
     private final SpriteBatch batch = new SpriteBatch();
     private final ShapeRenderer shapes = new ShapeRenderer();
     private final BitmapFont font = new BitmapFont();
@@ -28,7 +28,7 @@ final class KeyBindingsScreen implements Screen {
     private BindableAction capturing;
     private String message = "Select an action, confirm, then press a keyboard key.";
 
-    KeyBindingsScreen(HorseboundGame game, LivingRanchScreen pausedWorld) {
+    KeyBindingsScreen(HorseboundGame game, RanchSessionScreen pausedWorld) {
         this.game = game;
         this.pausedWorld = pausedWorld;
         this.profile = game.inputProfile();
@@ -166,7 +166,7 @@ final class KeyBindingsScreen implements Screen {
 
     @Override
     public void pause() {
-        if (pausedWorld != null) pausedWorld.pause();
+        if (pausedWorld != null) pausedWorld.saveSession();
     }
 
     @Override public void resume() { }
