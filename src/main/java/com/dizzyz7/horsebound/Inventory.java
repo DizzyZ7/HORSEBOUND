@@ -8,11 +8,18 @@ import java.util.Map;
 import java.util.Objects;
 
 final class Inventory {
+    static final int DEFAULT_SLOT_CAPACITY = 24;
     private static final int MAX_AMOUNT_PER_ITEM = 1_000_000;
 
     private final EnumMap<ItemId, Integer> amounts = new EnumMap<>(ItemId.class);
+    private final int slotCapacity;
 
     Inventory() {
+        this(DEFAULT_SLOT_CAPACITY);
+    }
+
+    Inventory(int slotCapacity) {
+        this.slotCapacity = Math.max(1, slotCapacity);
         for (ItemId item : ItemId.values()) amounts.put(item, 0);
     }
 
@@ -32,7 +39,10 @@ final class Inventory {
         for (ItemId item : ItemId.values()) inventory.set(item, 0);
         for (SaveGame.ItemStackData saved : items) {
             if (saved == null) continue;
-            ItemId.parse(saved.itemId()).ifPresent(item -> inventory.add(item, saved.amount()));
+            ItemId.parse(saved.itemId()).ifPresent(item -> {
+                long restored = (long) inventory.count(item) + saved.amount();
+                inventory.set(item, (int) Math.min(MAX_AMOUNT_PER_ITEM, restored));
+            });
         }
         return inventory;
     }
@@ -45,7 +55,13 @@ final class Inventory {
         Objects.requireNonNull(item, "item");
         if (amount <= 0) return 0;
         int current = count(item);
-        int accepted = Math.min(amount, MAX_AMOUNT_PER_ITEM - current);
+        int stackLimit = item.stackLimit();
+        int remainder = current % stackLimit;
+        int partialSpace = remainder == 0 ? 0 : stackLimit - remainder;
+        int freeSlots = Math.max(0, slotCapacity - usedSlots());
+        long slotSpace = (long) partialSpace + (long) freeSlots * stackLimit;
+        int totalSpace = MAX_AMOUNT_PER_ITEM - current;
+        int accepted = (int) Math.min(amount, Math.min(slotSpace, totalSpace));
         amounts.put(item, current + accepted);
         return accepted;
     }
@@ -66,6 +82,23 @@ final class Inventory {
     void set(ItemId item, int amount) {
         Objects.requireNonNull(item, "item");
         amounts.put(item, Math.max(0, Math.min(MAX_AMOUNT_PER_ITEM, amount)));
+    }
+
+    int slotCapacity() {
+        return slotCapacity;
+    }
+
+    int usedSlots() {
+        int result = 0;
+        for (ItemId item : ItemId.values()) {
+            int amount = count(item);
+            if (amount > 0) result += (amount + item.stackLimit() - 1) / item.stackLimit();
+        }
+        return result;
+    }
+
+    boolean isOverCapacity() {
+        return usedSlots() > slotCapacity;
     }
 
     Map<ItemId, Integer> snapshot() {
