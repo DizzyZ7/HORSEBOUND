@@ -21,6 +21,9 @@ final class KeyboardMouseInputMapper implements InputMapper {
 
     @Override
     public InputSnapshot sample() {
-        return mixedInput.sample();
+        InputSnapshot snapshot = mixedInput.sample();
+        if (!snapshot.command().pausePressed()) return snapshot;
+        PauseRequestBus.request();
+        return new InputSnapshot(snapshot.command().withoutPause(), snapshot.activeDevice());
     }
 }
