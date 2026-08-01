@@ -13,24 +13,56 @@ final class HomesteadRuntimeInput {
         int hotbarDelta = 0;
         int buildTypeDelta = 0;
         int rotationDelta = 0;
+        boolean keyboardActivity = directSlot >= 0;
+        boolean controllerActivity = false;
 
         ControllerFrame current = controller.poll();
         if (current.connected()) {
             if (buildMode) {
-                if (justPressed(current.dpadUp(), previous.dpadUp())) buildTypeDelta--;
-                if (justPressed(current.dpadDown(), previous.dpadDown())) buildTypeDelta++;
-                if (justPressed(current.dpadLeft(), previous.dpadLeft())) rotationDelta--;
-                if (justPressed(current.dpadRight(), previous.dpadRight())) rotationDelta++;
+                if (justPressed(current.dpadUp(), previous.dpadUp())) {
+                    buildTypeDelta--;
+                    controllerActivity = true;
+                }
+                if (justPressed(current.dpadDown(), previous.dpadDown())) {
+                    buildTypeDelta++;
+                    controllerActivity = true;
+                }
+                if (justPressed(current.dpadLeft(), previous.dpadLeft())) {
+                    rotationDelta--;
+                    controllerActivity = true;
+                }
+                if (justPressed(current.dpadRight(), previous.dpadRight())) {
+                    rotationDelta++;
+                    controllerActivity = true;
+                }
             } else {
-                if (justPressed(current.dpadLeft(), previous.dpadLeft())) hotbarDelta--;
-                if (justPressed(current.dpadRight(), previous.dpadRight())) hotbarDelta++;
+                if (justPressed(current.dpadLeft(), previous.dpadLeft())) {
+                    hotbarDelta--;
+                    controllerActivity = true;
+                }
+                if (justPressed(current.dpadRight(), previous.dpadRight())) {
+                    hotbarDelta++;
+                    controllerActivity = true;
+                }
             }
         }
         previous = current;
 
-        if (Gdx.input.isKeyJustPressed(Input.Keys.LEFT_BRACKET)) buildTypeDelta--;
-        if (Gdx.input.isKeyJustPressed(Input.Keys.RIGHT_BRACKET)) buildTypeDelta++;
-        if (Gdx.input.isKeyJustPressed(Input.Keys.R)) rotationDelta++;
+        if (Gdx.input.isKeyJustPressed(Input.Keys.LEFT_BRACKET)) {
+            buildTypeDelta--;
+            keyboardActivity = true;
+        }
+        if (Gdx.input.isKeyJustPressed(Input.Keys.RIGHT_BRACKET)) {
+            buildTypeDelta++;
+            keyboardActivity = true;
+        }
+        if (Gdx.input.isKeyJustPressed(Input.Keys.R)) {
+            rotationDelta++;
+            keyboardActivity = true;
+        }
+
+        if (controllerActivity) InputActivityTracker.record(InputDeviceType.GAMEPAD);
+        else if (keyboardActivity) InputActivityTracker.record(InputDeviceType.KEYBOARD_MOUSE);
 
         return new InputResult(directSlot, hotbarDelta, buildTypeDelta, rotationDelta);
     }
