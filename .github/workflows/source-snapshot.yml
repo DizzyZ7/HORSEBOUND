@@ -25,6 +25,7 @@ jobs:
           cat .github/dev/horsebound-055.patch.b64.* | base64 -d | gzip -d > /tmp/horsebound-055.patch
           git apply --check /tmp/horsebound-055.patch
           git apply /tmp/horsebound-055.patch
+          git checkout -- .github/workflows/windows-build.yml
           rm -rf .github/dev
           git config user.name "DizZyZ7 Release Bot"
           git config user.email "99655528+DizzyZ7@users.noreply.github.com"
