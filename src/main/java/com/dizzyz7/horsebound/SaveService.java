@@ -76,7 +76,7 @@ final class SaveService {
         validateSlot(slotId);
         activeSlot = slotId;
         SaveGame saveGame = withStarterHomesteadMaterials(SaveGame.fresh(WorldSeed.random()));
-        repository.save(activeSlot, saveGame);
+        repository.replace(activeSlot, saveGame);
         return saveGame;
     }
 

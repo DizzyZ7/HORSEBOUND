@@ -48,6 +48,33 @@ class SaveRepositoryTest {
     }
 
     @Test
+    void replacingARanchAlsoReplacesItsRecoveryBackup() throws Exception {
+        SaveRepository repository = new SaveRepository(tempDir.resolve("HORSEBOUND"));
+        SaveGame oldRanch = sampleSave(4, 5, 20f);
+        SaveGame replacement = new SaveGame(
+            SaveGame.CURRENT_VERSION,
+            999999L,
+            oldRanch.savedAtEpochMillis() + 1L,
+            oldRanch.worldTime(),
+            oldRanch.player(),
+            oldRanch.pushik(),
+            oldRanch.horses(),
+            oldRanch.fences(),
+            oldRanch.structures(),
+            oldRanch.hotbar(),
+            oldRanch.harvestedTreeIds()
+        );
+
+        repository.save("slot-1", oldRanch);
+        repository.replace("slot-1", replacement);
+
+        Path primary = repository.root().resolve("saves").resolve("slot-1").resolve("save.hbs");
+        Files.writeString(primary, "corrupted-replacement-primary");
+
+        assertEquals(replacement, repository.load("slot-1").orElseThrow());
+    }
+
+    @Test
     void fallsBackToPreviousBackupWhenLatestPrimaryIsCorrupt() throws Exception {
         SaveRepository repository = new SaveRepository(tempDir.resolve("HORSEBOUND"));
         SaveGame first = sampleSave(4, 5, 20f);
