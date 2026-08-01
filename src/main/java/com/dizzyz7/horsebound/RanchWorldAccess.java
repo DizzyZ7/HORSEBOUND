@@ -7,8 +7,8 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Narrow presentation boundary exposed by the ranch renderer to Homestead orchestration.
- * Domain code never depends on this interface; it exists only for typed render-thread access.
+ * Narrow typed presentation boundary exposed by the ranch renderer to Homestead orchestration.
+ * Domain code never depends on this interface; it exists only for render-thread access.
  */
 interface RanchWorldAccess {
     PerspectiveCamera camera();
@@ -20,6 +20,8 @@ interface RanchWorldAccess {
     void setActorPosition(float x, float z);
 
     boolean setHorsePosition(UUID horseId, float x, float z);
+
+    void setCameraObstacles(List<RanchCameraCollisionSystem.Obstacle> obstacles);
 
     record ActorPose(float x, float z, float heading, boolean mounted) {
         public ActorPose {
