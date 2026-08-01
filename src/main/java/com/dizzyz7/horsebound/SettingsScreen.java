@@ -20,11 +20,12 @@ final class SettingsScreen implements Screen {
     private static final int UI_SCALE = 4;
     private static final int SENSITIVITY = 5;
     private static final int SFX_VOLUME = 6;
-    private static final int PERFORMANCE = 7;
-    private static final int AUTOSAVE = 8;
-    private static final int DEFAULTS = 9;
-    private static final int BACK = 10;
-    private static final int ITEM_COUNT = 11;
+    private static final int AMBIENCE_VOLUME = 7;
+    private static final int PERFORMANCE = 8;
+    private static final int AUTOSAVE = 9;
+    private static final int DEFAULTS = 10;
+    private static final int BACK = 11;
+    private static final int ITEM_COUNT = 12;
 
     private final HorseboundGame game;
     private final SpriteBatch batch = new SpriteBatch();
@@ -86,16 +87,16 @@ final class SettingsScreen implements Screen {
 
         font.getData().setScale(0.72f * ui);
         font.setColor(new Color(0.68f, 0.73f, 0.69f, 1f));
-        font.draw(batch, "Display and ranch audio settings are device-local and excluded from Steam Cloud.", 18f * layoutScale, 42f * layoutScale);
+        font.draw(batch, "Display and audio-bus settings are device-local and excluded from Steam Cloud.", 18f * layoutScale, 42f * layoutScale);
         font.draw(batch, InputPromptCatalog.menuHint(input.activeDevice()), 18f * layoutScale, 23f * layoutScale);
         batch.end();
     }
 
     private void layout(int width, int height, float scale) {
         float rowWidth = Math.min(width - 40f * scale, 680f * scale);
-        float rowHeight = 37f * scale;
-        float gap = 42f * scale;
-        float startY = height - 105f * scale;
+        float rowHeight = 34f * scale;
+        float gap = 38f * scale;
+        float startY = height - 92f * scale;
         float x = (width - rowWidth) * 0.5f;
         for (int i = 0; i < rows.length; i++) {
             rows[i].set(x, startY - i * gap, rowWidth, rowHeight);
@@ -121,6 +122,7 @@ final class SettingsScreen implements Screen {
             case UI_SCALE -> "UI / text scale";
             case SENSITIVITY -> "Mouse / camera sensitivity";
             case SFX_VOLUME -> "Ranch effects volume";
+            case AMBIENCE_VOLUME -> "Meadow ambience volume";
             case PERFORMANCE -> "Performance overlay";
             case AUTOSAVE -> "Autosave interval";
             case DEFAULTS -> "Restore Deck-safe defaults";
@@ -138,6 +140,7 @@ final class SettingsScreen implements Screen {
             case UI_SCALE -> Math.round(settings.uiScale() * 100f) + "%";
             case SENSITIVITY -> String.format(Locale.ROOT, "%.2f", settings.mouseSensitivity());
             case SFX_VOLUME -> Math.round(settings.sfxVolume() * 100f) + "%";
+            case AMBIENCE_VOLUME -> Math.round(settings.ambienceVolume() * 100f) + "%";
             case PERFORMANCE -> settings.showPerformanceStats() ? "ON" : "OFF";
             case AUTOSAVE -> settings.autosaveSeconds() + " sec";
             case DEFAULTS, BACK -> "";
@@ -177,6 +180,7 @@ final class SettingsScreen implements Screen {
             case UI_SCALE -> apply(settings.withUiScale(settings.uiScale() + 0.10f * Integer.signum(direction)));
             case SENSITIVITY -> apply(settings.withMouseSensitivity(settings.mouseSensitivity() + 0.01f * direction));
             case SFX_VOLUME -> apply(settings.withSfxVolume(settings.sfxVolume() + 0.10f * Integer.signum(direction)));
+            case AMBIENCE_VOLUME -> apply(settings.withAmbienceVolume(settings.ambienceVolume() + 0.10f * Integer.signum(direction)));
             case PERFORMANCE -> apply(settings.withPerformanceStats(!settings.showPerformanceStats()));
             case AUTOSAVE -> apply(settings.withAutosaveSeconds(settings.autosaveSeconds() + 30 * direction));
             default -> { }

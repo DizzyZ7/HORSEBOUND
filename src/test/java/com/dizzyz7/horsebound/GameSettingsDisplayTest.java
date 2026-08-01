@@ -15,6 +15,8 @@ class GameSettingsDisplayTest {
         assertEquals(800, settings.windowHeight());
         assertEquals(GraphicsPreset.MEDIUM, settings.graphicsPreset());
         assertEquals(1f, settings.uiScale());
+        assertEquals(GameSettings.DEFAULT_SFX_VOLUME, settings.sfxVolume());
+        assertEquals(GameSettings.DEFAULT_AMBIENCE_VOLUME, settings.ambienceVolume());
     }
 
     @Test
@@ -36,6 +38,16 @@ class GameSettingsDisplayTest {
         assertEquals(GameSettings.MIN_WINDOW_HEIGHT, settings.windowHeight());
         assertEquals(GameSettings.DEFAULT_UI_SCALE, settings.uiScale());
         assertEquals(GraphicsPreset.MEDIUM, settings.graphicsPreset());
+    }
+
+    @Test
+    void audioBusValuesClampIndependently() {
+        GameSettings settings = GameSettings.defaults()
+            .withSfxVolume(2f)
+            .withAmbienceVolume(-1f);
+
+        assertEquals(1f, settings.sfxVolume());
+        assertEquals(0f, settings.ambienceVolume());
     }
 
     @Test
