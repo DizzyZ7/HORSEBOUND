@@ -57,6 +57,7 @@ jobs:
 
           $forbiddenNames = @(
             "settings.properties",
+            "input.properties",
             "save.hbs",
             "save.bak",
             "save.tmp",
@@ -78,7 +79,12 @@ jobs:
             "jamepad64.dll",
             "com/dizzyz7/horsebound/PromptOverlay.class",
             "com/dizzyz7/horsebound/InputGlyphCatalog.class",
-            "com/dizzyz7/horsebound/ControllerGlyphFamily.class"
+            "com/dizzyz7/horsebound/ControllerGlyphFamily.class",
+            "com/dizzyz7/horsebound/InputProfile.class",
+            "com/dizzyz7/horsebound/InputProfileRepository.class",
+            "com/dizzyz7/horsebound/PauseScreen.class",
+            "com/dizzyz7/horsebound/InputSettingsScreen.class",
+            "com/dizzyz7/horsebound/KeyBindingsScreen.class"
           )
           foreach ($entry in $requiredJarEntries) {
             if ($jarEntries -notcontains $entry) {
