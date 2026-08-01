@@ -1,0 +1,28 @@
+name: HORSEBOUND Source Audit Snapshot
+
+on:
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  source-snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact audit head
+        uses: actions/checkout@v4
+
+      - name: Archive source tree
+        shell: bash
+        run: zip -qr HORSEBOUND-source-audit.zip . -x '.git/*' 'build/*' '*.log'
+
+      - name: Upload source audit snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: HORSEBOUND-source-audit
+          path: HORSEBOUND-source-audit.zip
+          if-no-files-found: error
+          retention-days: 1
