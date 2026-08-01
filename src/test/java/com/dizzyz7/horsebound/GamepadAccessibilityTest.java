@@ -23,8 +23,10 @@ class GamepadAccessibilityTest {
     }
 
     @Test
-    void toggleSprintSurvivesReleaseAndStopsOnNextPressEdge() {
+    void toggleSprintRequiresFreshPressThenSurvivesReleaseAndStopsOnNextEdge() {
         List<ControllerFrame> frames = List.of(
+            frame(AnalogStick.zero(), true),
+            frame(AnalogStick.zero(), false),
             frame(AnalogStick.zero(), true),
             frame(AnalogStick.zero(), false),
             frame(AnalogStick.zero(), false),
@@ -38,6 +40,8 @@ class GamepadAccessibilityTest {
             () -> toggle
         );
 
+        assertFalse(mapper.sample().command().sprint());
+        assertFalse(mapper.sample().command().sprint());
         assertTrue(mapper.sample().command().sprint());
         assertTrue(mapper.sample().command().sprint());
         assertTrue(mapper.sample().command().sprint());
