@@ -96,6 +96,27 @@ final class SaveRepository {
         }
     }
 
+    /** Replaces an occupied ranch slot without retaining the previous ranch as its recovery backup. */
+    void replace(String slot, SaveGame saveGame) {
+        Path directory = slotDirectory(slot);
+        Path primary = savePath(slot);
+        Path backup = backupPath(slot);
+        Path primaryTemporary = directory.resolve("replace-primary.tmp");
+        Path backupTemporary = directory.resolve("replace-backup.tmp");
+
+        try {
+            Files.createDirectories(directory);
+            writeAndSync(primaryTemporary, saveGame);
+            writeAndSync(backupTemporary, saveGame);
+            moveAtomically(backupTemporary, backup);
+            moveAtomically(primaryTemporary, primary);
+        } catch (IOException ex) {
+            deleteQuietly(primaryTemporary);
+            deleteQuietly(backupTemporary);
+            throw new SaveException("Could not replace HORSEBOUND world in " + primary, ex);
+        }
+    }
+
     Path root() {
         return root;
     }
@@ -396,6 +417,14 @@ final class SaveRepository {
             Files.move(source, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
         } catch (AtomicMoveNotSupportedException ex) {
             Files.move(source, target, StandardCopyOption.REPLACE_EXISTING);
+        }
+    }
+
+    private static void deleteQuietly(Path path) {
+        try {
+            Files.deleteIfExists(path);
+        } catch (IOException ignored) {
+            // Keep the original persistence failure as the meaningful error.
         }
     }
 

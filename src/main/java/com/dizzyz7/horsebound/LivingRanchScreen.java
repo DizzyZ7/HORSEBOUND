@@ -52,6 +52,7 @@ final class LivingRanchScreen implements Screen, RanchWorldAccess {
     private final ModelBatch modelBatch = new ModelBatch();
     private final SpriteBatch spriteBatch = new SpriteBatch();
     private final BitmapFont font = new BitmapFont();
+    private final String buildLabel = GameplayHudCopy.buildLabel(BuildInfo.current());
     private final PerspectiveCamera camera;
     private final Environment environment = new Environment();
     private final DirectionalLight sun = new DirectionalLight();
@@ -126,8 +127,15 @@ final class LivingRanchScreen implements Screen, RanchWorldAccess {
         float px = clampWorld(savedPushik.x());
         float pz = clampWorld(savedPushik.z());
         if (Terrain.isInsideLake(px, pz)) {
-            px = playerPosition.x + 2f;
-            pz = playerPosition.z + 1f;
+            SafeGroundPlacement.Position safe = SafeGroundPlacement.nearest(
+                playerPosition.x,
+                playerPosition.z,
+                playerPosition.x + 2f,
+                playerPosition.z + 1f,
+                WORLD_LIMIT
+            );
+            px = safe.x();
+            pz = safe.z();
         }
         pushik = new PushikActor(
             new ModelInstance(models.pushik),
@@ -440,13 +448,16 @@ final class LivingRanchScreen implements Screen, RanchWorldAccess {
         float distance = planarDistance(pushik.position.x, pushik.position.z, target.x, target.z);
 
         if (distance > 28f) {
-            pushik.position.set(
+            SafeGroundPlacement.Position safe = SafeGroundPlacement.nearest(
+                target.x,
+                target.z,
                 target.x - 2f,
-                Terrain.heightAt(target.x - 2f, target.z - 1f),
-                target.z - 1f
+                target.z - 1f,
+                WORLD_LIMIT
             );
+            pushik.position.set(safe.x(), Terrain.heightAt(safe.x(), safe.z()), safe.z());
             session.pushikMind().reunited();
-            distance = 0f;
+            distance = planarDistance(pushik.position.x, pushik.position.z, target.x, target.z);
         }
 
         session.pushikMind().tick(dt, distance, session.worldTime());
@@ -546,12 +557,16 @@ final class LivingRanchScreen implements Screen, RanchWorldAccess {
             old.mounted = false;
             old.speed = 0f;
             mountedHorse = null;
-            playerPosition.set(
-                old.position.x + MathUtils.cosDeg(old.heading) * 2f,
-                0f,
-                old.position.z - MathUtils.sinDeg(old.heading) * 2f
+            float preferredX = old.position.x + MathUtils.cosDeg(old.heading) * 2f;
+            float preferredZ = old.position.z - MathUtils.sinDeg(old.heading) * 2f;
+            SafeGroundPlacement.Position safe = SafeGroundPlacement.nearest(
+                old.position.x,
+                old.position.z,
+                preferredX,
+                preferredZ,
+                WORLD_LIMIT
             );
-            playerPosition.y = Terrain.heightAt(playerPosition.x, playerPosition.z);
+            playerPosition.set(safe.x(), Terrain.heightAt(safe.x(), safe.z()), safe.z());
             setStatus("Dismounted " + old.name + ".");
             return;
         }
@@ -782,16 +797,19 @@ final class LivingRanchScreen implements Screen, RanchWorldAccess {
     private void renderHud() {
         int width = Gdx.graphics.getWidth();
         int height = Gdx.graphics.getHeight();
+        float ui = UiScale.effective(width, height, game.settings().uiScale());
+        float geometry = Math.min(ui, 1.18f);
+        float left = 18f * geometry;
         Gdx.gl.glDisable(GL20.GL_DEPTH_TEST);
         spriteBatch.getProjectionMatrix().setToOrtho2D(0f, 0f, width, height);
         spriteBatch.begin();
 
         font.setColor(Color.WHITE);
-        font.getData().setScale(1f);
-        font.draw(spriteBatch, "HORSEBOUND 0.4.3", 18f, height - 18f);
-        font.getData().setScale(0.82f);
+        font.getData().setScale(1f * ui);
+        font.draw(spriteBatch, buildLabel, left, height - 18f * geometry);
+        font.getData().setScale(0.76f * ui);
         font.setColor(new Color(0.88f, 0.91f, 0.86f, 1f));
-        font.draw(spriteBatch, inputHint(), 18f, height - 42f);
+        font.draw(spriteBatch, inputHint(), left, height - 42f * geometry);
         font.draw(
             spriteBatch,
             "Wood " + session.inventory().count(ItemId.WOOD)
@@ -799,8 +817,8 @@ final class LivingRanchScreen implements Screen, RanchWorldAccess {
                 + " | Seed " + session.worldSeed()
                 + " | Save " + saveService.activeSlot()
                 + " | Input " + activeInputDevice,
-            18f,
-            height - 64f
+            left,
+            height - 64f * geometry
         );
 
         HorseActor focus = mountedHorse != null ? mountedHorse : nearestHorse(7f);
@@ -817,8 +835,8 @@ final class LivingRanchScreen implements Screen, RanchWorldAccess {
                     ? " | stamina " + Math.round(focus.stamina)
                         + "% | speed " + String.format(Locale.ROOT, "%.1f", Math.abs(focus.speed))
                     : ""),
-                18f,
-                height - 86f
+                left,
+                height - 86f * geometry
             );
         }
 
@@ -829,34 +847,29 @@ final class LivingRanchScreen implements Screen, RanchWorldAccess {
                 "Pushik: " + session.pushikMind().state()
                     + " | affection " + Math.round(session.pushikMind().affection())
                     + "% | fluffy paws: silent",
-                18f,
-                52f
+                left,
+                52f * geometry
             );
         }
         if (statusTimer > 0f) {
             font.setColor(new Color(1f, 0.96f, 0.78f, 1f));
-            font.draw(spriteBatch, status, 18f, 82f);
+            font.draw(spriteBatch, status, left, 82f * geometry);
         }
 
         font.setColor(new Color(0.68f, 0.73f, 0.69f, 1f));
-        font.getData().setScale(0.72f);
+        font.getData().setScale(0.68f * ui);
         font.draw(
             spriteBatch,
             "Created by Dimash Janibekov (DizZyZ7) | (c) 2026 All rights reserved",
-            Math.max(18f, width - 420f),
-            20f
+            Math.max(left, width - 430f * geometry),
+            20f * geometry
         );
         spriteBatch.end();
         Gdx.gl.glEnable(GL20.GL_DEPTH_TEST);
     }
 
     private String inputHint() {
-        return switch (activeInputDevice) {
-            case KEYBOARD_MOUSE ->
-                "WASD move | E interact | F mount | B build | F5 save | Shift sprint/gallop | Space jump";
-            case GAMEPAD, STEAM_INPUT ->
-                "Controller connected | Left Stick move | Right Stick camera | glyph mapping in progress";
-        };
+        return GameplayHudCopy.inputHint(activeInputDevice, InputProfileContext.current());
     }
 
     private HorseActor nearestHorse(float radius) {
@@ -1063,6 +1076,24 @@ final class LivingRanchScreen implements Screen, RanchWorldAccess {
             if (obstacle != null && obstacle.radius() > 0f && obstacle.height() > 0f) safe.add(obstacle);
         }
         homesteadCameraObstacles = List.copyOf(safe);
+    }
+
+    @Override
+    public boolean isNaturePlacementBlocked(float x, float z, float radius) {
+        if (!Float.isFinite(x) || !Float.isFinite(z) || !Float.isFinite(radius)) return true;
+        float safeRadius = Math.max(0f, radius);
+        for (TreeNode tree : trees) {
+            if (tree.harvested) continue;
+            if (RanchPlacementCollision.overlaps(
+                x, z, safeRadius, tree.x, tree.z, tree.obstacle.radius(), 0f
+            )) return true;
+        }
+        for (RockNode rock : rocks) {
+            if (RanchPlacementCollision.overlaps(
+                x, z, safeRadius, rock.x, rock.z, rock.obstacle.radius(), 0f
+            )) return true;
+        }
+        return false;
     }
 
     private static void setHorseCoordinates(HorseActor horse, float x, float z) {

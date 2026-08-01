@@ -38,7 +38,7 @@ final class SaveSlotsScreen implements Screen {
     private final Rectangle backButton = new Rectangle();
 
     private List<SaveSlotInfo> slots = List.of();
-    private String pendingOverwriteSlot;
+    private final SaveSlotOverwriteConfirmation overwriteConfirmation = new SaveSlotOverwriteConfirmation();
     private String message;
     private int selectedIndex;
 
@@ -52,6 +52,8 @@ final class SaveSlotsScreen implements Screen {
         Gdx.input.setCursorCatched(false);
         slots = game.saveSlots();
         selectedIndex = 0;
+        overwriteConfirmation.clear();
+        message = null;
     }
 
     @Override
@@ -138,8 +140,10 @@ final class SaveSlotsScreen implements Screen {
     }
 
     private boolean handleNavigation(MenuCommand command) {
+        int previousSelection = selectedIndex;
         if (command.upPressed()) selectedIndex = Math.floorMod(selectedIndex - 1, ITEM_COUNT);
         if (command.downPressed()) selectedIndex = Math.floorMod(selectedIndex + 1, ITEM_COUNT);
+        if (selectedIndex != previousSelection) selectionChanged();
         if (command.confirmPressed()) {
             if (selectedIndex == BACK_INDEX) game.returnToMenu();
             else activateSlot(selectedIndex);
@@ -159,13 +163,17 @@ final class SaveSlotsScreen implements Screen {
         float y = height - Gdx.input.getY();
         for (int i = 0; i < slotButtons.length; i++) {
             if (slotButtons[i].contains(x, y)) {
-                selectedIndex = i;
+                if (selectedIndex != i) {
+                    selectedIndex = i;
+                    selectionChanged();
+                }
                 activateSlot(i);
                 return true;
             }
         }
         if (backButton.contains(x, y)) {
             selectedIndex = BACK_INDEX;
+            selectionChanged();
             game.returnToMenu();
             return true;
         }
@@ -209,6 +217,15 @@ final class SaveSlotsScreen implements Screen {
         );
     }
 
+    private void selectionChanged() {
+        String selectedSlotId = selectedIndex >= 0 && selectedIndex < slots.size()
+            ? slots.get(selectedIndex).slotId()
+            : null;
+        boolean wasArmed = selectedSlotId == null || !overwriteConfirmation.isArmedFor(selectedSlotId);
+        overwriteConfirmation.selectionChanged(selectedSlotId);
+        if (wasArmed) message = null;
+    }
+
     private void activateSlot(int index) {
         if (index < 0 || index >= slots.size()) return;
         SaveSlotInfo slot = slots.get(index);
@@ -229,13 +246,14 @@ final class SaveSlotsScreen implements Screen {
             return;
         }
 
-        if (!slot.slotId().equals(pendingOverwriteSlot)) {
-            pendingOverwriteSlot = slot.slotId();
+        SaveSlotOverwriteConfirmation.Decision decision = overwriteConfirmation.request(slot.slotId());
+        if (decision == SaveSlotOverwriteConfirmation.Decision.ARMED) {
             message = "Select " + slot.label() + " again to permanently replace that ranch.";
             return;
         }
-
-        game.startNewWorld(slot.slotId());
+        if (decision == SaveSlotOverwriteConfirmation.Decision.CONFIRMED) {
+            game.startNewWorld(slot.slotId());
+        }
     }
 
     @Override public void resize(int width, int height) { }

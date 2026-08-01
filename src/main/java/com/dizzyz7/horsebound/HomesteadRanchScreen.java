@@ -424,6 +424,16 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
         maximumSlope = Math.max(maximumSlope, Math.abs(center - Terrain.heightAt(x, z + sample)));
         maximumSlope = Math.max(maximumSlope, Math.abs(center - Terrain.heightAt(x, z - sample)));
         if (maximumSlope > 0.85f) return "Ground is too steep for this structure.";
+        if (worldAccess.isNaturePlacementBlocked(x, z, type.collisionRadius() + 0.15f)) {
+            return "Placement overlaps a tree or rock.";
+        }
+        for (RanchWorldAccess.HorseTelemetry horse : worldAccess.horses()) {
+            if (RanchPlacementCollision.overlaps(
+                x, z, type.collisionRadius(), horse.x(), horse.z(), HORSE_COLLISION_RADIUS, 0.25f
+            )) {
+                return "Move the horse away before building here.";
+            }
+        }
 
         for (PlacedStructure existing : session.homestead().structures()) {
             if (existing.id().equals(ignoredStructureId)) continue;
@@ -609,7 +619,7 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
         }
 
         RanchWorldAccess.ActorPose pose = worldAccess.actorPose();
-        RanchWorldAccess.HorseTelemetry nearest = nearestHorse(pose.x(), pose.z());
+        RanchWorldAccess.HorseTelemetry nearest = nearestHorse(pose.x(), pose.z(), 12f);
         if (nearest != null) {
             HorseNeeds needs = horseNeeds.getOrDefault(nearest.id(), HorseNeeds.healthy());
             font.getData().setScale(0.68f * ui);
@@ -695,8 +705,10 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
             .orElse(null);
     }
 
-    private RanchWorldAccess.HorseTelemetry nearestHorse(float x, float z) {
+    private RanchWorldAccess.HorseTelemetry nearestHorse(float x, float z, float radius) {
+        float radiusSquared = Math.max(0f, radius) * Math.max(0f, radius);
         return worldAccess.horses().stream()
+            .filter(value -> distanceSquared(x, z, value.x(), value.z()) <= radiusSquared)
             .min(Comparator.comparingDouble(value -> distanceSquared(x, z, value.x(), value.z())))
             .orElse(null);
     }

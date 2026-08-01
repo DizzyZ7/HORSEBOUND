@@ -18,6 +18,7 @@ final class GamepadInputMapper implements InputMapper {
     private final Supplier<InputProfile> profileSupplier;
     private final SprintLatch sprintLatch = new SprintLatch();
     private ControllerFrame previous = ControllerFrame.disconnected();
+    private boolean actionEdgesPrimed;
 
     GamepadInputMapper() {
         this(new GdxControllerStateSource(), () -> Gdx.graphics.getDeltaTime(), InputProfileContext::current);
@@ -43,23 +44,26 @@ final class GamepadInputMapper implements InputMapper {
         InputProfile profile = Objects.requireNonNullElse(profileSupplier.get(), InputProfile.defaults());
         if (!current.connected()) {
             previous = ControllerFrame.disconnected();
+            actionEdgesPrimed = false;
             sprintLatch.reset();
             return new InputSnapshot(PlayerCommand.idle(), InputDeviceType.GAMEPAD);
         }
 
+        ControllerFrame edgePrevious = actionEdgesPrimed ? previous : current;
+        actionEdgesPrimed = true;
         float frameDelta = safeFrameDelta(frameDeltaSupplier.getAsDouble());
-        boolean jumpPressed = justPressed(current.buttonA(), previous.buttonA());
-        boolean interactPressed = justPressed(current.buttonX(), previous.buttonX());
-        boolean mountPressed = justPressed(current.buttonY(), previous.buttonY());
-        boolean buildPressed = justPressed(current.buttonL1(), previous.buttonL1());
+        boolean jumpPressed = justPressed(current.buttonA(), edgePrevious.buttonA());
+        boolean interactPressed = justPressed(current.buttonX(), edgePrevious.buttonX());
+        boolean mountPressed = justPressed(current.buttonY(), edgePrevious.buttonY());
+        boolean buildPressed = justPressed(current.buttonL1(), edgePrevious.buttonL1());
         boolean inventoryPressed = !HomesteadInputContext.capturesPauseAsCancel()
-            && justPressed(current.dpadUp(), previous.dpadUp());
-        boolean savePressed = justPressed(current.buttonBack(), previous.buttonBack());
-        boolean pausePressed = justPressed(current.buttonStart(), previous.buttonStart())
-            || justPressed(current.buttonB(), previous.buttonB());
+            && justPressed(current.dpadUp(), edgePrevious.dpadUp());
+        boolean savePressed = justPressed(current.buttonBack(), edgePrevious.buttonBack());
+        boolean pausePressed = justPressed(current.buttonStart(), edgePrevious.buttonStart())
+            || justPressed(current.buttonB(), edgePrevious.buttonB());
         boolean sprint = sprintLatch.update(
             current.buttonR1(),
-            justPressed(current.buttonR1(), previous.buttonR1()),
+            justPressed(current.buttonR1(), edgePrevious.buttonR1()),
             profile.sprintMode()
         );
         float lookPitch = current.rightStick().y() * LOOK_PITCH_DEGREES_PER_SECOND * frameDelta;

@@ -38,6 +38,8 @@ class RanchWorldAccessTest {
         access.setCameraObstacles(mutable);
         mutable.clear();
         assertEquals(1, access.cameraObstacles.size());
+        assertTrue(access.isNaturePlacementBlocked(4f, 5f, 1f));
+        assertFalse(access.isNaturePlacementBlocked(20f, 20f, 1f));
     }
 
     @Test
@@ -98,6 +100,13 @@ class RanchWorldAccessTest {
         @Override
         public void setCameraObstacles(List<RanchCameraCollisionSystem.Obstacle> obstacles) {
             cameraObstacles = obstacles == null ? List.of() : List.copyOf(obstacles);
+        }
+
+        @Override
+        public boolean isNaturePlacementBlocked(float x, float z, float radius) {
+            return cameraObstacles.stream().anyMatch(obstacle -> RanchPlacementCollision.overlaps(
+                x, z, radius, obstacle.x(), obstacle.z(), obstacle.radius(), 0f
+            ));
         }
     }
 }

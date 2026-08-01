@@ -13,30 +13,49 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class MenuInputMapperTest {
     @Test
-    void emitsControllerNavigationAndConfirmOnlyOnEdges() {
+    void suppressesCarriedControllerInputUntilTheControllerReturnsToNeutral() {
         ControllerFrame held = frame(new AnalogStick(0f, 0.8f), true, false, false);
-        List<ControllerFrame> frames = List.of(held, held, frame(AnalogStick.zero(), false, false, false));
+        ControllerFrame neutral = frame(AnalogStick.zero(), false, false, false);
+        List<ControllerFrame> frames = List.of(held, held, neutral, held, held);
         AtomicInteger index = new AtomicInteger();
-        ControllerStateSource source = () -> frames.get(Math.min(index.getAndIncrement(), frames.size() - 1));
-        MenuInputMapper mapper = new MenuInputMapper(source, MenuCommand::idle);
+        MenuInputMapper mapper = new MenuInputMapper(
+            () -> frames.get(Math.min(index.getAndIncrement(), frames.size() - 1)),
+            MenuCommand::idle,
+            () -> 1d / 60d
+        );
 
         MenuInputSnapshot first = mapper.sample();
-        MenuInputSnapshot second = mapper.sample();
+        MenuInputSnapshot carried = mapper.sample();
+        MenuInputSnapshot released = mapper.sample();
+        MenuInputSnapshot freshPress = mapper.sample();
+        MenuInputSnapshot stillHeld = mapper.sample();
 
-        assertTrue(first.command().downPressed());
-        assertTrue(first.command().confirmPressed());
+        assertFalse(first.command().hasActivity());
         assertEquals(InputDeviceType.GAMEPAD, first.activeDevice());
-        assertFalse(second.command().downPressed());
-        assertFalse(second.command().confirmPressed());
+        assertFalse(carried.command().hasActivity());
+        assertFalse(released.command().hasActivity());
+        assertTrue(freshPress.command().downPressed());
+        assertTrue(freshPress.command().confirmPressed());
+        assertFalse(stillHeld.command().downPressed());
+        assertFalse(stillHeld.command().confirmPressed());
     }
 
     @Test
     void heldDirectionRepeatsAfterDelayButConfirmNeverRepeats() {
+        ControllerFrame neutral = frame(AnalogStick.zero(), false, false, false);
         ControllerFrame held = frame(new AnalogStick(0f, 0.8f), true, false, false);
-        MenuInputMapper mapper = new MenuInputMapper(() -> held, MenuCommand::idle, () -> 0.10d);
+        AtomicInteger index = new AtomicInteger();
+        MenuInputMapper mapper = new MenuInputMapper(
+            () -> index.getAndIncrement() == 0 ? neutral : held,
+            MenuCommand::idle,
+            () -> 0.10d
+        );
 
-        assertTrue(mapper.sample().command().downPressed());
-        assertTrue(mapper.sample().command().confirmPressed() == false);
+        assertFalse(mapper.sample().command().hasActivity());
+        MenuCommand firstPress = mapper.sample().command();
+        assertTrue(firstPress.downPressed());
+        assertTrue(firstPress.confirmPressed());
+        assertFalse(mapper.sample().command().downPressed());
         assertFalse(mapper.sample().command().downPressed());
         assertFalse(mapper.sample().command().downPressed());
         assertTrue(mapper.sample().command().downPressed());
@@ -44,19 +63,21 @@ class MenuInputMapperTest {
     }
 
     @Test
-    void supportsDpadAndBackAndReturnsPromptsToKeyboardWhenUsed() {
+    void supportsBackAndReturnsPromptsToKeyboardWhenUsed() {
         List<ControllerFrame> frames = List.of(
+            frame(AnalogStick.zero(), false, false, false),
             frame(AnalogStick.zero(), false, false, true),
             frame(AnalogStick.zero(), false, false, false)
         );
         AtomicInteger controllerIndex = new AtomicInteger();
         ControllerStateSource source = () -> frames.get(Math.min(controllerIndex.getAndIncrement(), frames.size() - 1));
         AtomicInteger keyboardIndex = new AtomicInteger();
-        Supplier<MenuCommand> keyboard = () -> keyboardIndex.getAndIncrement() == 0
+        Supplier<MenuCommand> keyboard = () -> keyboardIndex.getAndIncrement() < 2
             ? MenuCommand.idle()
             : new MenuCommand(true, false, false, false, false, false);
         MenuInputMapper mapper = new MenuInputMapper(source, keyboard);
 
+        assertFalse(mapper.sample().command().hasActivity());
         MenuInputSnapshot controller = mapper.sample();
         MenuInputSnapshot keyboardReturn = mapper.sample();
 
@@ -67,12 +88,31 @@ class MenuInputMapperTest {
     }
 
     @Test
-    void pointerActivityForcesKeyboardMousePrompts() {
+    void keyboardRemainsResponsiveDuringControllerPriming() {
+        ControllerFrame held = frame(AnalogStick.zero(), true, false, false);
         MenuInputMapper mapper = new MenuInputMapper(
-            () -> frame(AnalogStick.zero(), true, false, false),
+            () -> held,
+            () -> new MenuCommand(false, true, false, false, false, false)
+        );
+
+        MenuInputSnapshot snapshot = mapper.sample();
+
+        assertTrue(snapshot.command().downPressed());
+        assertFalse(snapshot.command().confirmPressed());
+        assertEquals(InputDeviceType.KEYBOARD_MOUSE, snapshot.activeDevice());
+    }
+
+    @Test
+    void pointerActivityForcesKeyboardMousePrompts() {
+        AtomicInteger index = new AtomicInteger();
+        MenuInputMapper mapper = new MenuInputMapper(
+            () -> index.getAndIncrement() == 0
+                ? frame(AnalogStick.zero(), false, false, false)
+                : frame(AnalogStick.zero(), true, false, false),
             MenuCommand::idle
         );
 
+        mapper.sample();
         assertEquals(InputDeviceType.GAMEPAD, mapper.sample().activeDevice());
         mapper.markPointerActive();
         assertEquals(InputDeviceType.KEYBOARD_MOUSE, mapper.activeDevice());
