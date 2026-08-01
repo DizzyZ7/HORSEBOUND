@@ -32,6 +32,7 @@ final class LivingRanchScreen implements Screen, RanchWorldAccess {
     private static final float PLAYER_WALK_SPEED = 5.2f;
     private static final float PLAYER_RUN_SPEED = 8.4f;
     private static final float WORLD_LIMIT = Terrain.WORLD_HALF_SIZE - 3f;
+    private static final float MIN_CAMERA_DISTANCE = 2.2f;
 
     private final HorseboundGame game;
     private final SaveService saveService;
@@ -48,6 +49,7 @@ final class LivingRanchScreen implements Screen, RanchWorldAccess {
     private final PerspectiveCamera camera;
     private final Environment environment = new Environment();
     private final DirectionalLight sun = new DirectionalLight();
+    private final RanchCameraCollisionSystem cameraCollisionSystem = new RanchCameraCollisionSystem();
 
     private final ModelInstance player = new ModelInstance(models.player);
     private final ModelInstance water = new ModelInstance(models.water);
@@ -62,12 +64,15 @@ final class LivingRanchScreen implements Screen, RanchWorldAccess {
     private final Vector3 tmpRight = new Vector3();
     private final Vector3 tmpMove = new Vector3();
     private final Vector3 tmpTarget = new Vector3();
+    private final Vector3 tmpDesiredCamera = new Vector3();
 
     private HorseActor mountedHorse;
     private InputDeviceType activeInputDevice = InputDeviceType.KEYBOARD_MOUSE;
+    private List<RanchCameraCollisionSystem.Obstacle> cameraObstacles = List.of();
     private float cameraYaw = 18f;
     private float cameraPitch = 27f;
     private float cameraDistance = 10f;
+    private float resolvedCameraDistance = 10f;
     private float playerFacing;
     private float playerJumpOffset;
     private float playerJumpVelocity;
@@ -499,7 +504,7 @@ final class LivingRanchScreen implements Screen, RanchWorldAccess {
             } else if (horse.relationship.trust() >= 100f) {
                 setStatus(
                     horse.name + " trusts you but needs calm. Fear "
-                        + Math.round(horse.relationship.fear()) + "%."
+                        + Math.round(horse.relationship.fear()) + "% ."
                 );
             } else {
                 setStatus(
@@ -536,8 +541,7 @@ final class LivingRanchScreen implements Screen, RanchWorldAccess {
         } else if (!horse.tamed) {
             setStatus(
                 horse.name + " is not ready yet. Trust "
-                    + Math.round(horse.relationship.trust()) + "%."
-            );
+                    + Math.round(horse.relationship.trust()) + "%.");
         } else {
             mountedHorse = horse;
             horse.mounted = true;
@@ -632,10 +636,37 @@ final class LivingRanchScreen implements Screen, RanchWorldAccess {
         tmpTarget.set(actor.x, actor.y + targetHeight, actor.z);
 
         float cosPitch = MathUtils.cosDeg(cameraPitch);
-        camera.position.set(
+        tmpDesiredCamera.set(
             tmpTarget.x - MathUtils.sinDeg(cameraYaw) * cosPitch * cameraDistance,
             tmpTarget.y + MathUtils.sinDeg(cameraPitch) * cameraDistance,
             tmpTarget.z - MathUtils.cosDeg(cameraYaw) * cosPitch * cameraDistance
+        );
+        float allowedDistance = cameraCollisionSystem.resolveDistance(
+            tmpTarget.x,
+            tmpTarget.y,
+            tmpTarget.z,
+            tmpDesiredCamera.x,
+            tmpDesiredCamera.y,
+            tmpDesiredCamera.z,
+            MIN_CAMERA_DISTANCE,
+            cameraObstacles,
+            Terrain::heightAt
+        );
+        float frameDelta = Math.min(
+            Math.max(0f, Gdx.graphics.getDeltaTime()),
+            FixedStepClock.DEFAULT_MAX_FRAME_SECONDS
+        );
+        float response = allowedDistance < resolvedCameraDistance ? 16f : 5f;
+        resolvedCameraDistance = MathUtils.lerp(
+            resolvedCameraDistance,
+            allowedDistance,
+            Math.min(1f, response * frameDelta)
+        );
+        float distanceRatio = cameraDistance <= 0.001f ? 1f : resolvedCameraDistance / cameraDistance;
+        camera.position.set(
+            tmpTarget.x + (tmpDesiredCamera.x - tmpTarget.x) * distanceRatio,
+            tmpTarget.y + (tmpDesiredCamera.y - tmpTarget.y) * distanceRatio,
+            tmpTarget.z + (tmpDesiredCamera.z - tmpTarget.z) * distanceRatio
         );
         camera.up.set(Vector3.Y);
         camera.lookAt(tmpTarget);
@@ -941,6 +972,19 @@ final class LivingRanchScreen implements Screen, RanchWorldAccess {
             return true;
         }
         return false;
+    }
+
+    @Override
+    public void setCameraObstacles(List<RanchCameraCollisionSystem.Obstacle> obstacles) {
+        if (obstacles == null || obstacles.isEmpty()) {
+            cameraObstacles = List.of();
+            return;
+        }
+        List<RanchCameraCollisionSystem.Obstacle> safe = new ArrayList<>(obstacles.size());
+        for (RanchCameraCollisionSystem.Obstacle obstacle : obstacles) {
+            if (obstacle != null && obstacle.radius() > 0f && obstacle.height() > 0f) safe.add(obstacle);
+        }
+        cameraObstacles = List.copyOf(safe);
     }
 
     private static void setHorseCoordinates(HorseActor horse, float x, float z) {
