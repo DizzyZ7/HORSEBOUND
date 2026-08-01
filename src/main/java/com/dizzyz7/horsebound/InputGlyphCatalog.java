@@ -1,6 +1,8 @@
 // HORSEBOUND — Created by Dimash Janibekov (DizZyZ7), © 2026. All rights reserved.
 package com.dizzyz7.horsebound;
 
+import com.badlogic.gdx.Input;
+
 import java.util.List;
 
 /** Maps semantic actions to the currently active keyboard or controller glyph family. */
@@ -8,11 +10,7 @@ final class InputGlyphCatalog {
     private InputGlyphCatalog() {
     }
 
-    static GlyphBinding binding(
-        PromptAction action,
-        InputDeviceType device,
-        ControllerGlyphFamily family
-    ) {
+    static GlyphBinding binding(PromptAction action, InputDeviceType device, ControllerGlyphFamily family) {
         if (device == InputDeviceType.KEYBOARD_MOUSE) {
             return new GlyphBinding(keyboardGlyph(action), action.label());
         }
@@ -32,28 +30,32 @@ final class InputGlyphCatalog {
                 PromptAction.PAUSE
             );
         }
-        if (screen instanceof SettingsScreen) {
+        if (screen instanceof InputSettingsScreen || screen instanceof SettingsScreen) {
             return List.of(PromptAction.NAVIGATE, PromptAction.ADJUST, PromptAction.CONFIRM, PromptAction.BACK);
-        }
-        if (screen instanceof SaveSlotsScreen) {
-            return List.of(PromptAction.NAVIGATE, PromptAction.CONFIRM, PromptAction.BACK);
         }
         return List.of(PromptAction.NAVIGATE, PromptAction.CONFIRM, PromptAction.BACK);
     }
 
     private static String keyboardGlyph(PromptAction action) {
+        InputProfile profile = InputProfileContext.current();
         return switch (action) {
             case NAVIGATE -> "WASD";
             case ADJUST -> "A / D";
             case CONFIRM -> "ENTER";
-            case BACK, PAUSE -> "ESC";
-            case INTERACT -> "E";
-            case MOUNT -> "F";
-            case BUILD -> "B";
-            case JUMP -> "SPACE";
-            case SPRINT -> "SHIFT";
-            case SAVE -> "F5";
+            case BACK -> "ESC";
+            case PAUSE -> keyName(profile.pauseKey());
+            case INTERACT -> keyName(profile.interactKey());
+            case MOUNT -> keyName(profile.mountKey());
+            case BUILD -> keyName(profile.buildKey());
+            case JUMP -> keyName(profile.jumpKey());
+            case SPRINT -> keyName(profile.sprintKey());
+            case SAVE -> keyName(profile.saveKey());
         };
+    }
+
+    private static String keyName(int keyCode) {
+        String name = Input.Keys.toString(keyCode);
+        return name == null || name.isBlank() ? "KEY " + keyCode : name.toUpperCase();
     }
 
     private static String controllerGlyph(PromptAction action, ControllerGlyphFamily family) {
