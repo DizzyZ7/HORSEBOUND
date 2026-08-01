@@ -33,10 +33,21 @@ final class Inventory {
     }
 
     static Inventory restore(List<SaveGame.ItemStackData> items, int legacyWood, int legacyApples) {
-        Inventory inventory = starter(legacyWood, legacyApples);
+        return restore(items, legacyWood, legacyApples, DEFAULT_SLOT_CAPACITY);
+    }
+
+    static Inventory restore(
+        List<SaveGame.ItemStackData> items,
+        int legacyWood,
+        int legacyApples,
+        int slotCapacity
+    ) {
+        Inventory inventory = new Inventory(slotCapacity);
+        inventory.set(ItemId.WOOD, legacyWood);
+        inventory.set(ItemId.APPLE, legacyApples);
         if (items == null || items.isEmpty()) return inventory;
 
-        for (ItemId item : ItemId.values()) inventory.set(item, 0);
+        inventory.clear();
         for (SaveGame.ItemStackData saved : items) {
             if (saved == null) continue;
             ItemId.parse(saved.itemId()).ifPresent(item -> {
@@ -47,6 +58,12 @@ final class Inventory {
         return inventory;
     }
 
+    Inventory copy() {
+        Inventory copy = new Inventory(slotCapacity);
+        for (ItemId item : ItemId.values()) copy.set(item, count(item));
+        return copy;
+    }
+
     int count(ItemId item) {
         return amounts.getOrDefault(Objects.requireNonNull(item, "item"), 0);
     }
@@ -54,6 +71,13 @@ final class Inventory {
     int add(ItemId item, int amount) {
         Objects.requireNonNull(item, "item");
         if (amount <= 0) return 0;
+        int accepted = Math.min(amount, availableSpace(item));
+        amounts.put(item, count(item) + accepted);
+        return accepted;
+    }
+
+    int availableSpace(ItemId item) {
+        Objects.requireNonNull(item, "item");
         int current = count(item);
         int stackLimit = item.stackLimit();
         int remainder = current % stackLimit;
@@ -61,9 +85,19 @@ final class Inventory {
         int freeSlots = Math.max(0, slotCapacity - usedSlots());
         long slotSpace = (long) partialSpace + (long) freeSlots * stackLimit;
         int totalSpace = MAX_AMOUNT_PER_ITEM - current;
-        int accepted = (int) Math.min(amount, Math.min(slotSpace, totalSpace));
-        amounts.put(item, current + accepted);
-        return accepted;
+        return (int) Math.max(0L, Math.min(slotSpace, totalSpace));
+    }
+
+    boolean canAccept(List<SaveGame.ItemStackData> items) {
+        Inventory simulation = copy();
+        if (items == null) return true;
+        for (SaveGame.ItemStackData saved : items) {
+            if (saved == null || saved.amount() <= 0) continue;
+            ItemId item = ItemId.parse(saved.itemId()).orElse(null);
+            if (item == null) continue;
+            if (simulation.add(item, saved.amount()) != saved.amount()) return false;
+        }
+        return true;
     }
 
     boolean remove(ItemId item, int amount) {
@@ -75,6 +109,29 @@ final class Inventory {
         return true;
     }
 
+    boolean transferTo(Inventory destination, ItemId item, int amount) {
+        Objects.requireNonNull(destination, "destination");
+        Objects.requireNonNull(item, "item");
+        if (amount <= 0) return true;
+        if (!has(item, amount) || destination.availableSpace(item) < amount) return false;
+        remove(item, amount);
+        if (destination.add(item, amount) == amount) return true;
+        add(item, amount);
+        return false;
+    }
+
+    boolean transferAllTo(Inventory destination) {
+        Objects.requireNonNull(destination, "destination");
+        List<SaveGame.ItemStackData> contents = toSaveData();
+        if (!destination.canAccept(contents)) return false;
+        for (SaveGame.ItemStackData saved : contents) {
+            ItemId item = ItemId.parse(saved.itemId()).orElse(null);
+            if (item == null || saved.amount() <= 0) continue;
+            transferTo(destination, item, saved.amount());
+        }
+        return true;
+    }
+
     boolean has(ItemId item, int amount) {
         return amount <= 0 || count(item) >= amount;
     }
@@ -82,6 +139,15 @@ final class Inventory {
     void set(ItemId item, int amount) {
         Objects.requireNonNull(item, "item");
         amounts.put(item, Math.max(0, Math.min(MAX_AMOUNT_PER_ITEM, amount)));
+    }
+
+    void clear() {
+        for (ItemId item : ItemId.values()) amounts.put(item, 0);
+    }
+
+    boolean isEmpty() {
+        for (ItemId item : ItemId.values()) if (count(item) > 0) return false;
+        return true;
     }
 
     int slotCapacity() {
