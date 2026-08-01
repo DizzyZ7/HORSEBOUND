@@ -23,6 +23,8 @@ final class HomesteadRenderer implements Disposable {
     private final ModelBatch modelBatch = new ModelBatch();
     private final Environment environment = new Environment();
     private final Map<UUID, ModelInstance> instances = new HashMap<>();
+    private final GateAnimationState gateAnimation = new GateAnimationState();
+    private final RanchPresentationObserver presentationObserver = new RanchPresentationObserver();
     private ModelInstance preview;
     private HomesteadStructureType previewType;
     private boolean previewValidity;
@@ -38,7 +40,12 @@ final class HomesteadRenderer implements Disposable {
         Set<UUID> hiddenStructureIds,
         PlacementPreview placement
     ) {
-        sync(state, hiddenStructureIds == null ? Set.of() : hiddenStructureIds);
+        float frameDelta = Math.min(
+            Math.max(0f, Gdx.graphics.getDeltaTime()),
+            FixedStepClock.DEFAULT_MAX_FRAME_SECONDS
+        );
+        for (RanchAudio.Cue cue : presentationObserver.observe(state.structures())) RanchAudio.play(cue);
+        sync(state, hiddenStructureIds == null ? Set.of() : hiddenStructureIds, frameDelta);
         Gdx.gl.glEnable(GL20.GL_DEPTH_TEST);
         Gdx.gl.glEnable(GL20.GL_BLEND);
         Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
@@ -52,8 +59,9 @@ final class HomesteadRenderer implements Disposable {
         Gdx.gl.glDisable(GL20.GL_BLEND);
     }
 
-    private void sync(HomesteadState state, Set<UUID> hiddenStructureIds) {
+    private void sync(HomesteadState state, Set<UUID> hiddenStructureIds, float frameDelta) {
         Set<UUID> alive = new HashSet<>();
+        Set<UUID> aliveGates = new HashSet<>();
         for (PlacedStructure structure : state.structures()) {
             if (hiddenStructureIds.contains(structure.id())) continue;
             alive.add(structure.id());
@@ -62,12 +70,16 @@ final class HomesteadRenderer implements Disposable {
                 ignored -> new ModelInstance(models.normal(structure.type()))
             );
             float visualHeading = structure.heading();
-            if (structure.type() == HomesteadStructureType.GATE && structure.isOpen()) visualHeading += 90f;
+            if (structure.type() == HomesteadStructureType.GATE) {
+                aliveGates.add(structure.id());
+                visualHeading += gateAnimation.update(structure.id(), structure.isOpen(), frameDelta);
+            }
             instance.transform.idt()
                 .translate(structure.x(), Terrain.heightAt(structure.x(), structure.z()), structure.z())
                 .rotate(Vector3.Y, visualHeading);
         }
         instances.keySet().removeIf(id -> !alive.contains(id));
+        gateAnimation.retain(aliveGates);
     }
 
     private void syncPreview(PlacementPreview placement) {
@@ -83,9 +95,11 @@ final class HomesteadRenderer implements Disposable {
 
     @Override
     public void dispose() {
+        RanchAudio.shutdown();
         modelBatch.dispose();
         models.dispose();
         instances.clear();
+        gateAnimation.retain(Set.of());
         preview = null;
     }
 

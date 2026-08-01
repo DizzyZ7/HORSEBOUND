@@ -31,6 +31,19 @@ class MenuInputMapperTest {
     }
 
     @Test
+    void heldDirectionRepeatsAfterDelayButConfirmNeverRepeats() {
+        ControllerFrame held = frame(new AnalogStick(0f, 0.8f), true, false, false);
+        MenuInputMapper mapper = new MenuInputMapper(() -> held, MenuCommand::idle, () -> 0.10d);
+
+        assertTrue(mapper.sample().command().downPressed());
+        assertTrue(mapper.sample().command().confirmPressed() == false);
+        assertFalse(mapper.sample().command().downPressed());
+        assertFalse(mapper.sample().command().downPressed());
+        assertTrue(mapper.sample().command().downPressed());
+        assertFalse(mapper.sample().command().confirmPressed());
+    }
+
+    @Test
     void supportsDpadAndBackAndReturnsPromptsToKeyboardWhenUsed() {
         List<ControllerFrame> frames = List.of(
             frame(AnalogStick.zero(), false, false, true),

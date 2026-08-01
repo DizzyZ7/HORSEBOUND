@@ -28,7 +28,7 @@ import java.util.UUID;
 /**
  * libGDX presentation layer over a fixed-step, device-neutral gameplay loop.
  */
-final class LivingRanchScreen implements Screen {
+final class LivingRanchScreen implements Screen, RanchWorldAccess {
     private static final float PLAYER_WALK_SPEED = 5.2f;
     private static final float PLAYER_RUN_SPEED = 8.4f;
     private static final float WORLD_LIMIT = Terrain.WORLD_HALF_SIZE - 3f;
@@ -876,6 +876,75 @@ final class LivingRanchScreen implements Screen {
     private void setStatus(String message) {
         status = message;
         statusTimer = 5f;
+    }
+
+    @Override
+    public PerspectiveCamera camera() {
+        return camera;
+    }
+
+    @Override
+    public ActorPose actorPose() {
+        if (mountedHorse != null) {
+            return new ActorPose(
+                mountedHorse.position.x,
+                mountedHorse.position.z,
+                mountedHorse.heading,
+                true
+            );
+        }
+        return new ActorPose(playerPosition.x, playerPosition.z, playerFacing, false);
+    }
+
+    @Override
+    public List<HorseTelemetry> horses() {
+        List<HorseTelemetry> result = new ArrayList<>(horses.size());
+        for (HorseActor horse : horses) {
+            result.add(new HorseTelemetry(
+                horse.id,
+                horse.position.x,
+                horse.position.z,
+                horse.speed,
+                horse == mountedHorse,
+                horse.tamed
+            ));
+        }
+        return List.copyOf(result);
+    }
+
+    @Override
+    public void setActorPosition(float x, float z) {
+        if (!Float.isFinite(x) || !Float.isFinite(z)) return;
+        float safeX = clampWorld(x);
+        float safeZ = clampWorld(z);
+        if (mountedHorse != null) {
+            setHorseCoordinates(mountedHorse, safeX, safeZ);
+            playerPosition.set(mountedHorse.position);
+            playerFacing = mountedHorse.heading;
+            return;
+        }
+        playerPosition.set(safeX, Terrain.heightAt(safeX, safeZ), safeZ);
+    }
+
+    @Override
+    public boolean setHorsePosition(UUID horseId, float x, float z) {
+        if (horseId == null || !Float.isFinite(x) || !Float.isFinite(z)) return false;
+        float safeX = clampWorld(x);
+        float safeZ = clampWorld(z);
+        for (HorseActor horse : horses) {
+            if (!horse.id.equals(horseId)) continue;
+            setHorseCoordinates(horse, safeX, safeZ);
+            if (horse == mountedHorse) {
+                playerPosition.set(horse.position);
+                playerFacing = horse.heading;
+            }
+            return true;
+        }
+        return false;
+    }
+
+    private static void setHorseCoordinates(HorseActor horse, float x, float z) {
+        horse.position.set(x, Terrain.heightAt(x, z), z);
     }
 
     @Override
