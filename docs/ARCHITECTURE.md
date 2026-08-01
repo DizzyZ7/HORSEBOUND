@@ -34,17 +34,18 @@ The domain must not depend on libGDX input, rendering, controller or window clas
 
 - device-neutral `PlayerCommand` and menu commands;
 - fixed-step `GameSimulationLoop`;
-- pause/session lifecycle;
-- interaction and save orchestration;
-- future placement validator/snapshot assembler.
+- generic `RanchSessionScreen` pause/save lifecycle;
+- owner-scoped save enrichment;
+- semantic Homestead build/deposit/cancel action routing.
 
 ### Presentation
 
-- libGDX screens;
+- `HomesteadRanchScreen` live integration wrapper;
+- legacy `LivingRanchScreen` presentation delegate;
+- isolated `LivingRanchTelemetryAdapter` compatibility bridge;
+- provisional `HomesteadModels` and `HomesteadRenderer`;
 - keyboard/mouse/controller adapters;
-- cameras, models and lighting;
-- HUD, scalable prompts and menus;
-- performance/support overlays.
+- HUD, scalable prompts, menus and performance/support overlays.
 
 ### Persistence
 
@@ -60,68 +61,111 @@ The domain must not depend on libGDX input, rendering, controller or window clas
 
 Simulation uses a bounded accumulator at 60 ticks per second. Rendering may run at a different frame rate and later interpolate visual transforms. Domain systems receive commands/context rather than reading `Gdx.input` directly.
 
-This keeps movement, horse AI, needs, weather and save tests independent from 30/60/144 Hz rendering.
+Horse needs and Homestead care use a fixed-step clock. This keeps behavior independent from 30/60/144 Hz rendering.
 
-## Homestead architecture
+## Live Homestead integration
 
-0.5 uses explicit domain models rather than embedding more state into `LivingRanchScreen`.
+0.5.1 avoids placing more responsibility inside the legacy gameplay screen.
 
 ```text
-Input / build selection
+HorseboundGame
         ↓
-Placement request + validator
+HomesteadRanchScreen (session/presentation owner)
+        ├── LivingRanchScreen delegate
+        ├── captured GameSession
+        ├── Homestead input/action layer
+        ├── HomesteadRenderer
+        ├── HorseCareSystem
+        └── SaveService transformer
+```
+
+The wrapper obtains the actual `GameSession` through a scoped construction bridge, not reflection. Temporary reflection exists only in `LivingRanchTelemetryAdapter` to read camera and actor telemetry from the old presentation class. Domain and persistence code never depend on it.
+
+This is a transition architecture, not a permanent excuse to preserve the legacy screen forever.
+
+## Building flow
+
+```text
+remappable Build command
+        ↓
+HomesteadActionBus
+        ↓
+build selection + snapped preview
+        ↓
+placement validation
         ↓
 HomesteadState.place(...)
         ↓
-Inventory cost transaction
+atomic Inventory transaction
         ↓
-PlacedStructure + renderer actor
+HomesteadRenderer actor
         ↓
-Save v4 snapshot
+owner-scoped Save v4 enrichment
 ```
 
-Horse care follows:
+Validation currently checks world bounds, lake, slope, recipe and structure overlap. Player/horse physical collision and structure navigation are explicit 0.5.2 work.
+
+## Horse care flow
 
 ```text
-fixed simulation tick
+fixed care tick
+        ↓
+legacy actor telemetry
         ↓
 HorseNeeds.tick(...)
         ↓
 HorseCareSystem
         ↓
-nearest feeder / trough / stall query
+nearby feeder / trough / stall query
         ↓
-care result + visual/audio feedback
+resource consumption + HUD feedback
+        ↓
+Save v4 enrichment
 ```
 
 Per-stack item limits are presentation limits. `Inventory` owns aggregate totals and exposes stack views, preventing old saves with more than one stack from being truncated.
+
+## Save ownership
+
+`SaveService` accepts an owner-scoped transformer. Every manual save, autosave, pause save and disposal save produced by the delegate passes through the current Homestead owner.
+
+A stale screen cannot clear a transformer installed by a newer ranch session. The final snapshot combines:
+
+- live positions and relationships from the delegate;
+- inventory/hotbar from the captured session;
+- placed structures and stored units;
+- current horse needs;
+- deterministic legacy-fence compatibility structures.
 
 ## Version sequence
 
 ### 0.5.0 — Homestead Domain Foundation
 
-- inventory totals and stack views;
+- inventory capacity and stack views;
 - persistent hotbar;
 - typed structure catalog/storage;
 - persistent horse needs;
-- save format v4 and v3 binary migration coverage.
+- save format v4 and binary v3 migration coverage.
 
 ### 0.5.1 — Live Homestead Integration
 
-- hotbar input and HUD;
-- placement ghost, snapping and collision validation;
-- gates, feeders, troughs and stalls rendered in-world;
-- deposit interactions;
-- live HorseCareSystem updates;
-- active-screen v4 snapshot assembly.
+- live hotbar and controller selection;
+- placement ghost, snapping and validation;
+- structures rendered in-world;
+- resource deposits;
+- live horse-care updates;
+- complete v4 save enrichment.
 
-### 0.5.2 — Inventory and Building UX
+### 0.5.2 — Inventory, Physics and Building UX
 
-- inventory screen;
-- chest/storage UI;
-- placement rotation/cancel/undo;
-- accessible controller building flow;
-- construction feedback and audio.
+- inventory/chest/storage screens;
+- opening gates;
+- player/horse structure collision;
+- tree/rock placement collision;
+- build undo/removal mode;
+- construction feedback and audio;
+- replace reflection telemetry with explicit delegate interfaces/controllers;
+- begin production asset replacement.
 
 ### 0.6 — Living World
 
@@ -145,18 +189,10 @@ Do not introduce a full ECS yet. Explicit domain models and focused systems are 
 
 ## Scope control
 
-Before Early Access, do not prioritize:
-
-- multiplayer or accounts/backend;
-- live-service economy;
-- DLC architecture;
-- large NPC populations;
-- advanced genetics before care/build/explore is fun.
-
-The production loop is:
+Before Early Access, do not prioritize multiplayer/backend, live-service economy, DLC architecture, large NPC populations or advanced genetics ahead of the care/build/explore loop.
 
 ```text
 explore -> gather -> care -> bond -> build -> improve ranch -> explore farther
 ```
 
-Every feature must strengthen at least one part of that loop and survive save/load before it is considered complete.
+Every feature must strengthen that loop and survive save/load before it is considered complete.
