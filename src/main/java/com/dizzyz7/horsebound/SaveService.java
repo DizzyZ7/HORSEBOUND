@@ -11,6 +11,7 @@ import java.util.function.UnaryOperator;
 final class SaveService {
     static final String DEFAULT_SLOT = "slot-1";
     static final List<String> SLOT_IDS = List.of("slot-1", "slot-2", "slot-3");
+    private static final int STARTER_STONE = 8;
 
     private final SaveRepository repository;
     private String activeSlot = DEFAULT_SLOT;
@@ -74,7 +75,7 @@ final class SaveService {
     SaveGame createNewWorld(String slotId) {
         validateSlot(slotId);
         activeSlot = slotId;
-        SaveGame saveGame = SaveGame.fresh(WorldSeed.random());
+        SaveGame saveGame = withStarterHomesteadMaterials(SaveGame.fresh(WorldSeed.random()));
         repository.save(activeSlot, saveGame);
         return saveGame;
     }
@@ -115,6 +116,36 @@ final class SaveService {
 
     String saveLocation() {
         return repository.root().resolve("saves").resolve(activeSlot).toString();
+    }
+
+    private static SaveGame withStarterHomesteadMaterials(SaveGame source) {
+        Inventory inventory = Inventory.restore(
+            source.player().inventoryItems(),
+            source.player().wood(),
+            source.player().apples()
+        );
+        inventory.add(ItemId.STONE, STARTER_STONE);
+        SaveGame.PlayerData player = new SaveGame.PlayerData(
+            source.player().x(),
+            source.player().z(),
+            source.player().facing(),
+            inventory.count(ItemId.WOOD),
+            inventory.count(ItemId.APPLE),
+            inventory.toSaveData()
+        );
+        return new SaveGame(
+            SaveGame.CURRENT_VERSION,
+            source.worldSeed(),
+            source.savedAtEpochMillis(),
+            source.worldTime(),
+            player,
+            source.pushik(),
+            source.horses(),
+            source.fences(),
+            source.structures(),
+            source.hotbar(),
+            source.harvestedTreeIds()
+        );
     }
 
     private static void validateSlot(String slotId) {
