@@ -19,10 +19,14 @@ jobs:
           ref: ${{ github.event.pull_request.head.ref }}
           fetch-depth: 0
 
-      - name: Apply locally compiled hardening patch
+      - name: Verify and apply locally compiled hardening patch
         shell: bash
         run: |
-          cat .github/dev/horsebound-056.patch.b64.* | base64 -d | gzip -d > /tmp/horsebound-056.patch
+          sha256sum .github/dev/horsebound-056.patch.b64.*
+          wc -c .github/dev/horsebound-056.patch.b64.*
+          cat .github/dev/horsebound-056.patch.b64.* > /tmp/horsebound-056.patch.b64
+          echo "combined bytes: $(wc -c < /tmp/horsebound-056.patch.b64)"
+          base64 -d /tmp/horsebound-056.patch.b64 | gzip -d > /tmp/horsebound-056.patch
           git apply --check /tmp/horsebound-056.patch
           git apply /tmp/horsebound-056.patch
           rm -rf .github/dev
