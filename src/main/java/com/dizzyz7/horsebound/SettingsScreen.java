@@ -19,11 +19,12 @@ final class SettingsScreen implements Screen {
     private static final int GRAPHICS = 3;
     private static final int UI_SCALE = 4;
     private static final int SENSITIVITY = 5;
-    private static final int PERFORMANCE = 6;
-    private static final int AUTOSAVE = 7;
-    private static final int DEFAULTS = 8;
-    private static final int BACK = 9;
-    private static final int ITEM_COUNT = 10;
+    private static final int SFX_VOLUME = 6;
+    private static final int PERFORMANCE = 7;
+    private static final int AUTOSAVE = 8;
+    private static final int DEFAULTS = 9;
+    private static final int BACK = 10;
+    private static final int ITEM_COUNT = 11;
 
     private final HorseboundGame game;
     private final SpriteBatch batch = new SpriteBatch();
@@ -85,16 +86,16 @@ final class SettingsScreen implements Screen {
 
         font.getData().setScale(0.72f * ui);
         font.setColor(new Color(0.68f, 0.73f, 0.69f, 1f));
-        font.draw(batch, "Display settings are device-local and excluded from Steam Cloud.", 18f * layoutScale, 42f * layoutScale);
+        font.draw(batch, "Display and ranch audio settings are device-local and excluded from Steam Cloud.", 18f * layoutScale, 42f * layoutScale);
         font.draw(batch, InputPromptCatalog.menuHint(input.activeDevice()), 18f * layoutScale, 23f * layoutScale);
         batch.end();
     }
 
     private void layout(int width, int height, float scale) {
         float rowWidth = Math.min(width - 40f * scale, 680f * scale);
-        float rowHeight = 40f * scale;
-        float gap = 46f * scale;
-        float startY = height - 116f * scale;
+        float rowHeight = 37f * scale;
+        float gap = 42f * scale;
+        float startY = height - 105f * scale;
         float x = (width - rowWidth) * 0.5f;
         for (int i = 0; i < rows.length; i++) {
             rows[i].set(x, startY - i * gap, rowWidth, rowHeight);
@@ -103,11 +104,11 @@ final class SettingsScreen implements Screen {
 
     private void drawRow(int index, Rectangle row, float ui, float layoutScale) {
         font.setColor(index == selectedIndex ? Color.WHITE : new Color(0.84f, 0.90f, 0.85f, 1f));
-        font.draw(batch, label(index), row.x + 14f * layoutScale, row.y + 27f * layoutScale);
+        font.draw(batch, label(index), row.x + 14f * layoutScale, row.y + 25f * layoutScale);
         String value = value(index);
         if (!value.isEmpty()) {
             font.setColor(new Color(1f, 0.88f, 0.58f, 1f));
-            font.draw(batch, value, row.x + row.width - 245f * layoutScale, row.y + 27f * layoutScale);
+            font.draw(batch, value, row.x + row.width - 245f * layoutScale, row.y + 25f * layoutScale);
         }
     }
 
@@ -119,6 +120,7 @@ final class SettingsScreen implements Screen {
             case GRAPHICS -> "Graphics preset";
             case UI_SCALE -> "UI / text scale";
             case SENSITIVITY -> "Mouse / camera sensitivity";
+            case SFX_VOLUME -> "Ranch effects volume";
             case PERFORMANCE -> "Performance overlay";
             case AUTOSAVE -> "Autosave interval";
             case DEFAULTS -> "Restore Deck-safe defaults";
@@ -135,6 +137,7 @@ final class SettingsScreen implements Screen {
             case GRAPHICS -> settings.graphicsPreset().displayName() + " | MSAA next launch";
             case UI_SCALE -> Math.round(settings.uiScale() * 100f) + "%";
             case SENSITIVITY -> String.format(Locale.ROOT, "%.2f", settings.mouseSensitivity());
+            case SFX_VOLUME -> Math.round(settings.sfxVolume() * 100f) + "%";
             case PERFORMANCE -> settings.showPerformanceStats() ? "ON" : "OFF";
             case AUTOSAVE -> settings.autosaveSeconds() + " sec";
             case DEFAULTS, BACK -> "";
@@ -173,6 +176,7 @@ final class SettingsScreen implements Screen {
             case GRAPHICS -> apply(settings.withGraphicsPreset(settings.graphicsPreset().shifted(direction)));
             case UI_SCALE -> apply(settings.withUiScale(settings.uiScale() + 0.10f * Integer.signum(direction)));
             case SENSITIVITY -> apply(settings.withMouseSensitivity(settings.mouseSensitivity() + 0.01f * direction));
+            case SFX_VOLUME -> apply(settings.withSfxVolume(settings.sfxVolume() + 0.10f * Integer.signum(direction)));
             case PERFORMANCE -> apply(settings.withPerformanceStats(!settings.showPerformanceStats()));
             case AUTOSAVE -> apply(settings.withAutosaveSeconds(settings.autosaveSeconds() + 30 * direction));
             default -> { }

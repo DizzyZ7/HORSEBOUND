@@ -35,12 +35,13 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
     private final HorseboundGame game;
     private final SaveService saveService;
     private final LivingRanchScreen delegate;
+    private final RanchWorldAccess worldAccess;
     private final GameSession session;
-    private final LivingRanchTelemetryAdapter telemetry;
     private final HomesteadRuntimeInput runtimeInput = new HomesteadRuntimeInput();
     private final HomesteadRenderer homesteadRenderer = new HomesteadRenderer();
     private final InventoryOverlay inventoryOverlay = new InventoryOverlay();
     private final HomesteadCollisionSystem collisionSystem = new HomesteadCollisionSystem();
+    private final RanchUndoManager undoManager = new RanchUndoManager();
     private final HorseCareSystem careSystem = new HorseCareSystem();
     private final FixedStepClock careClock = new FixedStepClock();
     private final Map<UUID, HorseNeeds> horseNeeds = new LinkedHashMap<>();
@@ -76,8 +77,8 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
             throw ex;
         }
         delegate = created;
+        worldAccess = created;
         session = captured;
-        telemetry = new LivingRanchTelemetryAdapter(delegate);
 
         for (SaveGame.HorseData horse : initialState.horses()) {
             horseNeeds.put(horse.id(), horse.needs());
@@ -103,7 +104,7 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
             return;
         }
 
-        LivingRanchTelemetryAdapter.ActorPose beforePose = telemetry.actorPose();
+        RanchWorldAccess.ActorPose beforePose = worldAccess.actorPose();
         PlacedStructure nearby = nearestInteractiveStructure(beforePose.x(), beforePose.z(), INTERACTION_RADIUS);
         boolean placementMode = buildMode || editMode;
         HomesteadInputContext.configure(
@@ -117,6 +118,7 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
         HomesteadRuntimeInput.InputResult input = runtimeInput.sample(placementMode);
         applySelectionInput(input);
         placement = placementMode ? calculatePlacement(beforePose) : null;
+        worldAccess.setCameraObstacles(cameraObstacles());
 
         try {
             delegate.render(delta);
@@ -126,12 +128,21 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
         if (game.getScreen() != this) return;
 
         resolveStructureCollisions(beforePose);
-        LivingRanchTelemetryAdapter.ActorPose currentPose = telemetry.actorPose();
+        RanchWorldAccess.ActorPose currentPose = worldAccess.actorPose();
         nearby = nearestInteractiveStructure(currentPose.x(), currentPose.z(), INTERACTION_RADIUS);
-        handleSemanticActions(nearby, input.editPressed());
+        handleSemanticActions(nearby, input.editPressed(), input.undoPressed());
         careClock.advance(frameDelta, this::updateHorseCare);
-        placement = buildMode || editMode ? calculatePlacement(telemetry.actorPose()) : null;
-        homesteadRenderer.render(telemetry.camera(), session.homestead(), hiddenLegacyStructureIds, placement);
+        placement = buildMode || editMode ? calculatePlacement(worldAccess.actorPose()) : null;
+        UUID selected = editMode && editedStructureId != null
+            ? editedStructureId
+            : nearby == null ? null : nearby.id();
+        homesteadRenderer.render(
+            worldAccess.camera(),
+            session.homestead(),
+            hiddenLegacyStructureIds,
+            placement,
+            selected
+        );
         renderHomesteadHud();
 
         statusTimer = Math.max(0f, statusTimer - frameDelta);
@@ -140,6 +151,7 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
 
     private void renderFrozenWorldAndInventory(float frameDelta) {
         HomesteadInputContext.configure(true, true, true, true, true);
+        worldAccess.setCameraObstacles(cameraObstacles());
         try {
             delegate.render(0f);
         } finally {
@@ -152,7 +164,7 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
             HomesteadActionBus.reset();
             return;
         }
-        homesteadRenderer.render(telemetry.camera(), session.homestead(), hiddenLegacyStructureIds, null);
+        homesteadRenderer.render(worldAccess.camera(), session.homestead(), hiddenLegacyStructureIds, null, null);
         inventoryOverlay.updateAndRender(game.settings().uiScale());
         statusTimer = Math.max(0f, statusTimer - frameDelta);
     }
@@ -169,8 +181,12 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
         }
     }
 
-    private void handleSemanticActions(PlacedStructure nearby, boolean editPressed) {
+    private void handleSemanticActions(PlacedStructure nearby, boolean editPressed, boolean undoPressed) {
         if (HomesteadActionBus.consumeCancel()) cancelPlacement("Placement cancelled.");
+
+        if (undoPressed && !buildMode && !editMode) {
+            undoLastRanchEdit();
+        }
 
         if (HomesteadActionBus.consumeInventory()) {
             if (buildMode || editMode) {
@@ -197,13 +213,13 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
         buildMode = true;
         editMode = false;
         editedStructureId = null;
-        placementHeading = snapHeading(telemetry.actorPose().heading());
-        placement = calculatePlacement(telemetry.actorPose());
+        placementHeading = snapHeading(worldAccess.actorPose().heading());
+        placement = calculatePlacement(worldAccess.actorPose());
         setStatus("Build mode: " + selectedBuildType().displayName() + ". Build confirms; Back cancels.");
     }
 
     private void startEditMode() {
-        LivingRanchTelemetryAdapter.ActorPose pose = telemetry.actorPose();
+        RanchWorldAccess.ActorPose pose = worldAccess.actorPose();
         PlacedStructure nearest = session.homestead().nearest(pose.x(), pose.z(), INTERACTION_RADIUS)
             .filter(value -> !hiddenLegacyStructureIds.contains(value.id()))
             .orElse(null);
@@ -216,7 +232,7 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
         editedStructureId = nearest.id();
         placementHeading = nearest.heading();
         placement = calculatePlacement(pose);
-        setStatus("Editing " + nearest.type().displayName() + ": Build moves, Mount/Y dismantles, Back cancels.");
+        setStatus("Editing " + nearest.type().displayName() + ": highlighted origin + move ghost are active.");
     }
 
     private void cancelPlacement(String message) {
@@ -233,18 +249,20 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
             return;
         }
         HomesteadStructureType type = selectedBuildType();
-        if (session.homestead().place(
+        PlacedStructure placed = session.homestead().place(
             type,
             placement.x(),
             placement.z(),
             placement.heading(),
             session.inventory()
-        ).isEmpty()) {
+        ).orElse(null);
+        if (placed == null) {
             setStatus("Missing materials: " + costText(type) + ".");
             return;
         }
+        undoManager.recordPlacement(placed);
         ControllerRumble.pulse(game.inputProfile(), 65, 0.42f);
-        setStatus(type.displayName() + " placed. Cost: " + costText(type) + ".");
+        setStatus(type.displayName() + " placed. U/Ctrl+Z or Pause can undo the unchanged build.");
     }
 
     private void confirmRelocation() {
@@ -252,6 +270,14 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
             setStatus(placement == null ? "No relocation preview." : placement.reason());
             return;
         }
+        PlacedStructure structure = session.homestead().find(editedStructureId).orElse(null);
+        if (structure == null) {
+            cancelPlacement("That structure is no longer available.");
+            return;
+        }
+        float fromX = structure.x();
+        float fromZ = structure.z();
+        float fromHeading = structure.heading();
         if (!session.homestead().relocate(
             editedStructureId,
             placement.x(),
@@ -261,8 +287,17 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
             cancelPlacement("That structure is no longer available.");
             return;
         }
+        undoManager.recordRelocation(
+            structure,
+            fromX,
+            fromZ,
+            fromHeading,
+            placement.x(),
+            placement.z(),
+            placement.heading()
+        );
         ControllerRumble.pulse(game.inputProfile(), 60, 0.38f);
-        cancelPlacement("Structure moved successfully.");
+        cancelPlacement("Structure moved. U/Ctrl+Z or Pause can restore its previous position.");
     }
 
     private void dismantleEditedStructure() {
@@ -270,6 +305,7 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
         HomesteadState.DismantleResult result = session.homestead().dismantle(editedStructureId, session.inventory());
         switch (result) {
             case SUCCESS -> {
+                undoManager.clear();
                 ControllerRumble.pulse(game.inputProfile(), 70, 0.45f);
                 cancelPlacement("Structure dismantled; half materials returned.");
             }
@@ -318,7 +354,7 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
         );
     }
 
-    private HomesteadRenderer.PlacementPreview calculatePlacement(LivingRanchTelemetryAdapter.ActorPose pose) {
+    private HomesteadRenderer.PlacementPreview calculatePlacement(RanchWorldAccess.ActorPose pose) {
         PlacedStructure edited = editMode ? session.homestead().find(editedStructureId).orElse(null) : null;
         HomesteadStructureType type = edited != null ? edited.type() : selectedBuildType();
         float x = snap(pose.x() + MathUtils.sinDeg(pose.heading()) * PLACEMENT_DISTANCE);
@@ -374,8 +410,8 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
         return null;
     }
 
-    private void resolveStructureCollisions(LivingRanchTelemetryAdapter.ActorPose beforePose) {
-        LivingRanchTelemetryAdapter.ActorPose afterPose = telemetry.actorPose();
+    private void resolveStructureCollisions(RanchWorldAccess.ActorPose beforePose) {
+        RanchWorldAccess.ActorPose afterPose = worldAccess.actorPose();
         float actorRadius = afterPose.mounted() ? HORSE_COLLISION_RADIUS : PLAYER_COLLISION_RADIUS;
         HomesteadCollisionSystem.Position actor = collisionSystem.resolve(
             beforePose.x(),
@@ -385,9 +421,9 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
             actorRadius,
             session.homestead().structures()
         );
-        if (actor.blocked()) telemetry.setActorPosition(actor.x(), actor.z());
+        if (actor.blocked()) worldAccess.setActorPosition(actor.x(), actor.z());
 
-        for (LivingRanchTelemetryAdapter.HorseTelemetry horse : telemetry.horses()) {
+        for (RanchWorldAccess.HorseTelemetry horse : worldAccess.horses()) {
             if (horse.mounted()) {
                 previousHorsePositions.put(horse.id(), new Position(actor.x(), actor.z()));
                 continue;
@@ -401,13 +437,13 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
                 HORSE_COLLISION_RADIUS,
                 session.homestead().structures()
             );
-            if (corrected.blocked()) telemetry.setHorsePosition(horse.id(), corrected.x(), corrected.z());
+            if (corrected.blocked()) worldAccess.setHorsePosition(horse.id(), corrected.x(), corrected.z());
             previousHorsePositions.put(horse.id(), new Position(corrected.x(), corrected.z()));
         }
     }
 
     private void updateHorseCare(float fixedDelta) {
-        for (LivingRanchTelemetryAdapter.HorseTelemetry horse : telemetry.horses()) {
+        for (RanchWorldAccess.HorseTelemetry horse : worldAccess.horses()) {
             HorseNeeds current = horseNeeds.getOrDefault(horse.id(), HorseNeeds.healthy());
             boolean moving = Math.abs(horse.speed()) > 0.15f;
             boolean galloping = Math.abs(horse.speed()) > 8f;
@@ -431,6 +467,32 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
                 careFeedbackCooldown = 4f;
             }
         }
+    }
+
+    private List<RanchCameraCollisionSystem.Obstacle> cameraObstacles() {
+        List<RanchCameraCollisionSystem.Obstacle> result = new ArrayList<>();
+        for (PlacedStructure structure : session.homestead().structures()) {
+            if (!structure.blocksMovement()) continue;
+            result.add(new RanchCameraCollisionSystem.Obstacle(
+                structure.x(),
+                structure.z(),
+                Math.max(0.45f, structure.type().collisionRadius()),
+                cameraHeight(structure.type())
+            ));
+        }
+        return List.copyOf(result);
+    }
+
+    private static float cameraHeight(HomesteadStructureType type) {
+        return switch (type) {
+            case FENCE -> 1.65f;
+            case GATE -> 1.95f;
+            case FEEDER -> 1.15f;
+            case WATER_TROUGH -> 1.05f;
+            case HAY_STORAGE -> 2.10f;
+            case CHEST -> 1.15f;
+            case STALL -> 2.85f;
+        };
     }
 
     private SaveGame enrichSave(SaveGame base) {
@@ -514,8 +576,8 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
             }
         }
 
-        LivingRanchTelemetryAdapter.ActorPose pose = telemetry.actorPose();
-        LivingRanchTelemetryAdapter.HorseTelemetry nearest = nearestHorse(pose.x(), pose.z());
+        RanchWorldAccess.ActorPose pose = worldAccess.actorPose();
+        RanchWorldAccess.HorseTelemetry nearest = nearestHorse(pose.x(), pose.z());
         if (nearest != null) {
             HorseNeeds needs = horseNeeds.getOrDefault(nearest.id(), HorseNeeds.healthy());
             font.getData().setScale(0.68f * ui);
@@ -535,12 +597,24 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
             font.setColor(placement.valid() ? new Color(0.62f, 1f, 0.68f, 1f) : new Color(1f, 0.58f, 0.50f, 1f));
             String prefix = editMode ? "EDIT" : "BUILD";
             String controls = editMode
-                ? " | R/D-pad rotate | Build move | Mount/Y dismantle | Back cancel"
+                ? " | highlighted origin -> ghost | R/D-pad rotate | Build move | Mount/Y dismantle | Back cancel"
                 : " | [ / ] type | R/D-pad rotate | Build place | Back cancel";
+            String moveDelta = "";
+            if (editMode && editedStructureId != null) {
+                PlacedStructure edited = session.homestead().find(editedStructureId).orElse(null);
+                if (edited != null) {
+                    moveDelta = String.format(
+                        Locale.ROOT,
+                        " | %.1f,%.1f -> %.1f,%.1f",
+                        edited.x(), edited.z(), placement.x(), placement.z()
+                    );
+                }
+            }
             font.draw(
                 batch,
                 prefix + ": " + placement.type().displayName().toUpperCase(Locale.ROOT)
                     + (editMode ? "" : " | cost " + costText(placement.type()))
+                    + moveDelta
                     + controls
                     + (placement.valid() ? "" : " | " + placement.reason()),
                 16f * geometry,
@@ -565,8 +639,8 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
             .orElse(null);
     }
 
-    private LivingRanchTelemetryAdapter.HorseTelemetry nearestHorse(float x, float z) {
-        return telemetry.horses().stream()
+    private RanchWorldAccess.HorseTelemetry nearestHorse(float x, float z) {
+        return worldAccess.horses().stream()
             .min(Comparator.comparingDouble(value -> distanceSquared(x, z, value.x(), value.z())))
             .orElse(null);
     }
@@ -624,6 +698,30 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
     }
 
     @Override
+    public String undoLastRanchEdit() {
+        RanchUndoManager.UndoResult result = undoManager.undo(
+            session.homestead(),
+            session.inventory(),
+            (structure, x, z, heading) -> validatePlacement(structure.type(), x, z, structure.id(), false) == null
+        );
+        String message = switch (result) {
+            case PLACEMENT_REVERTED -> "Last unchanged build removed; full materials returned.";
+            case RELOCATION_REVERTED -> "Last structure move restored to its previous position.";
+            case NOTHING_TO_UNDO -> "Nothing to undo in this ranch session.";
+            case STRUCTURE_CHANGED -> "Undo expired because that structure changed after the edit.";
+            case INVENTORY_FULL -> "Free backpack space before undoing the build refund.";
+            case RESTORE_BLOCKED -> "The previous position is now blocked; undo remains available.";
+        };
+        if (result == RanchUndoManager.UndoResult.PLACEMENT_REVERTED
+            || result == RanchUndoManager.UndoResult.RELOCATION_REVERTED) {
+            RanchAudio.play(RanchAudio.Cue.UNDO);
+            ControllerRumble.pulse(game.inputProfile(), 55, 0.38f);
+        }
+        setStatus(message);
+        return message;
+    }
+
+    @Override
     public void saveSession() {
         delegate.pause();
     }
@@ -656,6 +754,7 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
         disposed = true;
         HomesteadInputContext.reset();
         HomesteadActionBus.reset();
+        undoManager.clear();
         inventoryOverlay.dispose();
         delegate.dispose();
         saveService.clearSaveTransformer(this);

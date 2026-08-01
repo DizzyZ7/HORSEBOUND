@@ -13,10 +13,11 @@ import com.badlogic.gdx.math.Rectangle;
 /** Pauses simulation without disposing or recreating the active ranch. */
 final class PauseScreen implements Screen {
     private static final int RESUME = 0;
-    private static final int INPUT = 1;
-    private static final int SAVE = 2;
-    private static final int MAIN_MENU = 3;
-    private static final int ITEM_COUNT = 4;
+    private static final int UNDO = 1;
+    private static final int INPUT = 2;
+    private static final int SAVE = 3;
+    private static final int MAIN_MENU = 4;
+    private static final int ITEM_COUNT = 5;
 
     private final HorseboundGame game;
     private final RanchSessionScreen world;
@@ -24,7 +25,13 @@ final class PauseScreen implements Screen {
     private final ShapeRenderer shapes = new ShapeRenderer();
     private final BitmapFont font = new BitmapFont();
     private final MenuInputMapper menuInput = new MenuInputMapper();
-    private final Rectangle[] rows = {new Rectangle(), new Rectangle(), new Rectangle(), new Rectangle()};
+    private final Rectangle[] rows = {
+        new Rectangle(),
+        new Rectangle(),
+        new Rectangle(),
+        new Rectangle(),
+        new Rectangle()
+    };
     private int selectedIndex;
     private String message = "Ranch simulation is paused.";
 
@@ -45,10 +52,10 @@ final class PauseScreen implements Screen {
         float ui = UiScale.effective(width, height, game.settings().uiScale());
         float geometry = Math.min(ui, 1.20f);
         float rowWidth = Math.min(width - 40f * geometry, 520f * geometry);
-        float rowHeight = 54f * geometry;
+        float rowHeight = 48f * geometry;
         float x = (width - rowWidth) * 0.5f;
-        float startY = height * 0.57f;
-        for (int i = 0; i < rows.length; i++) rows[i].set(x, startY - i * 68f * geometry, rowWidth, rowHeight);
+        float startY = height * 0.60f;
+        for (int i = 0; i < rows.length; i++) rows[i].set(x, startY - i * 60f * geometry, rowWidth, rowHeight);
 
         MenuInputSnapshot input = menuInput.sample();
         if (input.command().upPressed()) selectedIndex = Math.floorMod(selectedIndex - 1, ITEM_COUNT);
@@ -82,26 +89,31 @@ final class PauseScreen implements Screen {
         batch.begin();
         font.setColor(Color.WHITE);
         font.getData().setScale(2.4f * ui);
-        font.draw(batch, "PAUSED", width * 0.5f - 92f * ui, height * 0.82f);
-        font.getData().setScale(1.02f * ui);
+        font.draw(batch, "PAUSED", width * 0.5f - 92f * ui, height * 0.84f);
+        font.getData().setScale(0.98f * ui);
         drawLabel("RESUME", rows[RESUME], ui);
+        drawLabel("UNDO LAST RANCH EDIT", rows[UNDO], ui);
         drawLabel("INPUT & ACCESSIBILITY", rows[INPUT], ui);
         drawLabel("SAVE GAME", rows[SAVE], ui);
         drawLabel("SAVE & MAIN MENU", rows[MAIN_MENU], ui);
-        font.getData().setScale(0.78f * ui);
+        font.getData().setScale(0.76f * ui);
         font.setColor(new Color(0.78f, 0.86f, 0.79f, 1f));
-        font.draw(batch, message, x, startY - 286f * geometry);
+        font.draw(batch, message, x, startY - 318f * geometry);
         batch.end();
     }
 
     private void drawLabel(String text, Rectangle row, float ui) {
         font.setColor(Color.WHITE);
-        font.draw(batch, text, row.x + 18f * ui, row.y + 35f * ui);
+        font.draw(batch, text, row.x + 18f * ui, row.y + 32f * ui);
     }
 
     private void activate() {
         switch (selectedIndex) {
             case RESUME -> game.resumePausedWorld(world);
+            case UNDO -> {
+                message = world.undoLastRanchEdit();
+                ControllerRumble.pulse(game.inputProfile(), 45, 0.34f);
+            }
             case INPUT -> game.showInputSettings(world);
             case SAVE -> {
                 world.saveSession();

@@ -31,7 +31,8 @@ class SettingsRepositoryTest {
             1080,
             1.30f,
             GraphicsPreset.HIGH,
-            true
+            true,
+            0.35f
         );
 
         repository.save(expected);
@@ -40,12 +41,13 @@ class SettingsRepositoryTest {
     }
 
     @Test
-    void legacySettingsReceiveDeckSafeDisplayDefaults() throws Exception {
+    void legacySettingsReceiveDeckSafeDisplayAndAudioDefaults() throws Exception {
         Path path = tempDir.resolve("settings.properties");
         Files.writeString(path, "vsync=false\nmouseSensitivity=0.20\nautosaveSeconds=120\n");
         SettingsRepository repository = new SettingsRepository(path);
 
         assertEquals(new GameSettings(false, 0.20f, 120), repository.load());
+        assertEquals(GameSettings.DEFAULT_SFX_VOLUME, repository.load().sfxVolume());
     }
 
     @Test
@@ -60,9 +62,18 @@ class SettingsRepositoryTest {
                 + "windowWidth=nope\n"
                 + "uiScale=NaN\n"
                 + "graphicsPreset=cinematic\n"
+                + "sfxVolume=broken\n"
         );
         SettingsRepository repository = new SettingsRepository(path);
 
         assertEquals(new GameSettings(false, 0.16f, 60), repository.load());
+    }
+
+    @Test
+    void sfxVolumeIsClampedOnLoad() throws Exception {
+        Path path = tempDir.resolve("settings.properties");
+        Files.writeString(path, "sfxVolume=5.0\n");
+
+        assertEquals(1f, new SettingsRepository(path).load().sfxVolume());
     }
 }

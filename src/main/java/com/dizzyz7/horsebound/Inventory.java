@@ -13,6 +13,7 @@ final class Inventory {
 
     private final EnumMap<ItemId, Integer> amounts = new EnumMap<>(ItemId.class);
     private final int slotCapacity;
+    private long mutationVersion;
 
     Inventory() {
         this(DEFAULT_SLOT_CAPACITY);
@@ -72,7 +73,10 @@ final class Inventory {
         Objects.requireNonNull(item, "item");
         if (amount <= 0) return 0;
         int accepted = Math.min(amount, availableSpace(item));
-        amounts.put(item, count(item) + accepted);
+        if (accepted > 0) {
+            amounts.put(item, count(item) + accepted);
+            mutationVersion++;
+        }
         return accepted;
     }
 
@@ -106,6 +110,7 @@ final class Inventory {
         int current = count(item);
         if (current < amount) return false;
         amounts.put(item, current - amount);
+        mutationVersion++;
         return true;
     }
 
@@ -138,11 +143,19 @@ final class Inventory {
 
     void set(ItemId item, int amount) {
         Objects.requireNonNull(item, "item");
-        amounts.put(item, Math.max(0, Math.min(MAX_AMOUNT_PER_ITEM, amount)));
+        int normalized = Math.max(0, Math.min(MAX_AMOUNT_PER_ITEM, amount));
+        if (count(item) == normalized) return;
+        amounts.put(item, normalized);
+        mutationVersion++;
     }
 
     void clear() {
-        for (ItemId item : ItemId.values()) amounts.put(item, 0);
+        boolean changed = false;
+        for (ItemId item : ItemId.values()) {
+            if (count(item) != 0) changed = true;
+            amounts.put(item, 0);
+        }
+        if (changed) mutationVersion++;
     }
 
     boolean isEmpty() {
@@ -165,6 +178,10 @@ final class Inventory {
 
     boolean isOverCapacity() {
         return usedSlots() > slotCapacity;
+    }
+
+    long mutationVersion() {
+        return mutationVersion;
     }
 
     Map<ItemId, Integer> snapshot() {

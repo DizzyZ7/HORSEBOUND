@@ -18,14 +18,24 @@ import java.util.concurrent.ThreadFactory;
 final class RanchAudio {
     static final int SAMPLE_RATE = 22_050;
     private static final Object LOCK = new Object();
+    private static volatile float masterVolume = GameSettings.DEFAULT_SFX_VOLUME;
     private static Engine shared;
     private static boolean unavailable;
 
     private RanchAudio() {
     }
 
+    static void setMasterVolume(float value) {
+        if (!Float.isFinite(value)) value = GameSettings.DEFAULT_SFX_VOLUME;
+        masterVolume = Math.max(GameSettings.MIN_SFX_VOLUME, Math.min(GameSettings.MAX_SFX_VOLUME, value));
+    }
+
+    static float masterVolume() {
+        return masterVolume;
+    }
+
     static void play(Cue cue) {
-        if (cue == null) return;
+        if (cue == null || masterVolume <= 0f) return;
         Engine engine = engine();
         if (engine != null) engine.play(cue);
     }
@@ -65,6 +75,17 @@ final class RanchAudio {
         return samples;
     }
 
+    static float[] applyMasterVolume(float[] samples, float volume) {
+        if (samples == null || samples.length == 0) return new float[0];
+        float safeVolume = Float.isFinite(volume)
+            ? Math.max(GameSettings.MIN_SFX_VOLUME, Math.min(GameSettings.MAX_SFX_VOLUME, volume))
+            : GameSettings.DEFAULT_SFX_VOLUME;
+        if (safeVolume == 1f) return samples;
+        float[] scaled = new float[samples.length];
+        for (int i = 0; i < samples.length; i++) scaled[i] = samples[i] * safeVolume;
+        return scaled;
+    }
+
     private static Engine engine() {
         synchronized (LOCK) {
             if (shared != null) return shared;
@@ -94,7 +115,8 @@ final class RanchAudio {
         DISMANTLE(210f, 85f, 0.20f, 0.31f, 0.42f, 0.08f),
         GATE_OPEN(125f, 205f, 0.22f, 0.27f, 0.34f, 0.12f),
         GATE_CLOSE(195f, 105f, 0.20f, 0.29f, 0.38f, 0.10f),
-        INVENTORY_TRANSFER(440f, 540f, 0.08f, 0.20f, 0.08f, 0.20f);
+        INVENTORY_TRANSFER(440f, 540f, 0.08f, 0.20f, 0.08f, 0.20f),
+        UNDO(310f, 190f, 0.14f, 0.25f, 0.14f, 0.12f);
 
         private final float startFrequency;
         private final float endFrequency;
@@ -166,10 +188,13 @@ final class RanchAudio {
         private void play(Cue cue) {
             float[] cueSamples = samples.get(cue);
             if (cueSamples == null || cueSamples.length == 0) return;
+            float volumeAtDispatch = masterVolume;
+            if (volumeAtDispatch <= 0f) return;
             try {
                 executor.execute(() -> {
                     try {
-                        device.writeSamples(cueSamples, 0, cueSamples.length);
+                        float[] output = applyMasterVolume(cueSamples, volumeAtDispatch);
+                        if (output.length > 0) device.writeSamples(output, 0, output.length);
                     } catch (RuntimeException ex) {
                         if (Gdx.app != null) Gdx.app.debug("HORSEBOUND", "Ranch audio playback skipped.");
                     }

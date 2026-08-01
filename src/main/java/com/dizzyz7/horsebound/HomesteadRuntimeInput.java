@@ -14,6 +14,7 @@ final class HomesteadRuntimeInput {
         int buildTypeDelta = 0;
         int rotationDelta = 0;
         boolean editPressed = false;
+        boolean undoPressed = false;
         boolean keyboardActivity = directSlot >= 0;
         boolean controllerActivity = false;
 
@@ -69,11 +70,18 @@ final class HomesteadRuntimeInput {
             editPressed = true;
             keyboardActivity = true;
         }
+        boolean controlHeld = Gdx.input.isKeyPressed(Input.Keys.CONTROL_LEFT)
+            || Gdx.input.isKeyPressed(Input.Keys.CONTROL_RIGHT);
+        if (!placementMode && (Gdx.input.isKeyJustPressed(Input.Keys.U)
+            || (controlHeld && Gdx.input.isKeyJustPressed(Input.Keys.Z)))) {
+            undoPressed = true;
+            keyboardActivity = true;
+        }
 
         if (controllerActivity) InputActivityTracker.record(InputDeviceType.GAMEPAD);
         else if (keyboardActivity) InputActivityTracker.record(InputDeviceType.KEYBOARD_MOUSE);
 
-        return new InputResult(directSlot, hotbarDelta, buildTypeDelta, rotationDelta, editPressed);
+        return new InputResult(directSlot, hotbarDelta, buildTypeDelta, rotationDelta, editPressed, undoPressed);
     }
 
     private static int directSlot() {
@@ -112,7 +120,8 @@ final class HomesteadRuntimeInput {
         int hotbarDelta,
         int buildTypeDelta,
         int rotationDelta,
-        boolean editPressed
+        boolean editPressed,
+        boolean undoPressed
     ) {
     }
 }
