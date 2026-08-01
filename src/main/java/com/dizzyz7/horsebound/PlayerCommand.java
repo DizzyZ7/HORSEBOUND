@@ -61,6 +61,14 @@ record PlayerCommand(
         );
     }
 
+    PlayerCommand withoutPause() {
+        if (!pausePressed) return this;
+        return new PlayerCommand(
+            moveForward, moveRight, lookYaw, lookPitch, sprint,
+            jumpPressed, interactPressed, mountPressed, buildPressed, savePressed, false
+        );
+    }
+
     private static float clampAxis(float value) {
         if (!Float.isFinite(value)) return 0f;
         return Math.max(-1f, Math.min(1f, value));
