@@ -19,7 +19,7 @@ interface RanchWorldAccess {
 
     void setActorPosition(float x, float z);
 
-    void setHorsePosition(UUID horseId, float x, float z);
+    boolean setHorsePosition(UUID horseId, float x, float z);
 
     record ActorPose(float x, float z, float heading, boolean mounted) {
         ActorPose {
