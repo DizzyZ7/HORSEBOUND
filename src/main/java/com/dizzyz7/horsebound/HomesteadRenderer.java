@@ -24,6 +24,8 @@ final class HomesteadRenderer implements Disposable {
     private final Environment environment = new Environment();
     private final Map<UUID, ModelInstance> instances = new HashMap<>();
     private final GateAnimationState gateAnimation = new GateAnimationState();
+    private final RanchPresentationObserver presentationObserver = new RanchPresentationObserver();
+    private final RanchAudio audio = new RanchAudio();
     private ModelInstance preview;
     private HomesteadStructureType previewType;
     private boolean previewValidity;
@@ -43,6 +45,7 @@ final class HomesteadRenderer implements Disposable {
             Math.max(0f, Gdx.graphics.getDeltaTime()),
             FixedStepClock.DEFAULT_MAX_FRAME_SECONDS
         );
+        for (RanchAudio.Cue cue : presentationObserver.observe(state.structures())) audio.play(cue);
         sync(state, hiddenStructureIds == null ? Set.of() : hiddenStructureIds, frameDelta);
         Gdx.gl.glEnable(GL20.GL_DEPTH_TEST);
         Gdx.gl.glEnable(GL20.GL_BLEND);
@@ -93,6 +96,7 @@ final class HomesteadRenderer implements Disposable {
 
     @Override
     public void dispose() {
+        audio.dispose();
         modelBatch.dispose();
         models.dispose();
         instances.clear();
