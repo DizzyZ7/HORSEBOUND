@@ -27,7 +27,7 @@ final class InputProfileRepository {
         try (InputStream in = Files.newInputStream(path)) {
             properties.load(in);
             InputProfile defaults = InputProfile.defaults();
-            return new InputProfile(
+            InputProfile raw = new InputProfile(
                 parseBoolean(properties.getProperty("invertCameraY"), defaults.invertCameraY()),
                 parseFloat(properties.getProperty("moveDeadZone"), defaults.moveDeadZone()),
                 parseFloat(properties.getProperty("lookDeadZone"), defaults.lookDeadZone()),
@@ -46,6 +46,7 @@ final class InputProfileRepository {
                 parseInt(properties.getProperty("key.save"), defaults.saveKey()),
                 parseInt(properties.getProperty("key.pause"), defaults.pauseKey())
             );
+            return normalizeBindings(raw);
         } catch (IOException | RuntimeException ex) {
             return InputProfile.defaults();
         }
@@ -91,6 +92,33 @@ final class InputProfileRepository {
 
     Path path() {
         return path;
+    }
+
+    private static InputProfile normalizeBindings(InputProfile raw) {
+        InputProfile defaults = InputProfile.defaults();
+        InputProfile normalized = new InputProfile(
+            raw.invertCameraY(),
+            raw.moveDeadZone(),
+            raw.lookDeadZone(),
+            raw.sprintMode(),
+            raw.rumbleEnabled(),
+            raw.rumbleStrength(),
+            defaults.moveForwardKey(),
+            defaults.moveBackwardKey(),
+            defaults.moveLeftKey(),
+            defaults.moveRightKey(),
+            defaults.jumpKey(),
+            defaults.interactKey(),
+            defaults.mountKey(),
+            defaults.buildKey(),
+            defaults.sprintKey(),
+            defaults.saveKey(),
+            defaults.pauseKey()
+        );
+        for (BindableAction action : BindableAction.values()) {
+            normalized = normalized.withBinding(action, raw.keyFor(action));
+        }
+        return normalized;
     }
 
     private static boolean parseBoolean(String raw, boolean fallback) {
