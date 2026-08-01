@@ -9,7 +9,7 @@ record SaveSlotInfo(
     long worldSeed,
     int horseCount,
     int tamedHorseCount,
-    int fenceCount
+    int structureCount
 ) {
     enum State {
         EMPTY,
