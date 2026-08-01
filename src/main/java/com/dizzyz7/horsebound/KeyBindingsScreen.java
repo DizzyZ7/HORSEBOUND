@@ -2,7 +2,6 @@
 package com.dizzyz7.horsebound;
 
 import com.badlogic.gdx.Gdx;
-import com.badlogic.gdx.Input;
 import com.badlogic.gdx.Screen;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
@@ -66,9 +65,7 @@ final class KeyBindingsScreen implements Screen {
         } else {
             if (input.command().upPressed()) selectedIndex = Math.floorMod(selectedIndex - 1, ITEM_COUNT);
             if (input.command().downPressed()) selectedIndex = Math.floorMod(selectedIndex + 1, ITEM_COUNT);
-            if (input.command().confirmPressed()) {
-                if (activate()) return;
-            }
+            if (input.command().confirmPressed() && activate()) return;
             if (input.command().backPressed()) {
                 goBack();
                 return;
@@ -103,7 +100,7 @@ final class KeyBindingsScreen implements Screen {
             font.setColor(i == selectedIndex ? Color.WHITE : new Color(0.84f, 0.90f, 0.85f, 1f));
             font.draw(batch, action.displayName(), row.x + 12f * ui, row.y + 22f * ui);
             font.setColor(new Color(1f, 0.88f, 0.58f, 1f));
-            font.draw(batch, keyName(profile.keyFor(action)), row.x + row.width - 155f * ui, row.y + 22f * ui);
+            font.draw(batch, KeyLabel.of(profile.keyFor(action)), row.x + row.width - 155f * ui, row.y + 22f * ui);
         }
         drawFooterRow(DEFAULTS_INDEX, "RESTORE DEFAULT BINDINGS", ui);
         drawFooterRow(BACK_INDEX, "BACK", ui);
@@ -120,7 +117,7 @@ final class KeyBindingsScreen implements Screen {
             if (!Gdx.input.isKeyJustPressed(keyCode)) continue;
             profile = profile.withBinding(capturing, keyCode);
             game.updateInputProfile(profile);
-            message = capturing.displayName() + " is now bound to " + keyName(keyCode) + ".";
+            message = capturing.displayName() + " is now bound to " + KeyLabel.of(keyCode) + ".";
             capturing = null;
             return;
         }
@@ -163,11 +160,6 @@ final class KeyBindingsScreen implements Screen {
 
     private void goBack() {
         game.showInputSettings(pausedWorld);
-    }
-
-    private static String keyName(int keyCode) {
-        String value = Input.Keys.toString(keyCode);
-        return value == null || value.isBlank() ? "KEY " + keyCode : value.toUpperCase();
     }
 
     @Override public void resize(int width, int height) { }
