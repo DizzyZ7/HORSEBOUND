@@ -44,6 +44,7 @@ final class RawKeyboardMouseInputMapper implements InputMapper {
             Gdx.input.isKeyJustPressed(profile.interactKey()),
             Gdx.input.isKeyJustPressed(profile.mountKey()),
             Gdx.input.isKeyJustPressed(profile.buildKey()),
+            Gdx.input.isKeyJustPressed(profile.inventoryKey()),
             Gdx.input.isKeyJustPressed(profile.saveKey()),
             Gdx.input.isKeyJustPressed(profile.pauseKey())
         );
