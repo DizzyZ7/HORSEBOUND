@@ -28,7 +28,9 @@ final class HomesteadState {
                 saved.x(),
                 saved.z(),
                 saved.heading(),
-                saved.storedUnits()
+                saved.storedUnits(),
+                saved.open(),
+                saved.storedItems()
             ));
         }
         return state;
@@ -58,20 +60,44 @@ final class HomesteadState {
         return Optional.of(placed);
     }
 
-    boolean remove(UUID id, Inventory refundTo) {
+    boolean relocate(UUID id, float x, float z, float heading) {
+        PlacedStructure structure = find(id).orElse(null);
+        return structure != null && structure.relocate(x, z, heading);
+    }
+
+    boolean toggleGate(UUID id) {
+        PlacedStructure structure = find(id).orElse(null);
+        return structure != null && structure.toggleOpen();
+    }
+
+    DismantleResult dismantle(UUID id, Inventory refundTo) {
         Objects.requireNonNull(id, "id");
-        for (int i = 0; i < structures.size(); i++) {
-            PlacedStructure structure = structures.get(i);
-            if (!structure.id().equals(id)) continue;
-            structures.remove(i);
-            if (refundTo != null) {
-                for (Map.Entry<ItemId, Integer> cost : structure.type().buildCost().entrySet()) {
-                    refundTo.add(cost.getKey(), Math.max(1, cost.getValue() / 2));
-                }
-            }
-            return true;
+        Objects.requireNonNull(refundTo, "refundTo");
+        PlacedStructure structure = find(id).orElse(null);
+        if (structure == null) return DismantleResult.NOT_FOUND;
+        if (structure.storedUnits() > 0 || !structure.itemStorage().isEmpty()) {
+            return DismantleResult.STORAGE_NOT_EMPTY;
         }
-        return false;
+
+        List<SaveGame.ItemStackData> refund = new ArrayList<>();
+        for (Map.Entry<ItemId, Integer> cost : structure.type().buildCost().entrySet()) {
+            refund.add(new SaveGame.ItemStackData(cost.getKey().name(), Math.max(1, cost.getValue() / 2)));
+        }
+        if (!refundTo.canAccept(refund)) return DismantleResult.INVENTORY_FULL;
+
+        structures.remove(structure);
+        for (SaveGame.ItemStackData item : refund) {
+            ItemId.parse(item.itemId()).ifPresent(idValue -> refundTo.add(idValue, item.amount()));
+        }
+        return DismantleResult.SUCCESS;
+    }
+
+    /** Compatibility alias retained for older tests and call sites. */
+    boolean remove(UUID id, Inventory refundTo) {
+        if (refundTo == null) {
+            return structures.removeIf(structure -> structure.id().equals(id));
+        }
+        return dismantle(id, refundTo) == DismantleResult.SUCCESS;
     }
 
     int depositOneResource(UUID structureId, Inventory inventory) {
@@ -89,6 +115,32 @@ final class HomesteadState {
             return 0;
         }
         return accepted;
+    }
+
+    TransferResult storeOneItem(UUID structureId, Inventory source, ItemId item) {
+        Objects.requireNonNull(source, "source");
+        Objects.requireNonNull(item, "item");
+        PlacedStructure structure = find(structureId).orElse(null);
+        if (structure == null) return TransferResult.NOT_FOUND;
+        if (!structure.type().storesItems()) return TransferResult.NOT_ITEM_STORAGE;
+        if (!source.has(item, 1)) return TransferResult.NO_ITEM;
+        if (structure.itemStorage().availableSpace(item) < 1) return TransferResult.FULL;
+        return source.transferTo(structure.itemStorage(), item, 1)
+            ? TransferResult.SUCCESS
+            : TransferResult.FULL;
+    }
+
+    TransferResult takeOneItem(UUID structureId, Inventory destination, ItemId item) {
+        Objects.requireNonNull(destination, "destination");
+        Objects.requireNonNull(item, "item");
+        PlacedStructure structure = find(structureId).orElse(null);
+        if (structure == null) return TransferResult.NOT_FOUND;
+        if (!structure.type().storesItems()) return TransferResult.NOT_ITEM_STORAGE;
+        if (!structure.itemStorage().has(item, 1)) return TransferResult.NO_ITEM;
+        if (destination.availableSpace(item) < 1) return TransferResult.FULL;
+        return structure.itemStorage().transferTo(destination, item, 1)
+            ? TransferResult.SUCCESS
+            : TransferResult.FULL;
     }
 
     boolean consumeNearestResource(ItemId resource, float x, float z, float radius) {
@@ -118,6 +170,19 @@ final class HomesteadState {
         return false;
     }
 
+    Optional<PlacedStructure> nearest(float x, float z, float radius) {
+        float safeRadius = safeRadius(radius);
+        PlacedStructure nearest = null;
+        float bestDistanceSquared = safeRadius * safeRadius;
+        for (PlacedStructure structure : structures) {
+            float distanceSquared = distanceSquared(x, z, structure.x(), structure.z());
+            if (distanceSquared > bestDistanceSquared) continue;
+            bestDistanceSquared = distanceSquared;
+            nearest = structure;
+        }
+        return Optional.ofNullable(nearest);
+    }
+
     Optional<PlacedStructure> find(UUID id) {
         if (id == null) return Optional.empty();
         return structures.stream().filter(value -> value.id().equals(id)).findFirst();
@@ -142,5 +207,20 @@ final class HomesteadState {
         float dx = safeAx - bx;
         float dz = safeAz - bz;
         return dx * dx + dz * dz;
+    }
+
+    enum TransferResult {
+        SUCCESS,
+        NOT_FOUND,
+        NOT_ITEM_STORAGE,
+        NO_ITEM,
+        FULL
+    }
+
+    enum DismantleResult {
+        SUCCESS,
+        NOT_FOUND,
+        STORAGE_NOT_EMPTY,
+        INVENTORY_FULL
     }
 }
