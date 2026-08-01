@@ -32,6 +32,14 @@ final class KeyboardMouseInputMapper implements InputMapper {
             HomesteadActionBus.requestInteract();
             command = command.withoutInteract();
         }
+        if (command.mountPressed() && HomesteadInputContext.capturesMount()) {
+            HomesteadActionBus.requestDismantle();
+            command = command.withoutMount();
+        }
+        if (command.inventoryPressed() && HomesteadInputContext.capturesInventory()) {
+            HomesteadActionBus.requestInventory();
+            command = command.withoutInventory();
+        }
         if (command.pausePressed()) {
             if (HomesteadInputContext.capturesPauseAsCancel()) {
                 HomesteadActionBus.requestCancel();
