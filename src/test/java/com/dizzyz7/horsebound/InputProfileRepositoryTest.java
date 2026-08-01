@@ -50,6 +50,22 @@ class InputProfileRepositoryTest {
     }
 
     @Test
+    void oldProfileUsingInventoryDefaultKeyKeepsItsExistingAction() throws Exception {
+        Path path = tempDir.resolve("input.properties");
+        Files.writeString(path, "key.interact=" + Input.Keys.I + "\n");
+
+        InputProfile profile = new InputProfileRepository(path).load();
+
+        assertEquals(Input.Keys.I, profile.interactKey());
+        assertNotEquals(Input.Keys.I, profile.inventoryKey());
+        for (BindableAction first : BindableAction.values()) {
+            for (BindableAction second : BindableAction.values()) {
+                if (first != second) assertNotEquals(profile.keyFor(first), profile.keyFor(second));
+            }
+        }
+    }
+
+    @Test
     void malformedProfileFallsBackPerField() throws Exception {
         Path path = tempDir.resolve("input.properties");
         Files.writeString(
