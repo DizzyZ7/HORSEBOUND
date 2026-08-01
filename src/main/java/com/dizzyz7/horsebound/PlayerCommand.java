@@ -63,9 +63,32 @@ record PlayerCommand(
 
     PlayerCommand withoutPause() {
         if (!pausePressed) return this;
+        return copy(interactPressed, buildPressed, false);
+    }
+
+    PlayerCommand withoutBuild() {
+        if (!buildPressed) return this;
+        return copy(interactPressed, false, pausePressed);
+    }
+
+    PlayerCommand withoutInteract() {
+        if (!interactPressed) return this;
+        return copy(false, buildPressed, pausePressed);
+    }
+
+    private PlayerCommand copy(boolean interact, boolean build, boolean pause) {
         return new PlayerCommand(
-            moveForward, moveRight, lookYaw, lookPitch, sprint,
-            jumpPressed, interactPressed, mountPressed, buildPressed, savePressed, false
+            moveForward,
+            moveRight,
+            lookYaw,
+            lookPitch,
+            sprint,
+            jumpPressed,
+            interact,
+            mountPressed,
+            build,
+            savePressed,
+            pause
         );
     }
 
