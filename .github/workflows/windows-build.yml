@@ -90,7 +90,14 @@ jobs:
             "com/dizzyz7/horsebound/KeyBindingsScreen.class",
             "com/dizzyz7/horsebound/KeyLabel.class",
             "com/dizzyz7/horsebound/SprintLatch.class",
-            "com/dizzyz7/horsebound/ControllerRumble.class"
+            "com/dizzyz7/horsebound/ControllerRumble.class",
+            "com/dizzyz7/horsebound/InventoryStack.class",
+            "com/dizzyz7/horsebound/Hotbar.class",
+            "com/dizzyz7/horsebound/HomesteadStructureType.class",
+            "com/dizzyz7/horsebound/PlacedStructure.class",
+            "com/dizzyz7/horsebound/HomesteadState.class",
+            "com/dizzyz7/horsebound/HorseNeeds.class",
+            "com/dizzyz7/horsebound/HorseCareSystem.class"
           )
           foreach ($entry in $requiredJarEntries) {
             if ($jarEntries -notcontains $entry) {

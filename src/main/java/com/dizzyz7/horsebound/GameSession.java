@@ -6,6 +6,8 @@ import java.util.Objects;
 final class GameSession {
     private final long worldSeed;
     private final Inventory inventory;
+    private final Hotbar hotbar;
+    private final HomesteadState homestead;
     private final PushikMind pushikMind;
     private final FixedStepClock simulationClock;
     private float worldTime;
@@ -16,6 +18,7 @@ final class GameSession {
     }
 
     GameSession(SaveGame initialState, FixedStepClock simulationClock) {
+        Objects.requireNonNull(initialState, "initialState");
         this.worldSeed = initialState.worldSeed();
         this.worldTime = normalizeTime(initialState.worldTime());
         this.inventory = Inventory.restore(
@@ -23,6 +26,8 @@ final class GameSession {
             initialState.player().wood(),
             initialState.player().apples()
         );
+        this.hotbar = Hotbar.restore(initialState.hotbar());
+        this.homestead = HomesteadState.restore(initialState.structures());
         this.pushikMind = new PushikMind(initialState.pushik().state(), initialState.pushik().affection());
         this.simulationClock = Objects.requireNonNull(simulationClock, "simulationClock");
     }
@@ -33,6 +38,14 @@ final class GameSession {
 
     Inventory inventory() {
         return inventory;
+    }
+
+    Hotbar hotbar() {
+        return hotbar;
+    }
+
+    HomesteadState homestead() {
+        return homestead;
     }
 
     PushikMind pushikMind() {

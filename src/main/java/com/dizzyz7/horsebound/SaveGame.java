@@ -1,6 +1,8 @@
 // HORSEBOUND — Created by Dimash Janibekov (DizZyZ7), © 2026. All rights reserved.
 package com.dizzyz7.horsebound;
 
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -14,16 +16,47 @@ record SaveGame(
     PushikData pushik,
     List<HorseData> horses,
     List<FenceData> fences,
+    List<StructureData> structures,
+    HotbarData hotbar,
     List<Integer> harvestedTreeIds
 ) {
-    static final int CURRENT_VERSION = 3;
+    static final int CURRENT_VERSION = 4;
 
     SaveGame {
         player = Objects.requireNonNull(player, "player");
         pushik = Objects.requireNonNull(pushik, "pushik");
         horses = List.copyOf(Objects.requireNonNull(horses, "horses"));
         fences = List.copyOf(Objects.requireNonNull(fences, "fences"));
+        structures = List.copyOf(Objects.requireNonNull(structures, "structures"));
+        hotbar = Objects.requireNonNullElseGet(hotbar, () -> Hotbar.defaults().toSaveData());
         harvestedTreeIds = List.copyOf(Objects.requireNonNull(harvestedTreeIds, "harvestedTreeIds"));
+    }
+
+    /** Compatibility constructor for the 0.4 gameplay screen and older tests/call sites. */
+    SaveGame(
+        int saveVersion,
+        long worldSeed,
+        long savedAtEpochMillis,
+        float worldTime,
+        PlayerData player,
+        PushikData pushik,
+        List<HorseData> horses,
+        List<FenceData> fences,
+        List<Integer> harvestedTreeIds
+    ) {
+        this(
+            saveVersion,
+            worldSeed,
+            savedAtEpochMillis,
+            worldTime,
+            player,
+            pushik,
+            horses,
+            fences,
+            structuresFromLegacyFences(worldSeed, fences),
+            Hotbar.defaults().toSaveData(),
+            harvestedTreeIds
+        );
     }
 
     static SaveGame fresh(WorldSeed seed) {
@@ -38,11 +71,18 @@ record SaveGame(
                 0f,
                 4,
                 5,
-                List.of(new ItemStackData(ItemId.WOOD.name(), 4), new ItemStackData(ItemId.APPLE.name(), 5))
+                List.of(
+                    new ItemStackData(ItemId.WOOD.name(), 4),
+                    new ItemStackData(ItemId.APPLE.name(), 5),
+                    new ItemStackData(ItemId.HAY.name(), 6),
+                    new ItemStackData(ItemId.WATER_BUCKET.name(), 2)
+                )
             ),
             new PushikData(2f, -16f, 0f, 45f, PushikState.FOLLOW),
             List.of(),
             List.of(),
+            List.of(),
+            Hotbar.defaults().toSaveData(),
             List.of()
         );
     }
@@ -82,6 +122,21 @@ record SaveGame(
         }
     }
 
+    record HotbarData(int selectedIndex, List<String> itemIds) {
+        HotbarData {
+            selectedIndex = Math.floorMod(selectedIndex, Hotbar.SLOT_COUNT);
+            List<String> normalized = new ArrayList<>(Hotbar.SLOT_COUNT);
+            if (itemIds != null) {
+                for (String id : itemIds) {
+                    if (normalized.size() >= Hotbar.SLOT_COUNT) break;
+                    normalized.add(id == null ? "" : id);
+                }
+            }
+            while (normalized.size() < Hotbar.SLOT_COUNT) normalized.add("");
+            itemIds = List.copyOf(normalized);
+        }
+    }
+
     record PushikData(float x, float z, float heading, float affection, PushikState state) {
         PushikData {
             affection = clampPercent(affection);
@@ -105,7 +160,10 @@ record SaveGame(
         boolean tamed,
         HorsePersonality personality,
         float bond,
-        float fear
+        float fear,
+        float hunger,
+        float thirst,
+        float energy
     ) {
         HorseData {
             id = Objects.requireNonNull(id, "id");
@@ -115,6 +173,41 @@ record SaveGame(
             stamina = clampPercent(stamina);
             bond = clampPercent(bond);
             fear = clampPercent(fear);
+            hunger = clampPercent(hunger);
+            thirst = clampPercent(thirst);
+            energy = clampPercent(energy);
+        }
+
+        /** Compatibility constructor used by v2/v3 saves and current gameplay actors. */
+        HorseData(
+            UUID id,
+            String name,
+            float x,
+            float z,
+            float heading,
+            float trust,
+            float stamina,
+            boolean tamed,
+            HorsePersonality personality,
+            float bond,
+            float fear
+        ) {
+            this(
+                id,
+                name,
+                x,
+                z,
+                heading,
+                trust,
+                stamina,
+                tamed,
+                personality,
+                bond,
+                fear,
+                HorseNeeds.healthy().hunger(),
+                HorseNeeds.healthy().thirst(),
+                HorseNeeds.healthy().energy()
+            );
         }
 
         /** Compatibility constructor used by v1 migration and older tests/call sites. */
@@ -142,15 +235,50 @@ record SaveGame(
                 tamed ? 5f : 12f
             );
         }
+
+        HorseNeeds needs() {
+            return new HorseNeeds(hunger, thirst, energy);
+        }
     }
 
     record FenceData(float x, float z, float heading) {
     }
 
-    private static float clampPercent(float value) {
-        if (!Float.isFinite(value)) {
-            return 0f;
+    record StructureData(
+        UUID id,
+        HomesteadStructureType type,
+        float x,
+        float z,
+        float heading,
+        int storedUnits
+    ) {
+        StructureData {
+            id = Objects.requireNonNull(id, "id");
+            type = Objects.requireNonNull(type, "type");
+            storedUnits = Math.max(0, Math.min(type.storageCapacity(), storedUnits));
         }
+    }
+
+    private static List<StructureData> structuresFromLegacyFences(long worldSeed, List<FenceData> fences) {
+        if (fences == null || fences.isEmpty()) return List.of();
+        List<StructureData> result = new ArrayList<>(fences.size());
+        for (int i = 0; i < fences.size(); i++) {
+            FenceData fence = fences.get(i);
+            String identity = worldSeed + ":legacy-fence:" + i + ":" + fence.x() + ":" + fence.z() + ":" + fence.heading();
+            result.add(new StructureData(
+                UUID.nameUUIDFromBytes(identity.getBytes(StandardCharsets.UTF_8)),
+                HomesteadStructureType.FENCE,
+                fence.x(),
+                fence.z(),
+                fence.heading(),
+                0
+            ));
+        }
+        return List.copyOf(result);
+    }
+
+    private static float clampPercent(float value) {
+        if (!Float.isFinite(value)) return 0f;
         return Math.max(0f, Math.min(100f, value));
     }
 }
