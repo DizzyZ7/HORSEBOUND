@@ -9,19 +9,38 @@ import java.util.List;
 
 public final class HorseboundGame extends Game {
     private final SettingsRepository settingsRepository;
+    private final InputProfileRepository inputProfileRepository;
     private final FrameMetrics frameMetrics = new FrameMetrics();
     private GameSettings settings;
+    private InputProfile inputProfile;
     private SaveService saveService;
     private PerformanceOverlay performanceOverlay;
     private PromptOverlay promptOverlay;
+    private LivingRanchScreen suspendedWorld;
 
     public HorseboundGame() {
-        this(new SettingsRepository(), GameSettings.defaults());
+        this(
+            new SettingsRepository(),
+            GameSettings.defaults(),
+            new InputProfileRepository(),
+            InputProfile.defaults()
+        );
     }
 
     HorseboundGame(SettingsRepository settingsRepository, GameSettings initialSettings) {
+        this(settingsRepository, initialSettings, new InputProfileRepository(), InputProfile.defaults());
+    }
+
+    HorseboundGame(
+        SettingsRepository settingsRepository,
+        GameSettings initialSettings,
+        InputProfileRepository inputProfileRepository,
+        InputProfile initialInputProfile
+    ) {
         this.settingsRepository = settingsRepository;
-        this.settings = initialSettings;
+        this.settings = initialSettings == null ? GameSettings.defaults() : initialSettings;
+        this.inputProfileRepository = inputProfileRepository;
+        this.inputProfile = initialInputProfile == null ? InputProfile.defaults() : initialInputProfile;
     }
 
     @Override
@@ -30,6 +49,8 @@ public final class HorseboundGame extends Game {
         performanceOverlay = new PerformanceOverlay();
         promptOverlay = new PromptOverlay();
         InputActivityTracker.reset();
+        PauseRequestBus.reset();
+        InputProfileContext.set(inputProfile);
         Gdx.graphics.setVSync(settings.vsync());
         setScreen(new MenuScreen(this));
     }
@@ -38,6 +59,10 @@ public final class HorseboundGame extends Game {
     public void render() {
         frameMetrics.record(Gdx.graphics.getDeltaTime());
         super.render();
+        if (PauseRequestBus.consume() && getScreen() instanceof LivingRanchScreen world) {
+            showPause(world);
+            return;
+        }
         if (promptOverlay != null) promptOverlay.render(getScreen(), settings);
         if (performanceOverlay != null) performanceOverlay.render(frameMetrics, settings);
     }
@@ -54,6 +79,10 @@ public final class HorseboundGame extends Game {
         return settings;
     }
 
+    InputProfile inputProfile() {
+        return inputProfile;
+    }
+
     FrameMetrics frameMetrics() {
         return frameMetrics;
     }
@@ -68,15 +97,28 @@ public final class HorseboundGame extends Game {
         }
     }
 
+    void updateInputProfile(InputProfile next) {
+        inputProfile = next == null ? InputProfile.defaults() : next;
+        InputProfileContext.set(inputProfile);
+        try {
+            inputProfileRepository.save(inputProfile);
+        } catch (InputProfileRepository.InputProfileException ex) {
+            Gdx.app.error("HORSEBOUND", "Input profile save failed", ex);
+        }
+    }
+
     public void startNewWorld(String slotId) {
+        suspendedWorld = null;
         switchTo(new LivingRanchScreen(this, saveService, saveService.createNewWorld(slotId)));
     }
 
     public void loadWorld(String slotId) {
+        suspendedWorld = null;
         switchTo(new LivingRanchScreen(this, saveService, saveService.loadWorld(slotId)));
     }
 
     public void continueWorld() {
+        suspendedWorld = null;
         switchTo(new LivingRanchScreen(this, saveService, saveService.loadMostRecent()));
     }
 
@@ -89,23 +131,72 @@ public final class HorseboundGame extends Game {
     }
 
     public void showSettings() {
+        switchTo(new SettingsHubScreen(this));
+    }
+
+    void showDisplaySettings() {
         switchTo(new SettingsScreen(this));
     }
 
-    public void returnToMenu() {
+    void showInputSettings(LivingRanchScreen pausedWorld) {
+        if (pausedWorld != null) suspendedWorld = pausedWorld;
+        switchTo(new InputSettingsScreen(this, pausedWorld));
+    }
+
+    void showKeyBindings(LivingRanchScreen pausedWorld) {
+        if (pausedWorld != null) suspendedWorld = pausedWorld;
+        switchTo(new KeyBindingsScreen(this, pausedWorld));
+    }
+
+    void showPause(LivingRanchScreen world) {
+        if (world == null) return;
+        suspendedWorld = world;
+        Screen current = getScreen();
+        PauseScreen pauseScreen = new PauseScreen(this, world);
+        if (current == world) {
+            setScreen(pauseScreen);
+        } else {
+            switchTo(pauseScreen);
+        }
+    }
+
+    void resumePausedWorld(LivingRanchScreen world) {
+        if (world == null) returnToMenu();
+        Screen previous = getScreen();
+        setScreen(world);
+        if (previous != null && previous != world) previous.dispose();
+        suspendedWorld = null;
+        PauseRequestBus.reset();
+    }
+
+    void leavePausedWorldToMenu(LivingRanchScreen world) {
+        if (world != null) world.dispose();
+        suspendedWorld = null;
         switchTo(new MenuScreen(this));
+    }
+
+    public void returnToMenu() {
+        if (getScreen() instanceof SettingsScreen) {
+            switchTo(new SettingsHubScreen(this));
+        } else {
+            switchTo(new MenuScreen(this));
+        }
     }
 
     private void switchTo(Screen next) {
         Screen previous = getScreen();
         setScreen(next);
-        if (previous != null) previous.dispose();
+        if (previous != null && previous != suspendedWorld) previous.dispose();
     }
 
     @Override
     public void dispose() {
-        if (getScreen() != null) getScreen().dispose();
+        Screen current = getScreen();
+        if (suspendedWorld != null && suspendedWorld != current) suspendedWorld.dispose();
+        if (current != null) current.dispose();
         if (promptOverlay != null) promptOverlay.dispose();
         if (performanceOverlay != null) performanceOverlay.dispose();
+        InputProfileContext.reset();
+        PauseRequestBus.reset();
     }
 }
