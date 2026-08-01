@@ -17,6 +17,7 @@ record InputProfile(
     int interactKey,
     int mountKey,
     int buildKey,
+    int inventoryKey,
     int sprintKey,
     int saveKey,
     int pauseKey
@@ -39,9 +40,52 @@ record InputProfile(
         interactKey = validKey(interactKey, BindableAction.INTERACT.defaultKey());
         mountKey = validKey(mountKey, BindableAction.MOUNT.defaultKey());
         buildKey = validKey(buildKey, BindableAction.BUILD.defaultKey());
+        inventoryKey = validKey(inventoryKey, BindableAction.INVENTORY.defaultKey());
         sprintKey = validKey(sprintKey, BindableAction.SPRINT.defaultKey());
         saveKey = validKey(saveKey, BindableAction.SAVE.defaultKey());
         pauseKey = validKey(pauseKey, BindableAction.PAUSE.defaultKey());
+    }
+
+    /** Compatibility constructor for input profiles created before 0.5.2. */
+    InputProfile(
+        boolean invertCameraY,
+        float moveDeadZone,
+        float lookDeadZone,
+        SprintMode sprintMode,
+        boolean rumbleEnabled,
+        float rumbleStrength,
+        int moveForwardKey,
+        int moveBackwardKey,
+        int moveLeftKey,
+        int moveRightKey,
+        int jumpKey,
+        int interactKey,
+        int mountKey,
+        int buildKey,
+        int sprintKey,
+        int saveKey,
+        int pauseKey
+    ) {
+        this(
+            invertCameraY,
+            moveDeadZone,
+            lookDeadZone,
+            sprintMode,
+            rumbleEnabled,
+            rumbleStrength,
+            moveForwardKey,
+            moveBackwardKey,
+            moveLeftKey,
+            moveRightKey,
+            jumpKey,
+            interactKey,
+            mountKey,
+            buildKey,
+            BindableAction.INVENTORY.defaultKey(),
+            sprintKey,
+            saveKey,
+            pauseKey
+        );
     }
 
     static InputProfile defaults() {
@@ -60,6 +104,7 @@ record InputProfile(
             BindableAction.INTERACT.defaultKey(),
             BindableAction.MOUNT.defaultKey(),
             BindableAction.BUILD.defaultKey(),
+            BindableAction.INVENTORY.defaultKey(),
             BindableAction.SPRINT.defaultKey(),
             BindableAction.SAVE.defaultKey(),
             BindableAction.PAUSE.defaultKey()
@@ -76,6 +121,7 @@ record InputProfile(
             case INTERACT -> interactKey;
             case MOUNT -> mountKey;
             case BUILD -> buildKey;
+            case INVENTORY -> inventoryKey;
             case SPRINT -> sprintKey;
             case SAVE -> saveKey;
             case PAUSE -> pauseKey;
@@ -111,9 +157,7 @@ record InputProfile(
         int oldKey = keyFor(action);
         BindableAction duplicate = actionForKey(keyCode);
         InputProfile updated = withRawBinding(action, keyCode);
-        if (duplicate != null && duplicate != action) {
-            updated = updated.withRawBinding(duplicate, oldKey);
-        }
+        if (duplicate != null && duplicate != action) updated = updated.withRawBinding(duplicate, oldKey);
         return updated;
     }
 
@@ -135,6 +179,7 @@ record InputProfile(
             action == BindableAction.INTERACT ? keyCode : interactKey,
             action == BindableAction.MOUNT ? keyCode : mountKey,
             action == BindableAction.BUILD ? keyCode : buildKey,
+            action == BindableAction.INVENTORY ? keyCode : inventoryKey,
             action == BindableAction.SPRINT ? keyCode : sprintKey,
             action == BindableAction.SAVE ? keyCode : saveKey,
             action == BindableAction.PAUSE ? keyCode : pauseKey
@@ -152,7 +197,7 @@ record InputProfile(
         return new InputProfile(
             invert, moveZone, lookZone, mode, rumble, strength,
             moveForwardKey, moveBackwardKey, moveLeftKey, moveRightKey,
-            jumpKey, interactKey, mountKey, buildKey, sprintKey, saveKey, pauseKey
+            jumpKey, interactKey, mountKey, buildKey, inventoryKey, sprintKey, saveKey, pauseKey
         );
     }
 

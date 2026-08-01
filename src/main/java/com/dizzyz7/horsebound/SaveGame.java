@@ -20,7 +20,7 @@ record SaveGame(
     HotbarData hotbar,
     List<Integer> harvestedTreeIds
 ) {
-    static final int CURRENT_VERSION = 4;
+    static final int CURRENT_VERSION = 5;
 
     SaveGame {
         player = Objects.requireNonNull(player, "player");
@@ -73,6 +73,7 @@ record SaveGame(
                 5,
                 List.of(
                     new ItemStackData(ItemId.WOOD.name(), 4),
+                    new ItemStackData(ItemId.STONE.name(), 8),
                     new ItemStackData(ItemId.APPLE.name(), 5),
                     new ItemStackData(ItemId.HAY.name(), 6),
                     new ItemStackData(ItemId.WATER_BUCKET.name(), 2)
@@ -178,7 +179,7 @@ record SaveGame(
             energy = clampPercent(energy);
         }
 
-        /** Compatibility constructor used by v2/v3 saves and current gameplay actors. */
+        /** Compatibility constructor used by v2/v3/v4 saves and current gameplay actors. */
         HorseData(
             UUID id,
             String name,
@@ -250,12 +251,33 @@ record SaveGame(
         float x,
         float z,
         float heading,
-        int storedUnits
+        int storedUnits,
+        boolean open,
+        List<ItemStackData> storedItems
     ) {
         StructureData {
             id = Objects.requireNonNull(id, "id");
             type = Objects.requireNonNull(type, "type");
+            x = finiteOrZero(x);
+            z = finiteOrZero(z);
+            heading = normalizeHeading(heading);
             storedUnits = Math.max(0, Math.min(type.storageCapacity(), storedUnits));
+            open = type.canToggleOpen() && open;
+            storedItems = type.storesItems()
+                ? List.copyOf(Objects.requireNonNullElse(storedItems, List.of()))
+                : List.of();
+        }
+
+        /** Compatibility constructor for save v4 and older call sites. */
+        StructureData(
+            UUID id,
+            HomesteadStructureType type,
+            float x,
+            float z,
+            float heading,
+            int storedUnits
+        ) {
+            this(id, type, x, z, heading, storedUnits, false, List.of());
         }
     }
 
@@ -280,5 +302,15 @@ record SaveGame(
     private static float clampPercent(float value) {
         if (!Float.isFinite(value)) return 0f;
         return Math.max(0f, Math.min(100f, value));
+    }
+
+    private static float finiteOrZero(float value) {
+        return Float.isFinite(value) ? value : 0f;
+    }
+
+    private static float normalizeHeading(float value) {
+        if (!Float.isFinite(value)) return 0f;
+        float normalized = value % 360f;
+        return normalized < 0f ? normalized + 360f : normalized;
     }
 }

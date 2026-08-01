@@ -124,7 +124,8 @@ final class SaveService {
             source.player().wood(),
             source.player().apples()
         );
-        inventory.add(ItemId.STONE, STARTER_STONE);
+        int missingStone = Math.max(0, STARTER_STONE - inventory.count(ItemId.STONE));
+        inventory.add(ItemId.STONE, missingStone);
         SaveGame.PlayerData player = new SaveGame.PlayerData(
             source.player().x(),
             source.player().z(),

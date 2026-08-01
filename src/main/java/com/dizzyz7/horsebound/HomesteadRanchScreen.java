@@ -11,7 +11,7 @@ import com.badlogic.gdx.math.MathUtils;
 
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -21,14 +21,16 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Live 0.5 Homestead presentation layered over the validated legacy ranch renderer.
- * Domain truth remains in the captured GameSession and SaveGame v4.
+ * Live Homestead presentation and application orchestration over the validated ranch renderer.
+ * Domain truth remains in GameSession and SaveGame v5.
  */
 final class HomesteadRanchScreen implements RanchSessionScreen {
     private static final HomesteadStructureType[] BUILD_TYPES = HomesteadStructureType.values();
     private static final float PLACEMENT_DISTANCE = 4.4f;
     private static final float GRID_SIZE = 0.5f;
     private static final float INTERACTION_RADIUS = 3.8f;
+    private static final float PLAYER_COLLISION_RADIUS = 0.45f;
+    private static final float HORSE_COLLISION_RADIUS = 0.92f;
 
     private final HorseboundGame game;
     private final SaveService saveService;
@@ -37,29 +39,29 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
     private final LivingRanchTelemetryAdapter telemetry;
     private final HomesteadRuntimeInput runtimeInput = new HomesteadRuntimeInput();
     private final HomesteadRenderer homesteadRenderer = new HomesteadRenderer();
+    private final InventoryOverlay inventoryOverlay = new InventoryOverlay();
+    private final HomesteadCollisionSystem collisionSystem = new HomesteadCollisionSystem();
     private final HorseCareSystem careSystem = new HorseCareSystem();
     private final FixedStepClock careClock = new FixedStepClock();
-    private final EnumMap<HomesteadStructureType, Float> collisionRadius = new EnumMap<>(HomesteadStructureType.class);
     private final Map<UUID, HorseNeeds> horseNeeds = new LinkedHashMap<>();
+    private final Map<UUID, Position> previousHorsePositions = new HashMap<>();
     private final Set<UUID> hiddenLegacyStructureIds;
     private final ShapeRenderer shapes = new ShapeRenderer();
     private final SpriteBatch batch = new SpriteBatch();
     private final BitmapFont font = new BitmapFont();
 
     private HomesteadRenderer.PlacementPreview placement;
+    private UUID editedStructureId;
     private int buildTypeIndex;
     private float placementHeading;
     private boolean buildMode;
+    private boolean editMode;
     private boolean disposed;
-    private String homesteadStatus = "Select hotbar slots with 1–8 or D-pad Left/Right.";
+    private String homesteadStatus = "Open inventory or select hotbar slots with 1–8 / D-pad.";
     private float statusTimer = 7f;
     private float careFeedbackCooldown;
 
-    HomesteadRanchScreen(
-        HorseboundGame game,
-        SaveService saveService,
-        SaveGame initialState
-    ) {
+    HomesteadRanchScreen(HorseboundGame game, SaveService saveService, SaveGame initialState) {
         this.game = game;
         this.saveService = saveService;
 
@@ -77,37 +79,44 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
         session = captured;
         telemetry = new LivingRanchTelemetryAdapter(delegate);
 
-        for (SaveGame.HorseData horse : initialState.horses()) horseNeeds.put(horse.id(), horse.needs());
+        for (SaveGame.HorseData horse : initialState.horses()) {
+            horseNeeds.put(horse.id(), horse.needs());
+            previousHorsePositions.put(horse.id(), new Position(horse.x(), horse.z()));
+        }
         hiddenLegacyStructureIds = legacyStructureIds(initialState);
-
-        collisionRadius.put(HomesteadStructureType.FENCE, 1.45f);
-        collisionRadius.put(HomesteadStructureType.GATE, 1.75f);
-        collisionRadius.put(HomesteadStructureType.FEEDER, 1.35f);
-        collisionRadius.put(HomesteadStructureType.WATER_TROUGH, 1.55f);
-        collisionRadius.put(HomesteadStructureType.HAY_STORAGE, 2.10f);
-        collisionRadius.put(HomesteadStructureType.CHEST, 1.05f);
-        collisionRadius.put(HomesteadStructureType.STALL, 2.65f);
-
         saveService.setSaveTransformer(this, this::enrichSave);
     }
 
     @Override
     public void show() {
         HomesteadActionBus.reset();
-        HomesteadInputContext.configure(true, false, false);
+        HomesteadInputContext.configure(true, false, false, true, false);
         delegate.show();
     }
 
     @Override
     public void render(float delta) {
         float frameDelta = Math.min(Math.max(0f, delta), FixedStepClock.DEFAULT_MAX_FRAME_SECONDS);
-        LivingRanchTelemetryAdapter.ActorPose pose = telemetry.actorPose();
-        PlacedStructure nearbyStorage = nearestResourceStructure(pose.x(), pose.z(), INTERACTION_RADIUS);
-        HomesteadInputContext.configure(true, nearbyStorage != null, buildMode);
 
-        HomesteadRuntimeInput.InputResult input = runtimeInput.sample(buildMode);
+        if (inventoryOverlay.isOpen()) {
+            renderFrozenWorldAndInventory(frameDelta);
+            return;
+        }
+
+        LivingRanchTelemetryAdapter.ActorPose beforePose = telemetry.actorPose();
+        PlacedStructure nearby = nearestInteractiveStructure(beforePose.x(), beforePose.z(), INTERACTION_RADIUS);
+        boolean placementMode = buildMode || editMode;
+        HomesteadInputContext.configure(
+            true,
+            nearby != null,
+            editMode,
+            true,
+            placementMode
+        );
+
+        HomesteadRuntimeInput.InputResult input = runtimeInput.sample(placementMode);
         applySelectionInput(input);
-        placement = buildMode ? calculatePlacement(telemetry.actorPose()) : null;
+        placement = placementMode ? calculatePlacement(beforePose) : null;
 
         try {
             delegate.render(delta);
@@ -116,50 +125,106 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
         }
         if (game.getScreen() != this) return;
 
-        handleSemanticActions(nearbyStorage);
+        resolveStructureCollisions(beforePose);
+        LivingRanchTelemetryAdapter.ActorPose currentPose = telemetry.actorPose();
+        nearby = nearestInteractiveStructure(currentPose.x(), currentPose.z(), INTERACTION_RADIUS);
+        handleSemanticActions(nearby, input.editPressed());
         careClock.advance(frameDelta, this::updateHorseCare);
-        placement = buildMode ? calculatePlacement(telemetry.actorPose()) : null;
-        homesteadRenderer.render(
-            telemetry.camera(),
-            session.homestead(),
-            hiddenLegacyStructureIds,
-            placement
-        );
+        placement = buildMode || editMode ? calculatePlacement(telemetry.actorPose()) : null;
+        homesteadRenderer.render(telemetry.camera(), session.homestead(), hiddenLegacyStructureIds, placement);
         renderHomesteadHud();
 
         statusTimer = Math.max(0f, statusTimer - frameDelta);
         careFeedbackCooldown = Math.max(0f, careFeedbackCooldown - frameDelta);
     }
 
+    private void renderFrozenWorldAndInventory(float frameDelta) {
+        HomesteadInputContext.configure(true, true, true, true, true);
+        try {
+            delegate.render(0f);
+        } finally {
+            HomesteadInputContext.reset();
+        }
+        if (game.getScreen() != this) return;
+
+        if (HomesteadActionBus.consumeInventory() || HomesteadActionBus.consumeCancel()) inventoryOverlay.close();
+        if (!inventoryOverlay.isOpen()) {
+            HomesteadActionBus.reset();
+            return;
+        }
+        homesteadRenderer.render(telemetry.camera(), session.homestead(), hiddenLegacyStructureIds, null);
+        inventoryOverlay.updateAndRender(game.settings().uiScale());
+        statusTimer = Math.max(0f, statusTimer - frameDelta);
+    }
+
     private void applySelectionInput(HomesteadRuntimeInput.InputResult input) {
         if (input.directSlot() >= 0) session.hotbar().select(input.directSlot());
-        if (!buildMode && input.hotbarDelta() != 0) session.hotbar().cycle(input.hotbarDelta());
-        if (input.buildTypeDelta() != 0) {
+        if (!buildMode && !editMode && input.hotbarDelta() != 0) session.hotbar().cycle(input.hotbarDelta());
+        if (buildMode && input.buildTypeDelta() != 0) {
             buildTypeIndex = Math.floorMod(buildTypeIndex + input.buildTypeDelta(), BUILD_TYPES.length);
             setStatus("Build blueprint: " + selectedBuildType().displayName() + ".");
         }
-        if (input.rotationDelta() != 0) {
+        if ((buildMode || editMode) && input.rotationDelta() != 0) {
             placementHeading = snapHeading(placementHeading + input.rotationDelta() * 15f);
         }
     }
 
-    private void handleSemanticActions(PlacedStructure nearbyStorage) {
-        if (HomesteadActionBus.consumeCancel()) {
-            buildMode = false;
-            placement = null;
-            setStatus("Build placement cancelled.");
-        }
-        if (HomesteadActionBus.consumeBuild()) {
-            if (!buildMode) {
-                buildMode = true;
-                placementHeading = snapHeading(telemetry.actorPose().heading());
-                placement = calculatePlacement(telemetry.actorPose());
-                setStatus("Build mode: " + selectedBuildType().displayName() + ". B/L1 confirms; Esc/B cancels.");
+    private void handleSemanticActions(PlacedStructure nearby, boolean editPressed) {
+        if (HomesteadActionBus.consumeCancel()) cancelPlacement("Placement cancelled.");
+
+        if (HomesteadActionBus.consumeInventory()) {
+            if (buildMode || editMode) {
+                setStatus("Cancel placement before opening inventory.");
             } else {
-                confirmPlacement();
+                inventoryOverlay.open(session.inventory(), null);
+                return;
             }
         }
-        if (HomesteadActionBus.consumeInteract()) depositSelectedResource(nearbyStorage);
+
+        if (editPressed && !buildMode && !editMode) startEditMode();
+
+        if (HomesteadActionBus.consumeBuild()) {
+            if (editMode) confirmRelocation();
+            else if (!buildMode) startBuildMode();
+            else confirmPlacement();
+        }
+
+        if (HomesteadActionBus.consumeDismantle() && editMode) dismantleEditedStructure();
+        if (HomesteadActionBus.consumeInteract()) interactWith(nearby);
+    }
+
+    private void startBuildMode() {
+        buildMode = true;
+        editMode = false;
+        editedStructureId = null;
+        placementHeading = snapHeading(telemetry.actorPose().heading());
+        placement = calculatePlacement(telemetry.actorPose());
+        setStatus("Build mode: " + selectedBuildType().displayName() + ". Build confirms; Back cancels.");
+    }
+
+    private void startEditMode() {
+        LivingRanchTelemetryAdapter.ActorPose pose = telemetry.actorPose();
+        PlacedStructure nearest = session.homestead().nearest(pose.x(), pose.z(), INTERACTION_RADIUS)
+            .filter(value -> !hiddenLegacyStructureIds.contains(value.id()))
+            .orElse(null);
+        if (nearest == null) {
+            setStatus("No editable Homestead structure nearby.");
+            return;
+        }
+        buildMode = false;
+        editMode = true;
+        editedStructureId = nearest.id();
+        placementHeading = nearest.heading();
+        placement = calculatePlacement(pose);
+        setStatus("Editing " + nearest.type().displayName() + ": Build moves, Mount/Y dismantles, Back cancels.");
+    }
+
+    private void cancelPlacement(String message) {
+        buildMode = false;
+        editMode = false;
+        editedStructureId = null;
+        placement = null;
+        setStatus(message);
     }
 
     private void confirmPlacement() {
@@ -180,6 +245,54 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
         }
         ControllerRumble.pulse(game.inputProfile(), 65, 0.42f);
         setStatus(type.displayName() + " placed. Cost: " + costText(type) + ".");
+    }
+
+    private void confirmRelocation() {
+        if (editedStructureId == null || placement == null || !placement.valid()) {
+            setStatus(placement == null ? "No relocation preview." : placement.reason());
+            return;
+        }
+        if (!session.homestead().relocate(
+            editedStructureId,
+            placement.x(),
+            placement.z(),
+            placement.heading()
+        )) {
+            cancelPlacement("That structure is no longer available.");
+            return;
+        }
+        ControllerRumble.pulse(game.inputProfile(), 60, 0.38f);
+        cancelPlacement("Structure moved successfully.");
+    }
+
+    private void dismantleEditedStructure() {
+        if (editedStructureId == null) return;
+        HomesteadState.DismantleResult result = session.homestead().dismantle(editedStructureId, session.inventory());
+        switch (result) {
+            case SUCCESS -> {
+                ControllerRumble.pulse(game.inputProfile(), 70, 0.45f);
+                cancelPlacement("Structure dismantled; half materials returned.");
+            }
+            case STORAGE_NOT_EMPTY -> setStatus("Empty the structure before dismantling it.");
+            case INVENTORY_FULL -> setStatus("Not enough backpack space for the refund.");
+            case NOT_FOUND -> cancelPlacement("That structure is no longer available.");
+        }
+    }
+
+    private void interactWith(PlacedStructure structure) {
+        if (structure == null) return;
+        if (structure.type().canToggleOpen()) {
+            if (session.homestead().toggleGate(structure.id())) {
+                ControllerRumble.pulse(game.inputProfile(), 42, 0.30f);
+                setStatus("Gate " + (structure.isOpen() ? "opened." : "closed."));
+            }
+            return;
+        }
+        if (structure.type().storesItems()) {
+            inventoryOverlay.open(session.inventory(), structure);
+            return;
+        }
+        depositSelectedResource(structure);
     }
 
     private void depositSelectedResource(PlacedStructure structure) {
@@ -205,14 +318,13 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
         );
     }
 
-    private HomesteadRenderer.PlacementPreview calculatePlacement(
-        LivingRanchTelemetryAdapter.ActorPose pose
-    ) {
-        HomesteadStructureType type = selectedBuildType();
+    private HomesteadRenderer.PlacementPreview calculatePlacement(LivingRanchTelemetryAdapter.ActorPose pose) {
+        PlacedStructure edited = editMode ? session.homestead().find(editedStructureId).orElse(null) : null;
+        HomesteadStructureType type = edited != null ? edited.type() : selectedBuildType();
         float x = snap(pose.x() + MathUtils.sinDeg(pose.heading()) * PLACEMENT_DISTANCE);
         float z = snap(pose.z() + MathUtils.cosDeg(pose.heading()) * PLACEMENT_DISTANCE);
         float y = Terrain.heightAt(x, z);
-        String reason = validatePlacement(type, x, z);
+        String reason = validatePlacement(type, x, z, edited == null ? null : edited.id(), edited == null);
         return new HomesteadRenderer.PlacementPreview(
             true,
             type,
@@ -225,7 +337,13 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
         );
     }
 
-    private String validatePlacement(HomesteadStructureType type, float x, float z) {
+    private String validatePlacement(
+        HomesteadStructureType type,
+        float x,
+        float z,
+        UUID ignoredStructureId,
+        boolean checkRecipe
+    ) {
         float limit = Terrain.WORLD_HALF_SIZE - 4f;
         if (Math.abs(x) > limit || Math.abs(z) > limit) return "Too close to the world boundary.";
         if (Terrain.isInsideLake(x, z)) return "Structures cannot be placed in the lake.";
@@ -239,19 +357,53 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
         maximumSlope = Math.max(maximumSlope, Math.abs(center - Terrain.heightAt(x, z - sample)));
         if (maximumSlope > 0.85f) return "Ground is too steep for this structure.";
 
-        float radius = collisionRadius.get(type);
         for (PlacedStructure existing : session.homestead().structures()) {
-            float required = radius + collisionRadius.get(existing.type());
+            if (existing.id().equals(ignoredStructureId)) continue;
+            float required = type.collisionRadius() + existing.type().collisionRadius() + 0.20f;
             if (distanceSquared(x, z, existing.x(), existing.z()) < required * required) {
                 return "Placement overlaps " + existing.type().displayName() + ".";
             }
         }
-        for (Map.Entry<ItemId, Integer> cost : type.buildCost().entrySet()) {
-            if (!session.inventory().has(cost.getKey(), cost.getValue())) {
-                return "Missing materials: " + costText(type) + ".";
+        if (checkRecipe) {
+            for (Map.Entry<ItemId, Integer> cost : type.buildCost().entrySet()) {
+                if (!session.inventory().has(cost.getKey(), cost.getValue())) {
+                    return "Missing materials: " + costText(type) + ".";
+                }
             }
         }
         return null;
+    }
+
+    private void resolveStructureCollisions(LivingRanchTelemetryAdapter.ActorPose beforePose) {
+        LivingRanchTelemetryAdapter.ActorPose afterPose = telemetry.actorPose();
+        float actorRadius = afterPose.mounted() ? HORSE_COLLISION_RADIUS : PLAYER_COLLISION_RADIUS;
+        HomesteadCollisionSystem.Position actor = collisionSystem.resolve(
+            beforePose.x(),
+            beforePose.z(),
+            afterPose.x(),
+            afterPose.z(),
+            actorRadius,
+            session.homestead().structures()
+        );
+        if (actor.blocked()) telemetry.setActorPosition(actor.x(), actor.z());
+
+        for (LivingRanchTelemetryAdapter.HorseTelemetry horse : telemetry.horses()) {
+            if (horse.mounted()) {
+                previousHorsePositions.put(horse.id(), new Position(actor.x(), actor.z()));
+                continue;
+            }
+            Position previous = previousHorsePositions.getOrDefault(horse.id(), new Position(horse.x(), horse.z()));
+            HomesteadCollisionSystem.Position corrected = collisionSystem.resolve(
+                previous.x(),
+                previous.z(),
+                horse.x(),
+                horse.z(),
+                HORSE_COLLISION_RADIUS,
+                session.homestead().structures()
+            );
+            if (corrected.blocked()) telemetry.setHorsePosition(horse.id(), corrected.x(), corrected.z());
+            previousHorsePositions.put(horse.id(), new Position(corrected.x(), corrected.z()));
+        }
     }
 
     private void updateHorseCare(float fixedDelta) {
@@ -286,27 +438,14 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
         for (SaveGame.HorseData horse : base.horses()) {
             HorseNeeds needs = horseNeeds.getOrDefault(horse.id(), horse.needs());
             enrichedHorses.add(new SaveGame.HorseData(
-                horse.id(),
-                horse.name(),
-                horse.x(),
-                horse.z(),
-                horse.heading(),
-                horse.trust(),
-                horse.stamina(),
-                horse.tamed(),
-                horse.personality(),
-                horse.bond(),
-                horse.fear(),
-                needs.hunger(),
-                needs.thirst(),
-                needs.energy()
+                horse.id(), horse.name(), horse.x(), horse.z(), horse.heading(), horse.trust(), horse.stamina(),
+                horse.tamed(), horse.personality(), horse.bond(), horse.fear(),
+                needs.hunger(), needs.thirst(), needs.energy()
             ));
         }
 
         LinkedHashMap<UUID, SaveGame.StructureData> structures = new LinkedHashMap<>();
-        for (SaveGame.StructureData structure : session.homestead().toSaveData()) {
-            structures.put(structure.id(), structure);
-        }
+        for (SaveGame.StructureData structure : session.homestead().toSaveData()) structures.put(structure.id(), structure);
         SaveGame compatibility = new SaveGame(
             SaveGame.CURRENT_VERSION,
             base.worldSeed(),
@@ -318,9 +457,7 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
             base.fences(),
             base.harvestedTreeIds()
         );
-        for (SaveGame.StructureData structure : compatibility.structures()) {
-            structures.putIfAbsent(structure.id(), structure);
-        }
+        for (SaveGame.StructureData structure : compatibility.structures()) structures.putIfAbsent(structure.id(), structure);
 
         return new SaveGame(
             SaveGame.CURRENT_VERSION,
@@ -393,14 +530,18 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
             );
         }
 
-        if (buildMode && placement != null) {
-            font.getData().setScale(0.70f * ui);
+        if ((buildMode || editMode) && placement != null) {
+            font.getData().setScale(0.68f * ui);
             font.setColor(placement.valid() ? new Color(0.62f, 1f, 0.68f, 1f) : new Color(1f, 0.58f, 0.50f, 1f));
+            String prefix = editMode ? "EDIT" : "BUILD";
+            String controls = editMode
+                ? " | R/D-pad rotate | Build move | Mount/Y dismantle | Back cancel"
+                : " | [ / ] type | R/D-pad rotate | Build place | Back cancel";
             font.draw(
                 batch,
-                "BUILD: " + placement.type().displayName().toUpperCase(Locale.ROOT)
-                    + " | cost " + costText(placement.type())
-                    + " | [ / ] type | R rotate | B/L1 place | Esc/B cancel"
+                prefix + ": " + placement.type().displayName().toUpperCase(Locale.ROOT)
+                    + (editMode ? "" : " | cost " + costText(placement.type()))
+                    + controls
                     + (placement.valid() ? "" : " | " + placement.reason()),
                 16f * geometry,
                 height - 70f * geometry
@@ -416,9 +557,9 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
         Gdx.gl.glEnable(GL20.GL_DEPTH_TEST);
     }
 
-    private PlacedStructure nearestResourceStructure(float x, float z, float radius) {
+    private PlacedStructure nearestInteractiveStructure(float x, float z, float radius) {
         return session.homestead().structures().stream()
-            .filter(value -> value.type().storesResource())
+            .filter(value -> value.type().storesResource() || value.type().storesItems() || value.type().canToggleOpen())
             .filter(value -> distanceSquared(x, z, value.x(), value.z()) <= radius * radius)
             .min(Comparator.comparingDouble(value -> distanceSquared(x, z, value.x(), value.z())))
             .orElse(null);
@@ -460,10 +601,7 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
     }
 
     private static String shortName(ItemId item) {
-        return switch (item) {
-            case WATER_BUCKET -> "WATER";
-            default -> item.name();
-        };
+        return item == ItemId.WATER_BUCKET ? "WATER" : item.name();
     }
 
     private void setStatus(String message) {
@@ -518,11 +656,15 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
         disposed = true;
         HomesteadInputContext.reset();
         HomesteadActionBus.reset();
+        inventoryOverlay.dispose();
         delegate.dispose();
         saveService.clearSaveTransformer(this);
         homesteadRenderer.dispose();
         shapes.dispose();
         batch.dispose();
         font.dispose();
+    }
+
+    private record Position(float x, float z) {
     }
 }

@@ -42,6 +42,7 @@ final class InputProfileRepository {
                 parseInt(properties.getProperty("key.interact"), defaults.interactKey()),
                 parseInt(properties.getProperty("key.mount"), defaults.mountKey()),
                 parseInt(properties.getProperty("key.build"), defaults.buildKey()),
+                parseInt(properties.getProperty("key.inventory"), defaults.inventoryKey()),
                 parseInt(properties.getProperty("key.sprint"), defaults.sprintKey()),
                 parseInt(properties.getProperty("key.save"), defaults.saveKey()),
                 parseInt(properties.getProperty("key.pause"), defaults.pauseKey())
@@ -70,6 +71,7 @@ final class InputProfileRepository {
         properties.setProperty("key.interact", Integer.toString(profile.interactKey()));
         properties.setProperty("key.mount", Integer.toString(profile.mountKey()));
         properties.setProperty("key.build", Integer.toString(profile.buildKey()));
+        properties.setProperty("key.inventory", Integer.toString(profile.inventoryKey()));
         properties.setProperty("key.sprint", Integer.toString(profile.sprintKey()));
         properties.setProperty("key.save", Integer.toString(profile.saveKey()));
         properties.setProperty("key.pause", Integer.toString(profile.pauseKey()));
@@ -111,11 +113,17 @@ final class InputProfileRepository {
             defaults.interactKey(),
             defaults.mountKey(),
             defaults.buildKey(),
+            defaults.inventoryKey(),
             defaults.sprintKey(),
             defaults.saveKey(),
             defaults.pauseKey()
         );
+
+        // Apply the newly introduced action first. Existing user actions are applied afterward and
+        // therefore keep priority if an old profile already used the default Inventory key.
+        normalized = normalized.withBinding(BindableAction.INVENTORY, raw.inventoryKey());
         for (BindableAction action : BindableAction.values()) {
+            if (action == BindableAction.INVENTORY) continue;
             normalized = normalized.withBinding(action, raw.keyFor(action));
         }
         return normalized;

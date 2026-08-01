@@ -8,17 +8,18 @@ final class HomesteadRuntimeInput {
     private final ControllerStateSource controller = new GdxControllerStateSource();
     private ControllerFrame previous = ControllerFrame.disconnected();
 
-    InputResult sample(boolean buildMode) {
+    InputResult sample(boolean placementMode) {
         int directSlot = directSlot();
         int hotbarDelta = 0;
         int buildTypeDelta = 0;
         int rotationDelta = 0;
+        boolean editPressed = false;
         boolean keyboardActivity = directSlot >= 0;
         boolean controllerActivity = false;
 
         ControllerFrame current = controller.poll();
         if (current.connected()) {
-            if (buildMode) {
+            if (placementMode) {
                 if (justPressed(current.dpadUp(), previous.dpadUp())) {
                     buildTypeDelta--;
                     controllerActivity = true;
@@ -44,6 +45,10 @@ final class HomesteadRuntimeInput {
                     hotbarDelta++;
                     controllerActivity = true;
                 }
+                if (justPressed(current.dpadDown(), previous.dpadDown())) {
+                    editPressed = true;
+                    controllerActivity = true;
+                }
             }
         }
         previous = current;
@@ -60,11 +65,15 @@ final class HomesteadRuntimeInput {
             rotationDelta++;
             keyboardActivity = true;
         }
+        if (!placementMode && Gdx.input.isKeyJustPressed(Input.Keys.M)) {
+            editPressed = true;
+            keyboardActivity = true;
+        }
 
         if (controllerActivity) InputActivityTracker.record(InputDeviceType.GAMEPAD);
         else if (keyboardActivity) InputActivityTracker.record(InputDeviceType.KEYBOARD_MOUSE);
 
-        return new InputResult(directSlot, hotbarDelta, buildTypeDelta, rotationDelta);
+        return new InputResult(directSlot, hotbarDelta, buildTypeDelta, rotationDelta, editPressed);
     }
 
     private static int directSlot() {
@@ -98,6 +107,12 @@ final class HomesteadRuntimeInput {
         return current && !old;
     }
 
-    record InputResult(int directSlot, int hotbarDelta, int buildTypeDelta, int rotationDelta) {
+    record InputResult(
+        int directSlot,
+        int hotbarDelta,
+        int buildTypeDelta,
+        int rotationDelta,
+        boolean editPressed
+    ) {
     }
 }

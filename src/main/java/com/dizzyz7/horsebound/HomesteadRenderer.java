@@ -61,9 +61,11 @@ final class HomesteadRenderer implements Disposable {
                 structure.id(),
                 ignored -> new ModelInstance(models.normal(structure.type()))
             );
+            float visualHeading = structure.heading();
+            if (structure.type() == HomesteadStructureType.GATE && structure.isOpen()) visualHeading += 90f;
             instance.transform.idt()
                 .translate(structure.x(), Terrain.heightAt(structure.x(), structure.z()), structure.z())
-                .rotate(Vector3.Y, structure.heading());
+                .rotate(Vector3.Y, visualHeading);
         }
         instances.keySet().removeIf(id -> !alive.contains(id));
     }

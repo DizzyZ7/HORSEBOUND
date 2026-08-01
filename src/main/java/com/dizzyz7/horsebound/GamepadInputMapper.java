@@ -52,6 +52,8 @@ final class GamepadInputMapper implements InputMapper {
         boolean interactPressed = justPressed(current.buttonX(), previous.buttonX());
         boolean mountPressed = justPressed(current.buttonY(), previous.buttonY());
         boolean buildPressed = justPressed(current.buttonL1(), previous.buttonL1());
+        boolean inventoryPressed = !HomesteadInputContext.capturesPauseAsCancel()
+            && justPressed(current.dpadUp(), previous.dpadUp());
         boolean savePressed = justPressed(current.buttonBack(), previous.buttonBack());
         boolean pausePressed = justPressed(current.buttonStart(), previous.buttonStart())
             || justPressed(current.buttonB(), previous.buttonB());
@@ -73,11 +75,12 @@ final class GamepadInputMapper implements InputMapper {
             interactPressed,
             mountPressed,
             buildPressed,
+            inventoryPressed,
             savePressed,
             pausePressed
         );
 
-        if (interactPressed || mountPressed || buildPressed) {
+        if (interactPressed || mountPressed || buildPressed || inventoryPressed) {
             ControllerRumble.pulse(profile, 65, 0.55f);
         } else if (jumpPressed) {
             ControllerRumble.pulse(profile, 35, 0.35f);

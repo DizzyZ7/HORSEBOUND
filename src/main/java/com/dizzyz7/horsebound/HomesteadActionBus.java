@@ -5,6 +5,8 @@ package com.dizzyz7.horsebound;
 final class HomesteadActionBus {
     private static boolean buildRequested;
     private static boolean interactRequested;
+    private static boolean inventoryRequested;
+    private static boolean dismantleRequested;
     private static boolean cancelRequested;
 
     private HomesteadActionBus() {
@@ -16,6 +18,14 @@ final class HomesteadActionBus {
 
     static void requestInteract() {
         interactRequested = true;
+    }
+
+    static void requestInventory() {
+        inventoryRequested = true;
+    }
+
+    static void requestDismantle() {
+        dismantleRequested = true;
     }
 
     static void requestCancel() {
@@ -34,6 +44,18 @@ final class HomesteadActionBus {
         return result;
     }
 
+    static boolean consumeInventory() {
+        boolean result = inventoryRequested;
+        inventoryRequested = false;
+        return result;
+    }
+
+    static boolean consumeDismantle() {
+        boolean result = dismantleRequested;
+        dismantleRequested = false;
+        return result;
+    }
+
     static boolean consumeCancel() {
         boolean result = cancelRequested;
         cancelRequested = false;
@@ -43,6 +65,8 @@ final class HomesteadActionBus {
     static void reset() {
         buildRequested = false;
         interactRequested = false;
+        inventoryRequested = false;
+        dismantleRequested = false;
         cancelRequested = false;
     }
 }

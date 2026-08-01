@@ -50,6 +50,28 @@ final class LivingRanchTelemetryAdapter {
         return new ActorPose(player.x, player.z, getFloat(playerFacingField, screen), false);
     }
 
+    void setActorPosition(float x, float z) {
+        Object mounted = get(mountedHorseField, screen);
+        if (mounted != null) {
+            prepareHorseFields(mounted.getClass());
+            setXZ((Vector3) get(horsePositionField, mounted), x, z);
+            return;
+        }
+        setXZ((Vector3) get(playerPositionField, screen), x, z);
+    }
+
+    boolean setHorsePosition(UUID id, float x, float z) {
+        if (id == null) return false;
+        List<?> actors = (List<?>) get(horsesField, screen);
+        for (Object actor : actors) {
+            prepareHorseFields(actor.getClass());
+            if (!id.equals(get(horseIdField, actor))) continue;
+            setXZ((Vector3) get(horsePositionField, actor), x, z);
+            return true;
+        }
+        return false;
+    }
+
     List<HorseTelemetry> horses() {
         List<?> actors = (List<?>) get(horsesField, screen);
         List<HorseTelemetry> result = new ArrayList<>(actors.size());
@@ -76,6 +98,12 @@ final class LivingRanchTelemetryAdapter {
         horseHeadingField = field(type, "heading");
         horseSpeedField = field(type, "speed");
         horseTamedField = field(type, "tamed");
+    }
+
+    private static void setXZ(Vector3 position, float x, float z) {
+        if (!Float.isFinite(x) || !Float.isFinite(z)) return;
+        position.x = x;
+        position.z = z;
     }
 
     private static Field field(Class<?> type, String name) {

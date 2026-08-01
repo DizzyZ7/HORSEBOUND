@@ -22,6 +22,7 @@ import java.util.UUID;
 final class SaveRepository {
     private static final int MAGIC = 0x48425356; // HBSV
     private static final int MAX_INVENTORY_ITEMS = 256;
+    private static final int MAX_STRUCTURE_INVENTORY_ITEMS = 64;
     private static final int MAX_HORSES = 10_000;
     private static final int MAX_FENCES = 100_000;
     private static final int MAX_STRUCTURES = 100_000;
@@ -132,10 +133,7 @@ final class SaveRepository {
             SaveGame.PlayerData player;
             if (version >= 3) {
                 int itemCount = checkedCount(in.readInt(), MAX_INVENTORY_ITEMS, "inventory item");
-                List<SaveGame.ItemStackData> items = new ArrayList<>(itemCount);
-                for (int i = 0; i < itemCount; i++) {
-                    items.add(new SaveGame.ItemStackData(in.readUTF(), in.readInt()));
-                }
+                List<SaveGame.ItemStackData> items = readItems(in, itemCount);
                 player = new SaveGame.PlayerData(
                     playerX,
                     playerZ,
@@ -227,14 +225,30 @@ final class SaveRepository {
                     String rawType = in.readUTF();
                     HomesteadStructureType type = HomesteadStructureType.parse(rawType)
                         .orElseThrow(() -> new IOException("Unknown homestead structure type: " + rawType));
-                    structures.add(new SaveGame.StructureData(
-                        id,
-                        type,
-                        in.readFloat(),
-                        in.readFloat(),
-                        in.readFloat(),
-                        in.readInt()
-                    ));
+                    float x = in.readFloat();
+                    float z = in.readFloat();
+                    float heading = in.readFloat();
+                    int storedUnits = in.readInt();
+                    if (version >= 5) {
+                        boolean open = in.readBoolean();
+                        int storedItemCount = checkedCount(
+                            in.readInt(),
+                            MAX_STRUCTURE_INVENTORY_ITEMS,
+                            "structure inventory item"
+                        );
+                        structures.add(new SaveGame.StructureData(
+                            id,
+                            type,
+                            x,
+                            z,
+                            heading,
+                            storedUnits,
+                            open,
+                            readItems(in, storedItemCount)
+                        ));
+                    } else {
+                        structures.add(new SaveGame.StructureData(id, type, x, z, heading, storedUnits));
+                    }
                 }
 
                 int selectedIndex = in.readInt();
@@ -298,11 +312,7 @@ final class SaveRepository {
             out.writeFloat(player.facing());
             out.writeInt(player.wood());
             out.writeInt(player.apples());
-            out.writeInt(player.inventoryItems().size());
-            for (SaveGame.ItemStackData item : player.inventoryItems()) {
-                out.writeUTF(item.itemId());
-                out.writeInt(item.amount());
-            }
+            writeItems(out, player.inventoryItems());
 
             SaveGame.PushikData pushik = saveGame.pushik();
             out.writeFloat(pushik.x());
@@ -349,6 +359,8 @@ final class SaveRepository {
                 out.writeFloat(structure.z());
                 out.writeFloat(structure.heading());
                 out.writeInt(structure.storedUnits());
+                out.writeBoolean(structure.open());
+                writeItems(out, structure.storedItems());
             }
 
             out.writeInt(saveGame.hotbar().selectedIndex());
@@ -357,6 +369,20 @@ final class SaveRepository {
 
             out.flush();
             channel.force(true);
+        }
+    }
+
+    private static List<SaveGame.ItemStackData> readItems(DataInputStream in, int count) throws IOException {
+        List<SaveGame.ItemStackData> items = new ArrayList<>(count);
+        for (int i = 0; i < count; i++) items.add(new SaveGame.ItemStackData(in.readUTF(), in.readInt()));
+        return items;
+    }
+
+    private static void writeItems(DataOutputStream out, List<SaveGame.ItemStackData> items) throws IOException {
+        out.writeInt(items.size());
+        for (SaveGame.ItemStackData item : items) {
+            out.writeUTF(item.itemId());
+            out.writeInt(item.amount());
         }
     }
 

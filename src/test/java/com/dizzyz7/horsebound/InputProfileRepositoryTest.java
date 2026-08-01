@@ -22,7 +22,7 @@ class InputProfileRepositoryTest {
     }
 
     @Test
-    void profileRoundTripsWithBindings() {
+    void profileRoundTripsWithBindingsIncludingInventory() {
         InputProfileRepository repository = new InputProfileRepository(tempDir.resolve("input.properties"));
         InputProfile expected = InputProfile.defaults()
             .withInvertCameraY(true)
@@ -30,11 +30,39 @@ class InputProfileRepositoryTest {
             .withLookDeadZone(0.22f)
             .withSprintMode(SprintMode.TOGGLE)
             .withRumbleStrength(0.80f)
-            .withBinding(BindableAction.INTERACT, Input.Keys.Q);
+            .withBinding(BindableAction.INTERACT, Input.Keys.Q)
+            .withBinding(BindableAction.INVENTORY, Input.Keys.TAB);
 
         repository.save(expected);
 
         assertEquals(expected, repository.load());
+    }
+
+    @Test
+    void oldProfileWithoutInventoryBindingReceivesDefault() throws Exception {
+        Path path = tempDir.resolve("input.properties");
+        Files.writeString(path, "key.interact=" + Input.Keys.Q + "\n");
+
+        InputProfile profile = new InputProfileRepository(path).load();
+
+        assertEquals(Input.Keys.Q, profile.interactKey());
+        assertEquals(BindableAction.INVENTORY.defaultKey(), profile.inventoryKey());
+    }
+
+    @Test
+    void oldProfileUsingInventoryDefaultKeyKeepsItsExistingAction() throws Exception {
+        Path path = tempDir.resolve("input.properties");
+        Files.writeString(path, "key.interact=" + Input.Keys.I + "\n");
+
+        InputProfile profile = new InputProfileRepository(path).load();
+
+        assertEquals(Input.Keys.I, profile.interactKey());
+        assertNotEquals(Input.Keys.I, profile.inventoryKey());
+        for (BindableAction first : BindableAction.values()) {
+            for (BindableAction second : BindableAction.values()) {
+                if (first != second) assertNotEquals(profile.keyFor(first), profile.keyFor(second));
+            }
+        }
     }
 
     @Test

@@ -1,6 +1,7 @@
 // HORSEBOUND — Created by Dimash Janibekov (DizZyZ7), © 2026. All rights reserved.
 package com.dizzyz7.horsebound;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -11,6 +12,11 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GamepadInputMapperTest {
+    @AfterEach
+    void cleanupContext() {
+        HomesteadInputContext.reset();
+    }
+
     @Test
     void mapsAnalogMovementLookAndStandardGameplayButtons() {
         ControllerFrame held = frame(
@@ -43,6 +49,17 @@ class GamepadInputMapperTest {
         assertFalse(second.buildPressed());
         assertFalse(second.savePressed());
         assertFalse(second.pausePressed());
+    }
+
+    @Test
+    void dpadUpOpensInventoryOnlyOutsidePlacementContext() {
+        ControllerFrame up = dpadFrame(true, false, false, false);
+        GamepadInputMapper normal = new GamepadInputMapper(() -> up, () -> 1d / 60d);
+        assertTrue(normal.sample().command().inventoryPressed());
+
+        HomesteadInputContext.configure(true, true, true, true, true);
+        GamepadInputMapper placement = new GamepadInputMapper(() -> up, () -> 1d / 60d);
+        assertFalse(placement.sample().command().inventoryPressed());
     }
 
     @Test
@@ -98,6 +115,17 @@ class GamepadInputMapperTest {
             a, b, x, y,
             back, start, l1, r1,
             false, false, false, false
+        );
+    }
+
+    private static ControllerFrame dpadFrame(boolean up, boolean down, boolean left, boolean right) {
+        return new ControllerFrame(
+            true,
+            AnalogStick.zero(),
+            AnalogStick.zero(),
+            false, false, false, false,
+            false, false, false, false,
+            up, down, left, right
         );
     }
 }

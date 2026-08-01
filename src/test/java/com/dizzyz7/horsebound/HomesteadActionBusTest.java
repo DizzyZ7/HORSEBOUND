@@ -18,21 +18,29 @@ class HomesteadActionBusTest {
     void actionsAreDeliveredExactlyOnce() {
         HomesteadActionBus.requestBuild();
         HomesteadActionBus.requestInteract();
+        HomesteadActionBus.requestInventory();
+        HomesteadActionBus.requestDismantle();
         HomesteadActionBus.requestCancel();
 
         assertTrue(HomesteadActionBus.consumeBuild());
         assertFalse(HomesteadActionBus.consumeBuild());
         assertTrue(HomesteadActionBus.consumeInteract());
         assertFalse(HomesteadActionBus.consumeInteract());
+        assertTrue(HomesteadActionBus.consumeInventory());
+        assertFalse(HomesteadActionBus.consumeInventory());
+        assertTrue(HomesteadActionBus.consumeDismantle());
+        assertFalse(HomesteadActionBus.consumeDismantle());
         assertTrue(HomesteadActionBus.consumeCancel());
         assertFalse(HomesteadActionBus.consumeCancel());
     }
 
     @Test
     void contextCapturesOnlyConfiguredActions() {
-        HomesteadInputContext.configure(true, false, true);
+        HomesteadInputContext.configure(true, false, true, true, true);
         assertTrue(HomesteadInputContext.capturesBuild());
         assertFalse(HomesteadInputContext.capturesInteract());
+        assertTrue(HomesteadInputContext.capturesMount());
+        assertTrue(HomesteadInputContext.capturesInventory());
         assertTrue(HomesteadInputContext.capturesPauseAsCancel());
     }
 }
