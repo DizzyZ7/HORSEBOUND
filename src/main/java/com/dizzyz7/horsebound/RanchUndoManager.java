@@ -25,7 +25,8 @@ final class RanchUndoManager {
             structure.heading(),
             structure.x(),
             structure.z(),
-            structure.heading()
+            structure.heading(),
+            structure.operationalVersion()
         );
     }
 
@@ -48,7 +49,8 @@ final class RanchUndoManager {
             normalizeHeading(fromHeading),
             finiteOrZero(toX),
             finiteOrZero(toZ),
-            normalizeHeading(toHeading)
+            normalizeHeading(toHeading),
+            structure.operationalVersion()
         );
     }
 
@@ -72,16 +74,12 @@ final class RanchUndoManager {
             pending = null;
             return UndoResult.STRUCTURE_CHANGED;
         }
-        if (!matchesExpectedTransform(structure, action)) {
+        if (!matchesExpectedState(structure, action)) {
             pending = null;
             return UndoResult.STRUCTURE_CHANGED;
         }
 
         if (action.kind() == Kind.PLACEMENT) {
-            if (structure.isOpen() || structure.storedUnits() > 0 || !structure.itemStorage().isEmpty()) {
-                pending = null;
-                return UndoResult.STRUCTURE_CHANGED;
-            }
             List<SaveGame.ItemStackData> refund = fullRecipeRefund(structure.type());
             if (!inventory.canAccept(refund)) return UndoResult.INVENTORY_FULL;
             if (!state.remove(structure.id(), null)) {
@@ -120,8 +118,9 @@ final class RanchUndoManager {
         return List.copyOf(result);
     }
 
-    private static boolean matchesExpectedTransform(PlacedStructure structure, Action action) {
-        return near(structure.x(), action.expectedX())
+    private static boolean matchesExpectedState(PlacedStructure structure, Action action) {
+        return structure.operationalVersion() == action.expectedOperationalVersion()
+            && near(structure.x(), action.expectedX())
             && near(structure.z(), action.expectedZ())
             && nearAngle(structure.heading(), action.expectedHeading());
     }
@@ -173,7 +172,8 @@ final class RanchUndoManager {
         float fromHeading,
         float expectedX,
         float expectedZ,
-        float expectedHeading
+        float expectedHeading,
+        long expectedOperationalVersion
     ) {
         private Action {
             Objects.requireNonNull(kind, "kind");
