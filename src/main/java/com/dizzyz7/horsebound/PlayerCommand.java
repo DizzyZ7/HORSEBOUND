@@ -14,6 +14,7 @@ record PlayerCommand(
     boolean interactPressed,
     boolean mountPressed,
     boolean buildPressed,
+    boolean inventoryPressed,
     boolean savePressed,
     boolean pausePressed
 ) {
@@ -26,8 +27,38 @@ record PlayerCommand(
         lookPitch = finiteOrZero(lookPitch);
     }
 
+    /** Compatibility constructor for pre-0.5.2 call sites and tests. */
+    PlayerCommand(
+        float moveForward,
+        float moveRight,
+        float lookYaw,
+        float lookPitch,
+        boolean sprint,
+        boolean jumpPressed,
+        boolean interactPressed,
+        boolean mountPressed,
+        boolean buildPressed,
+        boolean savePressed,
+        boolean pausePressed
+    ) {
+        this(
+            moveForward,
+            moveRight,
+            lookYaw,
+            lookPitch,
+            sprint,
+            jumpPressed,
+            interactPressed,
+            mountPressed,
+            buildPressed,
+            false,
+            savePressed,
+            pausePressed
+        );
+    }
+
     static PlayerCommand idle() {
-        return new PlayerCommand(0f, 0f, 0f, 0f, false, false, false, false, false, false, false);
+        return new PlayerCommand(0f, 0f, 0f, 0f, false, false, false, false, false, false, false, false);
     }
 
     boolean hasActivity() {
@@ -40,6 +71,7 @@ record PlayerCommand(
             || interactPressed
             || mountPressed
             || buildPressed
+            || inventoryPressed
             || savePressed
             || pausePressed;
     }
@@ -56,6 +88,7 @@ record PlayerCommand(
             interactPressed || other.interactPressed,
             mountPressed || other.mountPressed,
             buildPressed || other.buildPressed,
+            inventoryPressed || other.inventoryPressed,
             savePressed || other.savePressed,
             pausePressed || other.pausePressed
         );
@@ -63,20 +96,30 @@ record PlayerCommand(
 
     PlayerCommand withoutPause() {
         if (!pausePressed) return this;
-        return copy(interactPressed, buildPressed, false);
+        return copy(interactPressed, mountPressed, buildPressed, inventoryPressed, false);
     }
 
     PlayerCommand withoutBuild() {
         if (!buildPressed) return this;
-        return copy(interactPressed, false, pausePressed);
+        return copy(interactPressed, mountPressed, false, inventoryPressed, pausePressed);
     }
 
     PlayerCommand withoutInteract() {
         if (!interactPressed) return this;
-        return copy(false, buildPressed, pausePressed);
+        return copy(false, mountPressed, buildPressed, inventoryPressed, pausePressed);
     }
 
-    private PlayerCommand copy(boolean interact, boolean build, boolean pause) {
+    PlayerCommand withoutMount() {
+        if (!mountPressed) return this;
+        return copy(interactPressed, false, buildPressed, inventoryPressed, pausePressed);
+    }
+
+    PlayerCommand withoutInventory() {
+        if (!inventoryPressed) return this;
+        return copy(interactPressed, mountPressed, buildPressed, false, pausePressed);
+    }
+
+    private PlayerCommand copy(boolean interact, boolean mount, boolean build, boolean inventory, boolean pause) {
         return new PlayerCommand(
             moveForward,
             moveRight,
@@ -85,8 +128,9 @@ record PlayerCommand(
             sprint,
             jumpPressed,
             interact,
-            mountPressed,
+            mount,
             build,
+            inventory,
             savePressed,
             pause
         );
