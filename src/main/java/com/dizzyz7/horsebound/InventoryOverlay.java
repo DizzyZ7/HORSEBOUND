@@ -9,7 +9,6 @@ import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.utils.Disposable;
 
-import java.util.ArrayList;
 import java.util.List;
 
 /** Deck-safe in-ranch inventory and chest transfer overlay. */
@@ -20,13 +19,14 @@ final class InventoryOverlay implements Disposable {
     private final SpriteBatch batch = new SpriteBatch();
     private final BitmapFont font = new BitmapFont();
     private final MenuInputMapper input = new MenuInputMapper();
+    private final InventoryTransferService transfers = new InventoryTransferService();
 
     private Inventory player;
     private PlacedStructure chest;
     private boolean open;
     private boolean chestPanel;
     private int selectedIndex;
-    private String message = "Confirm transfers one item. Left/Right changes panel.";
+    private String message = "Confirm: one | Build/L1: stack | Mount/Y: all.";
 
     void open(Inventory playerInventory, PlacedStructure chestStructure) {
         player = playerInventory;
@@ -36,7 +36,7 @@ final class InventoryOverlay implements Disposable {
         open = true;
         message = chest == null
             ? "Player inventory. Back closes."
-            : "Confirm transfers one item. Left/Right changes panel.";
+            : "Confirm: one | Build/L1: stack | Mount/Y: all.";
         Gdx.input.setCursorCatched(false);
     }
 
@@ -59,7 +59,15 @@ final class InventoryOverlay implements Disposable {
         current = currentStacks();
         if (command.upPressed()) selectedIndex = Math.floorMod(selectedIndex - 1, Math.max(1, current.size()));
         if (command.downPressed()) selectedIndex = Math.floorMod(selectedIndex + 1, Math.max(1, current.size()));
-        if (command.confirmPressed()) transferSelected();
+
+        if (HomesteadActionBus.consumeDismantle()) {
+            transferSelected(InventoryTransferService.TransferMode.ALL);
+        } else if (HomesteadActionBus.consumeBuild()) {
+            transferSelected(InventoryTransferService.TransferMode.STACK);
+        } else if (command.confirmPressed()) {
+            transferSelected(InventoryTransferService.TransferMode.ONE);
+        }
+
         if (command.backPressed()) {
             close();
             return;
@@ -72,45 +80,48 @@ final class InventoryOverlay implements Disposable {
         selectedIndex = 0;
     }
 
-    private void transferSelected() {
+    private void transferSelected(InventoryTransferService.TransferMode mode) {
         List<InventoryStack> stacks = currentStacks();
         if (stacks.isEmpty()) {
             message = "This inventory is empty.";
             return;
         }
         selectedIndex = Math.min(selectedIndex, stacks.size() - 1);
-        ItemId item = stacks.get(selectedIndex).item();
+        InventoryStack selected = stacks.get(selectedIndex);
+        ItemId item = selected.item();
         if (chest == null) {
             message = "Open a nearby Chest with Interact to transfer items.";
             return;
         }
-        HomesteadState.TransferResult result = chestPanel
-            ? transferChestToPlayer(item)
-            : transferPlayerToChest(item);
-        message = switch (result) {
-            case SUCCESS -> (chestPanel ? "Took " : "Stored ") + item.displayName() + ".";
-            case FULL -> chestPanel ? "Player inventory is full." : "Chest is full.";
+
+        Inventory source = chestPanel ? chest.itemStorage() : player;
+        Inventory destination = chestPanel ? player : chest.itemStorage();
+        InventoryTransferService.TransferResult result = transfers.transfer(
+            source,
+            destination,
+            item,
+            selected.amount(),
+            mode
+        );
+        message = switch (result.status()) {
+            case SUCCESS -> transferSuccessMessage(mode, item, result.moved());
+            case FULL -> chestPanel ? "Player inventory has insufficient space." : "Chest has insufficient space.";
             case NO_ITEM -> "That item is no longer available.";
-            case NOT_FOUND, NOT_ITEM_STORAGE -> "Chest is unavailable.";
         };
         List<InventoryStack> after = currentStacks();
         selectedIndex = after.isEmpty() ? 0 : Math.min(selectedIndex, after.size() - 1);
     }
 
-    private HomesteadState.TransferResult transferPlayerToChest(ItemId item) {
-        if (!player.has(item, 1)) return HomesteadState.TransferResult.NO_ITEM;
-        if (chest.itemStorage().availableSpace(item) < 1) return HomesteadState.TransferResult.FULL;
-        return player.transferTo(chest.itemStorage(), item, 1)
-            ? HomesteadState.TransferResult.SUCCESS
-            : HomesteadState.TransferResult.FULL;
-    }
-
-    private HomesteadState.TransferResult transferChestToPlayer(ItemId item) {
-        if (!chest.itemStorage().has(item, 1)) return HomesteadState.TransferResult.NO_ITEM;
-        if (player.availableSpace(item) < 1) return HomesteadState.TransferResult.FULL;
-        return chest.itemStorage().transferTo(player, item, 1)
-            ? HomesteadState.TransferResult.SUCCESS
-            : HomesteadState.TransferResult.FULL;
+    private String transferSuccessMessage(
+        InventoryTransferService.TransferMode mode,
+        ItemId item,
+        int moved
+    ) {
+        String verb = chestPanel ? "Took " : "Stored ";
+        String amount = mode == InventoryTransferService.TransferMode.ONE
+            ? "1"
+            : Integer.toString(moved);
+        return verb + amount + " " + item.displayName() + ".";
     }
 
     private List<InventoryStack> currentStacks() {
