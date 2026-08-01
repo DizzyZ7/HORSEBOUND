@@ -5,41 +5,53 @@ Copyright © 2026 Dimash Janibekov. All rights reserved.
 
 HORSEBOUND is a cozy stylized 3D Java sandbox about horses, exploration, taming, riding and building a ranch. The world uses continuous terrain and is intentionally not voxel/block based.
 
-## 0.4.7 — HUD & Glyph Pass
+## 0.4.8 — Input & Accessibility
 
-HORSEBOUND now has a centralized, scalable action-prompt layer across gameplay and the core menu flow.
+HORSEBOUND now has a true in-memory pause lifecycle and a device-local input profile independent of ranch progress.
 
-### Dynamic input prompts
+### True pause
+
+- Pause opens a dedicated screen instead of immediately returning to the main menu;
+- ranch simulation stops while the current world remains alive in memory;
+- Resume returns to the same session without regeneration or reload;
+- Save Game persists without leaving the session;
+- Save & Main Menu persists and disposes the world cleanly;
+- backgrounding from pause or input screens saves the suspended ranch.
+
+### Input and accessibility settings
+
+- invert vertical camera;
+- configurable movement and camera stick dead zones;
+- Hold or Toggle sprint/gallop;
+- optional controller rumble and strength;
+- controller-accessible Settings Hub, pause and input screens;
+- changes apply to live input adapters without recreating the ranch.
+
+### Keyboard rebinding
+
+The player can rebind movement, jump, interact, mount, build, sprint, manual save and pause. Assigning an already-used key swaps the two actions instead of creating an invisible conflict. Dynamic HUD prompts immediately show the active bindings.
+
+Input settings are stored separately:
+
+```text
+%APPDATA%\HORSEBOUND\input.properties
+```
+
+The file uses temporary writes and atomic replacement where supported. Invalid fields fall back safely without resetting valid fields.
+
+## HUD & controller glyphs
+
+HORSEBOUND has a centralized scalable action-prompt layer across gameplay and the core menu flow.
 
 - prompts follow the last meaningfully used device;
-- small stick drift does not switch the visible prompt family;
-- keyboard/mouse prompts use the real HORSEBOUND bindings;
-- Xbox, PlayStation, Steam Deck and generic controller label families;
-- controller family is inferred from the standardized SDL device name;
+- small stick drift does not switch the prompt family;
+- keyboard prompts use active rebound keys;
+- stable labels such as `SHIFT`, `CTRL`, `ESC` and `SPACE` are independent of backend naming;
+- Xbox, PlayStation, Steam Deck, Nintendo and generic controller families;
 - vector-rendered prompt chips scale with the 1280×800 UI system;
-- gameplay now displays the current 0.4.7 header instead of the legacy prototype label.
+- save-slot cards remain readable at 150% UI scale.
 
-Examples:
-
-| Action | Keyboard | Xbox / Deck | PlayStation |
-|---|---|---|---|
-| Confirm / Jump | Enter / Space | A | Cross |
-| Back / Pause | Esc | B | Circle |
-| Interact | E | X | Square |
-| Mount | F | Y | Triangle |
-| Build | B | LB | L1 |
-| Sprint / Gallop | Shift | RB | R1 |
-
-### Save-slot readability
-
-- save-slot cards now scale from the 1280×800 design surface;
-- metadata remains readable with 150% UI scale;
-- overwrite confirmation remains fully controller accessible;
-- bottom input guidance is supplied by the shared glyph overlay instead of duplicated screen text.
-
-### Controller-only release contract
-
-Every future Steam candidate must pass the packaged launch-to-exit controller route in [`docs/STEAM_CONTROLLER_SMOKE_TEST.md`](docs/STEAM_CONTROLLER_SMOKE_TEST.md). It covers Settings, ranch slots, gameplay, save/restart, controller disconnect/reconnect and 1280×800 readability.
+Every future Steam candidate must pass the packaged controller-only route in [`docs/STEAM_CONTROLLER_SMOKE_TEST.md`](docs/STEAM_CONTROLLER_SMOKE_TEST.md).
 
 This is not a Steam Deck Verified claim. Physical Deck testing, Proton validation and Valve compatibility review remain required.
 
@@ -47,18 +59,13 @@ This is not a Steam Deck Verified claim. Physical Deck testing, Proton validatio
 
 HORSEBOUND has device-local display configuration, scalable 1280×800-oriented UI and measurable performance diagnostics.
 
-### Display and graphics settings
-
 - Deck-safe 1280×800 default window;
 - windowed and fullscreen modes;
-- runtime resolution changes with safe fallback;
 - 1280×720, 1280×800, 1600×900 and 1920×1080 windowed profiles;
+- runtime resolution changes with safe fallback;
 - VSync;
 - UI/text scale from 100% to 150%;
-- optional performance overlay;
-- display settings remain separate from ranch saves and Steam Cloud.
-
-Graphics presets are meaningful desktop startup profiles:
+- optional global performance overlay.
 
 | Preset | MSAA | Foreground cap |
 |---|---:|---:|
@@ -68,39 +75,27 @@ Graphics presets are meaningful desktop startup profiles:
 
 The FPS cap changes immediately. MSAA changes on the next launch because the OpenGL backbuffer must be recreated.
 
-### Performance diagnostics
-
-The optional global overlay is available in menus and gameplay and reports:
-
-- rolling average FPS;
-- average frame time;
-- worst frame time in the latest 120 samples;
-- current resolution and graphics preset;
-- an explicit 800p/30 target status.
-
-The overlay is a development and player-support aid. It is not a substitute for physical Steam Deck profiling.
+The performance overlay reports rolling FPS, average and worst frame time, current resolution/preset and an explicit 800p/30 target status.
 
 ## Support diagnostics
 
-HORSEBOUND carries an exact build identity and can produce privacy-conscious local crash reports.
-
-Crash reports are stored only on the player's device:
+Privacy-conscious crash reports are stored only on the player's device:
 
 ```text
 %APPDATA%\HORSEBOUND\logs\
 ```
 
 - no automatic telemetry or uploads;
-- build, OS, architecture, Java runtime, memory summary, thread and stack trace;
+- build, OS, architecture, Java runtime, memory, thread and stack trace;
 - home and AppData path prefixes are redacted;
-- only the 10 newest reports are retained;
+- only the 10 newest reports remain;
 - logs are excluded from the Steam install image and Steam Cloud policy.
 
 See [`docs/SUPPORT.md`](docs/SUPPORT.md).
 
 ## Controller foundation
 
-HORSEBOUND has a standardized controller path across live gameplay and the core menu flow using the official `gdx-controllers` desktop backend.
+HORSEBOUND uses the official `gdx-controllers` desktop backend and standardized mappings.
 
 | Controller input | Action |
 |---|---|
@@ -114,7 +109,7 @@ HORSEBOUND has a standardized controller path across live gameplay and the core 
 | Back / View / Share | Manual save |
 | Start / Menu or B / Circle | Pause / back |
 
-D-pad or Left Stick navigates the main menu, ranch slots and Settings. Confirm and Back labels follow the active controller family. Keyboard and mouse remain supported.
+D-pad or Left Stick navigates menus. Confirm and Back labels follow the active controller family. Unsupported rumble devices fail safely without affecting gameplay.
 
 ## Fixed-step gameplay
 
@@ -157,10 +152,13 @@ Pushik is the completely black fluffy cat with fluffy black paws and almost sile
 - day/night lighting;
 - Pushik companion AI;
 - Continue / New Game / Load Game / Settings / Exit;
+- true pause and resume;
 - three ranch save slots;
 - manual save, autosave and backup recovery.
 
-## Keyboard controls
+## Default keyboard controls
+
+All gameplay keys may be rebound.
 
 | Input | Action |
 |---|---|
@@ -172,13 +170,14 @@ Pushik is the completely black fluffy cat with fluffy black paws and almost sile
 | F | Mount / dismount |
 | B | Build fence |
 | F5 | Save |
-| Esc | Save and menu |
+| Esc | Pause |
 
 ## User data
 
 ```text
 %APPDATA%\HORSEBOUND\
     settings.properties
+    input.properties
     saves\
         slot-1\save.hbs + save.bak
         slot-2\save.hbs + save.bak
@@ -187,7 +186,7 @@ Pushik is the completely black fluffy cat with fluffy black paws and almost sile
         crash-*.log
 ```
 
-Ranch saves are prepared for Steam Auto-Cloud. Display/input settings and crash logs remain local.
+Ranch saves are prepared for Steam Auto-Cloud. Display settings, input profiles and crash logs remain device-local.
 
 ## Steam readiness
 
@@ -197,7 +196,7 @@ HORSEBOUND is developed against SteamPipe, Steam Cloud, offline single-player an
 - [`docs/STEAM_RELEASE_READINESS.md`](docs/STEAM_RELEASE_READINESS.md)
 - [`docs/STEAM_CONTROLLER_SMOKE_TEST.md`](docs/STEAM_CONTROLLER_SMOKE_TEST.md)
 - [`docs/SUPPORT.md`](docs/SUPPORT.md)
-- [`docs/releases/0.4.7.md`](docs/releases/0.4.7.md)
+- [`docs/releases/0.4.8.md`](docs/releases/0.4.8.md)
 - [`steam/README.md`](steam/README.md)
 
 The planned Steam launch target is `HORSEBOUND.exe` directly, without a mandatory external launcher.
@@ -226,8 +225,9 @@ The packaged game includes its Java runtime. CI verifies:
 - executable, application JAR and bundled runtime;
 - exact packaged version and source commit;
 - standardized controller classes and `jamepad64.dll`;
+- prompt, pause, input-profile and rebinding runtime classes;
 - third-party notices and exact license texts;
-- absence of saves, settings, crash logs and local Steam data in the install image;
+- absence of saves, display/input settings, crash logs and local Steam data in the install image;
 - SHA-256 package hashes.
 
 ## Tech
