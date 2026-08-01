@@ -82,9 +82,15 @@ jobs:
             "com/dizzyz7/horsebound/ControllerGlyphFamily.class",
             "com/dizzyz7/horsebound/InputProfile.class",
             "com/dizzyz7/horsebound/InputProfileRepository.class",
+            "com/dizzyz7/horsebound/InputProfileContext.class",
+            "com/dizzyz7/horsebound/SettingsHubScreen.class",
             "com/dizzyz7/horsebound/PauseScreen.class",
+            "com/dizzyz7/horsebound/PauseRequestBus.class",
             "com/dizzyz7/horsebound/InputSettingsScreen.class",
-            "com/dizzyz7/horsebound/KeyBindingsScreen.class"
+            "com/dizzyz7/horsebound/KeyBindingsScreen.class",
+            "com/dizzyz7/horsebound/KeyLabel.class",
+            "com/dizzyz7/horsebound/SprintLatch.class",
+            "com/dizzyz7/horsebound/ControllerRumble.class"
           )
           foreach ($entry in $requiredJarEntries) {
             if ($jarEntries -notcontains $entry) {
