@@ -20,6 +20,7 @@ final class InputGlyphCatalog {
         if (screen instanceof RanchSessionScreen) {
             return List.of(
                 PromptAction.INTERACT,
+                PromptAction.INVENTORY,
                 PromptAction.MOUNT,
                 PromptAction.JUMP,
                 PromptAction.SPRINT,
@@ -45,6 +46,7 @@ final class InputGlyphCatalog {
             case INTERACT -> KeyLabel.of(profile.interactKey());
             case MOUNT -> KeyLabel.of(profile.mountKey());
             case BUILD -> KeyLabel.of(profile.buildKey());
+            case INVENTORY -> KeyLabel.of(profile.inventoryKey());
             case JUMP -> KeyLabel.of(profile.jumpKey());
             case SPRINT -> KeyLabel.of(profile.sprintKey());
             case SAVE -> KeyLabel.of(profile.saveKey());
@@ -60,6 +62,7 @@ final class InputGlyphCatalog {
             case INTERACT -> faceX(family);
             case MOUNT -> faceY(family);
             case BUILD -> shoulderLeft(family);
+            case INVENTORY -> "D-PAD UP";
             case SPRINT -> shoulderRight(family);
             case SAVE -> viewButton(family);
         };
