@@ -10,6 +10,7 @@ final class RanchDismantleConfirmation {
 
     private final float windowSeconds;
     private UUID structureId;
+    private PlacedStructure armedStructure;
     private long operationalVersion;
     private float remainingSeconds;
 
@@ -33,6 +34,7 @@ final class RanchDismantleConfirmation {
             return Decision.CONFIRMED;
         }
         structureId = Objects.requireNonNull(structure.id(), "structure id");
+        armedStructure = structure;
         operationalVersion = structure.operationalVersion();
         remainingSeconds = windowSeconds;
         return Decision.ARMED;
@@ -46,7 +48,12 @@ final class RanchDismantleConfirmation {
     }
 
     boolean isArmed() {
-        return structureId != null && remainingSeconds > 0f;
+        if (structureId == null || armedStructure == null || remainingSeconds <= 0f) return false;
+        if (operationalVersion != armedStructure.operationalVersion()) {
+            cancel();
+            return false;
+        }
+        return true;
     }
 
     boolean isArmedFor(PlacedStructure structure) {
@@ -66,6 +73,7 @@ final class RanchDismantleConfirmation {
 
     void cancel() {
         structureId = null;
+        armedStructure = null;
         operationalVersion = 0L;
         remainingSeconds = 0f;
     }
