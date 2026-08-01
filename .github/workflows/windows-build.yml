@@ -97,7 +97,16 @@ jobs:
             "com/dizzyz7/horsebound/PlacedStructure.class",
             "com/dizzyz7/horsebound/HomesteadState.class",
             "com/dizzyz7/horsebound/HorseNeeds.class",
-            "com/dizzyz7/horsebound/HorseCareSystem.class"
+            "com/dizzyz7/horsebound/HorseCareSystem.class",
+            "com/dizzyz7/horsebound/RanchSessionScreen.class",
+            "com/dizzyz7/horsebound/GameSessionCapture.class",
+            "com/dizzyz7/horsebound/HomesteadInputContext.class",
+            "com/dizzyz7/horsebound/HomesteadActionBus.class",
+            "com/dizzyz7/horsebound/HomesteadRuntimeInput.class",
+            "com/dizzyz7/horsebound/LivingRanchTelemetryAdapter.class",
+            "com/dizzyz7/horsebound/HomesteadModels.class",
+            "com/dizzyz7/horsebound/HomesteadRenderer.class",
+            "com/dizzyz7/horsebound/HomesteadRanchScreen.class"
           )
           foreach ($entry in $requiredJarEntries) {
             if ($jarEntries -notcontains $entry) {
