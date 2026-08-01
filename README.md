@@ -5,49 +5,43 @@ Copyright © 2026 Dimash Janibekov. All rights reserved.
 
 HORSEBOUND is a cozy stylized 3D Java sandbox about horses, exploration, taming, riding and building a ranch. Its world uses continuous terrain and is intentionally not voxel/block based.
 
-## 0.5.5 — Ranch Workflow & Camera Hardening
+## 0.5.6 — Evening Test Hardening
 
-This release makes destructive ranch actions clearer, expands the third-person camera to procedural nature and separates interaction effects from meadow ambience without changing save format v5.
+This stabilization release prepares the current ranch loop for a serious manual playtest without expanding save format v5 or introducing the higher-risk Living World architecture.
 
-### Safer editing workflow
+### Input transition safety
 
-- the live HUD shows whether the latest build or move can still be undone;
-- Pause visibly enables or disables **Undo Last Ranch Edit**;
-- dismantling now requires two Mount/Y presses within a four-second confirmation window;
-- the confirmation is bound to the selected structure UUID and operational revision;
-- selection changes, expiry or any later structure mutation invalidate stale confirmation;
-- no world or inventory mutation occurs on the first dismantle press.
+- fresh menu and gameplay controller mappers suppress buttons carried across screen transitions;
+- a held Confirm can no longer instantly activate the next screen;
+- a held A/Start/B/D-pad action can no longer cause an immediate jump, pause, save or inventory open when gameplay begins;
+- analog movement and camera input remain responsive on the first gameplay frame;
+- Toggle Sprint requires a fresh R1 press after entering or reconnecting.
 
-### Nature-aware camera
+### Safer world interaction
 
-- camera collision now includes unharvested trees and rocks as well as terrain and blocking Homestead structures;
-- nature collision geometry follows each procedural prop's visible scale;
-- harvested trees immediately leave the camera-obstacle set;
-- trees and rocks directly between the actor and camera fade softly instead of hiding the player;
-- per-instance material isolation prevents one faded prop from changing every tree or rock;
-- open Gates remain non-blocking for movement and camera collision.
+- dismount uses deterministic safe-ground search instead of placing the player directly beside the horse;
+- Pushik catch-up teleports and invalid-save fallback also use safe dry ground;
+- new and moved structures cannot overlap live trees, rocks or horses;
+- horse-care HUD selection is limited to a useful nearby radius;
+- gameplay HUD version and keyboard prompts now come from the current build and live input profile.
 
-### Independent ranch audio buses
+### Save-slot hardening
 
-- ranch interaction SFX and meadow ambience have separate 0–100% controls;
-- old `settings.properties` files receive safe defaults of 80% SFX and 45% ambience;
-- day phases use a procedural Meadow Breeze profile;
-- night phases use a procedural Night Crickets profile;
-- deterministic bounded scheduling avoids constant audio spam;
-- all audio settings remain device-local and outside save v5 and Steam Cloud.
+- overwrite confirmation is cancelled whenever selection leaves the armed slot;
+- deliberate ranch replacement writes the new ranch to both primary and recovery backup;
+- a damaged new primary can no longer resurrect the previously overwritten ranch;
+- existing atomic writes, autosave history, v1–v5 migrations and ordinary backup recovery remain unchanged.
 
-### Persistence
+Save format remains **v5**. No migration is required.
 
-Save format remains **v5**. Existing ranches load without migration changes, preserving Gate state, Chest contents, moved structures, storage, inventory, hotbar, horse needs, Pushik and world progress.
-
-See [`docs/releases/0.5.5.md`](docs/releases/0.5.5.md) and [`docs/HOMESTEAD_RELEASE_CONTRACT.md`](docs/HOMESTEAD_RELEASE_CONTRACT.md).
+See [`docs/releases/0.5.6.md`](docs/releases/0.5.6.md), [`docs/EVENING_PLAYTEST_0.5.6.md`](docs/EVENING_PLAYTEST_0.5.6.md) and [`docs/HOMESTEAD_RELEASE_CONTRACT.md`](docs/HOMESTEAD_RELEASE_CONTRACT.md).
 
 ## Current playable gameplay
 
 - third-person movement with terrain, structure, tree and rock camera collision;
 - soft camera-occluder fading for procedural trees and rocks;
 - procedural continuous terrain, lake, trees and rocks;
-- resource gathering and persistent construction;
+- resource gathering and persistent construction with tree, rock and horse placement exclusion;
 - visible hotbar and placement preview;
 - feeders, troughs, hay storage, Chests, Gates and Stalls;
 - persistent one-item, stack and full-type Chest transfers;
@@ -58,14 +52,14 @@ See [`docs/releases/0.5.5.md`](docs/releases/0.5.5.md) and [`docs/HOMESTEAD_RELE
 - animated opening and closing Gates;
 - horse personalities and trust/bond/fear;
 - relationship-based taming;
-- riding, gallop stamina and jumping;
+- riding, gallop stamina, jumping and safe-ground dismounting;
 - hunger, thirst, energy and automatic ranch care;
 - day/night lighting;
-- Pushik companion AI;
+- Pushik companion AI with safe catch-up placement;
 - procedural interaction sounds plus day/night ambience on independent buses;
 - Continue / New Game / Load Game / Settings / Exit;
-- three ranch save slots with structure metadata;
-- manual save, autosave and backup recovery.
+- three ranch save slots with continuous-selection overwrite confirmation;
+- manual save, autosave, ranch-replacement backup safety and recovery.
 
 ## Pushik / Пушик
 
@@ -85,7 +79,8 @@ HORSEBOUND has a true in-memory pause lifecycle and device-local input profile.
 - two-step controller dismantle confirmation;
 - dynamic Xbox, PlayStation, Steam Deck, Nintendo and generic controller prompts;
 - context-aware D-pad actions avoid Inventory/blueprint conflicts;
-- held directional navigation repeats while Confirm/Back remain edge-only.
+- held directional navigation repeats while Confirm/Back remain edge-only;
+- controller action edges are re-primed safely across menus, gameplay and reconnects.
 
 Input settings are stored in `%APPDATA%\HORSEBOUND\input.properties` and remain separate from ranch saves, Steam Cloud and the install depot.
 
@@ -166,7 +161,8 @@ Key documents:
 - [`docs/STEAM_RELEASE_READINESS.md`](docs/STEAM_RELEASE_READINESS.md)
 - [`docs/STEAM_CONTROLLER_SMOKE_TEST.md`](docs/STEAM_CONTROLLER_SMOKE_TEST.md)
 - [`docs/HOMESTEAD_RELEASE_CONTRACT.md`](docs/HOMESTEAD_RELEASE_CONTRACT.md)
-- [`docs/releases/0.5.5.md`](docs/releases/0.5.5.md)
+- [`docs/releases/0.5.6.md`](docs/releases/0.5.6.md)
+- [`docs/EVENING_PLAYTEST_0.5.6.md`](docs/EVENING_PLAYTEST_0.5.6.md)
 - [`steam/README.md`](steam/README.md)
 
 ## Build
