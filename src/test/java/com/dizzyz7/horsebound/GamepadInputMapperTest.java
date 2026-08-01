@@ -33,7 +33,7 @@ class GamepadInputMapperTest {
             () -> 1d / 60d
         );
 
-        assertEquals(PlayerCommand.idle(), mapper.sample().command());
+        assertNoOneShotActions(mapper.sample().command());
         PlayerCommand first = mapper.sample().command();
         PlayerCommand second = mapper.sample().command();
 
@@ -106,7 +106,7 @@ class GamepadInputMapperTest {
         assertFalse(mapper.sample().command().jumpPressed());
         assertFalse(mapper.sample().command().jumpPressed());
         assertTrue(mapper.sample().command().jumpPressed());
-        assertEquals(PlayerCommand.idle(), mapper.sample().command());
+        assertNoOneShotActions(mapper.sample().command());
         assertFalse(mapper.sample().command().jumpPressed());
         assertFalse(mapper.sample().command().jumpPressed());
         assertTrue(mapper.sample().command().jumpPressed());
@@ -126,6 +126,16 @@ class GamepadInputMapperTest {
 
         assertEquals(7.5f, command.lookYaw(), 0.0001f);
         assertEquals(5.5f, command.lookPitch(), 0.0001f);
+    }
+
+    private static void assertNoOneShotActions(PlayerCommand command) {
+        assertFalse(command.jumpPressed());
+        assertFalse(command.interactPressed());
+        assertFalse(command.mountPressed());
+        assertFalse(command.buildPressed());
+        assertFalse(command.inventoryPressed());
+        assertFalse(command.savePressed());
+        assertFalse(command.pausePressed());
     }
 
     private static ControllerFrame frame(
