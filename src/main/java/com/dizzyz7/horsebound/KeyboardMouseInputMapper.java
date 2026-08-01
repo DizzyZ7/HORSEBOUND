@@ -22,8 +22,26 @@ final class KeyboardMouseInputMapper implements InputMapper {
     @Override
     public InputSnapshot sample() {
         InputSnapshot snapshot = mixedInput.sample();
-        if (!snapshot.command().pausePressed()) return snapshot;
-        PauseRequestBus.request();
-        return new InputSnapshot(snapshot.command().withoutPause(), snapshot.activeDevice());
+        PlayerCommand command = snapshot.command();
+
+        if (command.buildPressed() && HomesteadInputContext.capturesBuild()) {
+            HomesteadActionBus.requestBuild();
+            command = command.withoutBuild();
+        }
+        if (command.interactPressed() && HomesteadInputContext.capturesInteract()) {
+            HomesteadActionBus.requestInteract();
+            command = command.withoutInteract();
+        }
+        if (command.pausePressed()) {
+            if (HomesteadInputContext.capturesPauseAsCancel()) {
+                HomesteadActionBus.requestCancel();
+            } else {
+                PauseRequestBus.request();
+            }
+            command = command.withoutPause();
+        }
+        return command == snapshot.command()
+            ? snapshot
+            : new InputSnapshot(command, snapshot.activeDevice());
     }
 }
