@@ -42,6 +42,7 @@ class RanchDismantleConfirmationTest {
         confirmation.request(gate);
         gate.toggleOpen();
 
+        assertFalse(confirmation.isArmed());
         assertEquals(RanchDismantleConfirmation.Decision.ARMED, confirmation.request(gate));
         assertTrue(confirmation.isArmedFor(gate));
     }
