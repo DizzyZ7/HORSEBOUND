@@ -15,7 +15,7 @@ class ControllerGlyphFamilyTest {
     }
 
     @Test
-    void detectsPlayStationAndXboxFamilies() {
+    void detectsPlayStationXboxAndNintendoFamilies() {
         assertEquals(ControllerGlyphFamily.PLAYSTATION,
             ControllerGlyphFamily.fromControllerName("Sony DualSense Wireless Controller"));
         assertEquals(ControllerGlyphFamily.PLAYSTATION,
@@ -24,6 +24,10 @@ class ControllerGlyphFamilyTest {
             ControllerGlyphFamily.fromControllerName("Xbox Series X Controller"));
         assertEquals(ControllerGlyphFamily.XBOX,
             ControllerGlyphFamily.fromControllerName("XInput Controller #1"));
+        assertEquals(ControllerGlyphFamily.NINTENDO,
+            ControllerGlyphFamily.fromControllerName("Nintendo Switch Pro Controller"));
+        assertEquals(ControllerGlyphFamily.NINTENDO,
+            ControllerGlyphFamily.fromControllerName("Joy-Con (L/R)"));
     }
 
     @Test
