@@ -42,11 +42,16 @@ final class MenuInputMapper {
             activeDevice = InputDeviceType.GAMEPAD;
         }
 
+        if (keyboard.hasActivity() || controller.hasActivity()) {
+            InputActivityTracker.record(activeDevice);
+        }
+
         return new MenuInputSnapshot(keyboard.merge(controller), activeDevice);
     }
 
     void markPointerActive() {
         activeDevice = InputDeviceType.KEYBOARD_MOUSE;
+        InputActivityTracker.record(activeDevice);
     }
 
     InputDeviceType activeDevice() {

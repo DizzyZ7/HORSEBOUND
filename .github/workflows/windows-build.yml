@@ -75,11 +75,14 @@ jobs:
             "com/badlogic/gdx/controllers/Controllers.class",
             "com/badlogic/gdx/controllers/desktop/JamepadControllerManager.class",
             "com/studiohartman/jamepad/ControllerManager.class",
-            "jamepad64.dll"
+            "jamepad64.dll",
+            "com/dizzyz7/horsebound/PromptOverlay.class",
+            "com/dizzyz7/horsebound/InputGlyphCatalog.class",
+            "com/dizzyz7/horsebound/ControllerGlyphFamily.class"
           )
           foreach ($entry in $requiredJarEntries) {
             if ($jarEntries -notcontains $entry) {
-              throw "Controller runtime entry is missing from HORSEBOUND.jar: $entry"
+              throw "Required runtime entry is missing from HORSEBOUND.jar: $entry"
             }
           }
 

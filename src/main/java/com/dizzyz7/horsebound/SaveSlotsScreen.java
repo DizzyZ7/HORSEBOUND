@@ -6,6 +6,7 @@ import com.badlogic.gdx.Screen;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
+import com.badlogic.gdx.graphics.g2d.GlyphLayout;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Rectangle;
@@ -31,6 +32,7 @@ final class SaveSlotsScreen implements Screen {
     private final SpriteBatch batch = new SpriteBatch();
     private final ShapeRenderer shapes = new ShapeRenderer();
     private final BitmapFont font = new BitmapFont();
+    private final GlyphLayout layout = new GlyphLayout();
     private final MenuInputMapper menuInput = new MenuInputMapper();
     private final Rectangle[] slotButtons = {new Rectangle(), new Rectangle(), new Rectangle()};
     private final Rectangle backButton = new Rectangle();
@@ -56,13 +58,9 @@ final class SaveSlotsScreen implements Screen {
     public void render(float delta) {
         int width = Gdx.graphics.getWidth();
         int height = Gdx.graphics.getHeight();
-        float centerX = width * 0.5f;
-        float top = height * 0.68f;
-
-        for (int i = 0; i < slotButtons.length; i++) {
-            slotButtons[i].set(centerX - 260f, top - i * 104f, 520f, 82f);
-        }
-        backButton.set(centerX - 100f, top - 345f, 200f, 52f);
+        float ui = UiScale.effective(width, height, game.settings().uiScale());
+        float geometryScale = Math.min(ui, 1.15f);
+        layout(width, height, geometryScale);
 
         MenuInputSnapshot input = menuInput.sample();
         if (handleNavigation(input.command())) return;
@@ -90,42 +88,53 @@ final class SaveSlotsScreen implements Screen {
 
         batch.getProjectionMatrix().setToOrtho2D(0f, 0f, width, height);
         batch.begin();
-        font.setColor(Color.WHITE);
-        font.getData().setScale(2.3f);
-        font.draw(batch, mode == Mode.NEW_GAME ? "NEW RANCH" : "LOAD RANCH", centerX - 145f, height * 0.84f);
+        drawCenteredTitle(width, height, ui);
 
-        font.getData().setScale(0.9f);
+        font.getData().setScale(0.82f * ui);
         font.setColor(new Color(0.76f, 0.84f, 0.78f, 1f));
-        font.draw(batch,
-            mode == Mode.NEW_GAME
-                ? "Choose a world slot. Existing ranches require a second confirmation to overwrite."
-                : "Choose a saved ranch to continue.",
-            centerX - 250f,
-            height * 0.84f - 38f
-        );
+        String subtitle = mode == Mode.NEW_GAME
+            ? "Choose a ranch slot. Select an occupied slot twice to replace it."
+            : "Choose a saved ranch to continue.";
+        drawCentered(subtitle, width * 0.5f, height - 98f * geometryScale);
 
         for (int i = 0; i < slots.size(); i++) {
-            drawSlot(slots.get(i), slotButtons[i], i + 1);
+            drawSlot(slots.get(i), slotButtons[i], i + 1, ui, geometryScale);
         }
 
         font.setColor(Color.WHITE);
-        font.getData().setScale(1.05f);
-        font.draw(batch, "BACK", backButton.x + 72f, backButton.y + 34f);
-
-        font.getData().setScale(0.78f);
-        font.setColor(new Color(0.68f, 0.76f, 0.70f, 1f));
-        font.draw(batch, inputHint(input.activeDevice()), centerX - 235f, 78f);
+        font.getData().setScale(1.0f * ui);
+        drawCentered("BACK", backButton.x + backButton.width * 0.5f, backButton.y + 33f * geometryScale);
 
         if (message != null) {
-            font.getData().setScale(0.85f);
+            font.getData().setScale(0.80f * ui);
             font.setColor(new Color(1f, 0.88f, 0.58f, 1f));
-            font.draw(batch, message, centerX - 240f, 52f);
+            drawCentered(message, width * 0.5f, 88f * geometryScale);
         }
-
-        font.getData().setScale(0.72f);
-        font.setColor(new Color(0.68f, 0.73f, 0.69f, 1f));
-        font.draw(batch, "Created by Dimash Janibekov (DizZyZ7)", 18f, 20f);
         batch.end();
+    }
+
+    private void layout(int width, int height, float scale) {
+        float cardWidth = Math.min(width - 42f * scale, 720f * scale);
+        float cardHeight = 82f * scale;
+        float gap = 96f * scale;
+        float x = (width - cardWidth) * 0.5f;
+        float topY = height - 214f * scale;
+        for (int i = 0; i < slotButtons.length; i++) {
+            slotButtons[i].set(x, topY - i * gap, cardWidth, cardHeight);
+        }
+        float backWidth = 210f * scale;
+        backButton.set((width - backWidth) * 0.5f, topY - 3f * gap - 2f * scale, backWidth, 50f * scale);
+    }
+
+    private void drawCenteredTitle(int width, int height, float ui) {
+        font.setColor(Color.WHITE);
+        font.getData().setScale(2.25f * ui);
+        drawCentered(mode == Mode.NEW_GAME ? "NEW RANCH" : "LOAD RANCH", width * 0.5f, height - 42f * ui);
+    }
+
+    private void drawCentered(String text, float centerX, float baselineY) {
+        layout.setText(font, text);
+        font.draw(batch, text, centerX - layout.width * 0.5f, baselineY);
     }
 
     private boolean handleNavigation(MenuCommand command) {
@@ -172,20 +181,21 @@ final class SaveSlotsScreen implements Screen {
         };
     }
 
-    private void drawSlot(SaveSlotInfo slot, Rectangle rect, int number) {
-        font.getData().setScale(1.15f);
+    private void drawSlot(SaveSlotInfo slot, Rectangle rect, int number, float ui, float geometryScale) {
+        float left = rect.x + 18f * geometryScale;
+        font.getData().setScale(1.05f * ui);
         font.setColor(Color.WHITE);
-        font.draw(batch, number + ". " + slot.label(), rect.x + 18f, rect.y + 57f);
+        font.draw(batch, number + ". " + slot.label(), left, rect.y + 56f * geometryScale);
 
-        font.getData().setScale(0.78f);
+        font.getData().setScale(0.72f * ui);
         if (slot.state() == SaveSlotInfo.State.EMPTY) {
             font.setColor(new Color(0.68f, 0.76f, 0.70f, 1f));
-            font.draw(batch, "Empty slot", rect.x + 18f, rect.y + 29f);
+            font.draw(batch, "Empty slot", left, rect.y + 28f * geometryScale);
             return;
         }
         if (slot.state() == SaveSlotInfo.State.CORRUPT) {
             font.setColor(new Color(1f, 0.62f, 0.56f, 1f));
-            font.draw(batch, "Save and backup are unreadable", rect.x + 18f, rect.y + 29f);
+            font.draw(batch, "Save and backup are unreadable", left, rect.y + 28f * geometryScale);
             return;
         }
 
@@ -194,8 +204,8 @@ final class SaveSlotsScreen implements Screen {
         font.draw(batch,
             "Saved " + saved + " | horses " + slot.horseCount() + " | tamed " + slot.tamedHorseCount()
                 + " | fences " + slot.fenceCount(),
-            rect.x + 18f,
-            rect.y + 29f
+            left,
+            rect.y + 28f * geometryScale
         );
     }
 
@@ -226,12 +236,6 @@ final class SaveSlotsScreen implements Screen {
         }
 
         game.startNewWorld(slot.slotId());
-    }
-
-    private static String inputHint(InputDeviceType device) {
-        return device == InputDeviceType.KEYBOARD_MOUSE
-            ? "Up/Down or W/S navigate | Enter confirm | Esc back"
-            : "D-pad/Left Stick navigate | A confirm | B back";
     }
 
     @Override public void resize(int width, int height) { }

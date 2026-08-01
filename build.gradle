@@ -4,7 +4,7 @@ plugins {
 }
 
 group = 'com.dizzyz7'
-version = '0.4.6'
+version = '0.4.7'
 
 ext {
     gdxVersion = '1.14.2'
