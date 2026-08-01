@@ -3,35 +3,39 @@
 Created by **Dimash Janibekov (DizZyZ7)**.  
 Copyright © 2026 Dimash Janibekov. All rights reserved.
 
-This document is the release contract for HORSEBOUND. A feature is not considered shippable merely because it works from an IDE. It must survive installation, restart, Steam delivery, offline use and controller-oriented play.
+This document is the release contract for HORSEBOUND. A feature is not shippable merely because it works from an IDE. It must survive installation, restart, Steam delivery, offline use, controller-oriented play and device changes.
 
 ## Current target
 
 - Product: paid single-player cozy horse sandbox.
-- Runtime: Java 21 game/application/domain code with libGDX + LWJGL3.
+- Runtime: Java 21 application/domain code with libGDX + LWJGL3.
 - Initial supported OS: Windows x64.
 - Delivery: self-contained `jpackage` app image; players do not install Java separately.
 - Steam launch target: `HORSEBOUND.exe` directly, without a required external launcher.
-- Saves: `%APPDATA%\HORSEBOUND\saves\...`.
-- Device-local settings: `%APPDATA%\HORSEBOUND\settings.properties`.
+- Ranch saves: `%APPDATA%\HORSEBOUND\saves\...`.
+- Display settings: `%APPDATA%\HORSEBOUND\settings.properties`.
+- Input/accessibility profile: `%APPDATA%\HORSEBOUND\input.properties`.
+- Diagnostics: `%APPDATA%\HORSEBOUND\logs\...`.
 - Network: all single-player gameplay must work offline.
 
 ## Non-negotiable build rules
 
 1. The default Steam launch option starts the game directly.
 2. The game must not require administrator privileges.
-3. The game must never write mutable saves/settings into the Steam install directory.
-4. A clean Steam install must launch on a supported Windows x64 machine without a separately installed JRE.
+3. The game must never write mutable saves, settings or logs into the Steam install directory.
+4. A clean Steam install must launch on Windows x64 without a separately installed JRE.
 5. The packaged build must start, create user data, save, exit cleanly and reopen the same ranch.
-6. Store-page features must exist in the submitted build; planned features must be clearly marked as planned or omitted.
-7. Steam credentials, SDK binaries, private VDF files and build-account details must never enter Git.
-8. Every release candidate passes unit tests, save migration tests, Windows packaging and executable verification.
+6. Store-page features must exist in the submitted build; planned features are clearly marked or omitted.
+7. Steam credentials, SDK binaries, private VDF files and build-account details never enter Git.
+8. Every candidate passes unit tests, save migrations, Windows packaging, runtime-class assertions and executable verification.
+9. A pause screen must stop simulation and resume the same in-memory ranch rather than silently creating a new session.
+10. Required gameplay actions must remain reachable after rebinding and controller disconnect/reconnect.
 
 ## Steam Cloud design
 
-Use Steam Auto-Cloud first. It is simpler and does not couple the domain layer to Steamworks.
+Use Steam Auto-Cloud first so the gameplay/domain layer remains independent from Steamworks.
 
-Cloud these files:
+Cloud only ranch data:
 
 ```text
 %APPDATA%\HORSEBOUND\saves\**\save.hbs
@@ -42,13 +46,14 @@ Do **not** cloud:
 
 ```text
 %APPDATA%\HORSEBOUND\settings.properties
-logs
+%APPDATA%\HORSEBOUND\input.properties
+%APPDATA%\HORSEBOUND\logs\**
 crash dumps
-temporary files
 save.tmp
+*.tmp
 ```
 
-Reason: graphics, resolution, render distance and input tuning are device-specific. A desktop and Steam Deck must not overwrite each other's display configuration.
+Display and input tuning are device-specific. A desktop, laptop and Steam Deck must not overwrite one another's resolution, dead zones, rumble preference or local bindings.
 
 Recommended initial Auto-Cloud quota:
 
@@ -57,36 +62,52 @@ Recommended initial Auto-Cloud quota:
 - recursive sync under the HORSEBOUND `saves` directory;
 - Windows root first, with platform overrides only if native Linux/macOS builds are added later.
 
+## Input architecture
+
+Current implemented direction:
+
+```text
+Raw keyboard / mouse / standardized gamepad input
+                ↓
+InputProfile + device adapters
+                ↓
+InputMapper
+                ↓
+PlayerCommand / MenuCommand
+                ↓
+fixed-step GameSimulation
+```
+
+- gameplay receives semantic commands rather than physical keys;
+- keyboard bindings are device-local and conflict-safe;
+- movement/camera dead zones are configurable;
+- camera inversion and Hold/Toggle sprint work in the live adapters;
+- pause is intercepted at the application layer before world simulation sees it;
+- unsupported rumble devices fail safely;
+- dynamic prompts use the active input profile and controller family.
+
+The gameplay domain must not query physical input directly.
+
 ## Steam Deck / controller target
 
 HORSEBOUND should target **Deck Verified**, not merely “it launches through Proton”.
 
 Required design direction:
 
-- all gameplay, menus, save slots and settings reachable with a controller;
-- controller enabled by default, without requiring an in-game toggle;
-- mixed input: mouse and right stick may both rotate the camera cleanly;
-- active-device prompts/glyphs instead of permanently showing keyboard text;
+- all gameplay, menus, save slots, pause and essential settings reachable with a controller;
+- controller enabled by default without an in-game enable toggle;
+- mixed input for mouse/right-stick camera use;
+- active-device prompts instead of permanent keyboard text;
 - no required launcher before gameplay;
-- no manual on-screen-keyboard invocation for required text input;
+- no required manual on-screen keyboard invocation;
 - readable HUD and menus at 1280×800;
-- playable default graphics configuration at 30 FPS on Deck-class hardware;
+- playable default configuration at 30 FPS on Deck-class hardware;
 - 16:10 and non-16:9 aspect ratios supported;
-- single-player gameplay available offline.
+- single-player gameplay available offline;
+- controller disconnect/reconnect does not crash or trap focus;
+- accessibility settings persist locally and do not corrupt ranch saves.
 
-Controller abstraction planned for 0.4.2:
-
-```text
-Raw keyboard/mouse/gamepad input
-        ↓
-InputMapper
-        ↓
-PlayerCommand / MenuCommand
-        ↓
-Fixed-step GameSimulation
-```
-
-The gameplay domain must not query `Gdx.input` directly after this migration.
+Passing automated tests is not a Verified claim. Physical Deck profiling, Proton validation and Valve compatibility review remain mandatory.
 
 ## SteamPipe / depot policy
 
@@ -97,57 +118,66 @@ HORSEBOUND/
     HORSEBOUND.exe
     app/
     runtime/
+    licenses/
+    THIRD_PARTY_NOTICES.txt
+    SHA256SUMS.txt
 ```
 
-Do not place saves, settings or generated user files in the depot.
+Never place saves, settings, input profiles, logs or generated user files in the depot. CI explicitly rejects them.
 
 Branch policy once an AppID exists:
 
 - `default`: public approved release;
 - `playtest`: external QA / Steam Playtest build;
 - `internal`: private developer validation;
-- `previous`: rollback candidate when needed.
+- `previous`: rollback candidate.
 
-A build is uploaded to a non-public branch first. The default branch is changed only after installation and smoke testing through the Steam client.
+Upload to a non-public branch first. Promote only after installation and smoke testing through the Steam client.
 
 ## Release-candidate smoke test
 
-Test from the packaged/Steam-installed build, not from Gradle:
+Test the packaged/Steam-installed build, not Gradle:
 
 1. Install into a path containing spaces and non-ASCII characters.
 2. Launch directly from Steam.
-3. Create a new ranch in each save slot.
-4. Gather wood and spend it.
-5. Feed and tame a horse.
-6. Change horse trust/bond/fear.
-7. Pet Pushik and change his affection/state.
-8. Build multiple persistent objects.
-9. Trigger manual save and autosave.
-10. Exit through menu and by closing the window.
-11. Relaunch and verify all state.
-12. Corrupt the primary save and verify backup recovery.
-13. Run without network access.
-14. Run with a controller from startup to exit.
-15. Test 1920×1080, 1280×800 and at least one ultrawide aspect ratio.
-16. Verify no user data is created inside the install depot.
-17. Verify update/install validation does not erase saves.
+3. Create a ranch in each save slot.
+4. Gather/spend resources, feed/tame a horse and change relationship data.
+5. Pet Pushik and change affection/state.
+6. Build persistent objects.
+7. Trigger manual save and autosave.
+8. Pause, change accessibility settings and resume the same in-memory ranch.
+9. Rebind multiple keys, including a conflict swap, and verify HUD prompts update.
+10. Test Hold and Toggle sprint/gallop.
+11. Test camera inversion and several dead-zone values.
+12. Test rumble enabled/disabled on supported hardware.
+13. Exit through menu and close-window paths.
+14. Relaunch and verify all ranch state.
+15. Verify display/input settings persist locally but do not alter ranch data.
+16. Corrupt the primary save and verify backup recovery.
+17. Run without network access.
+18. Run controller-only from startup to exit.
+19. Disconnect and reconnect the controller in gameplay and menus.
+20. Test 1920×1080, 1280×800 and an ultrawide aspect ratio.
+21. Verify no user data appears inside the install depot.
+22. Verify update/install validation does not erase saves.
+
+The detailed controller route is in [`STEAM_CONTROLLER_SMOKE_TEST.md`](STEAM_CONTROLLER_SMOKE_TEST.md).
 
 ## Store/build review discipline
 
 Before submitting to Valve:
 
-- upload a near-final build to the default branch candidate;
-- ensure every feature selected on the store page is implemented;
+- upload a near-final build to a candidate branch;
+- ensure every selected store feature is implemented;
 - use only real gameplay screenshots;
 - do not advertise unimplemented features as current content;
-- make the product description coherent and specific;
 - submit store presence early enough for review feedback;
-- keep the Coming Soon page live for the required minimum period before release;
-- allow review time for both the store page and the product build.
+- keep the Coming Soon page live for the required period;
+- allow review time for both store presence and product build.
 
 ## Early Access decision gate
 
-Do not enter Early Access merely to finance development. HORSEBOUND may enter Early Access only when the current build is already worth its current asking price and provides a stable repeatable loop:
+HORSEBOUND may enter Early Access only when the current build is already worth its current asking price and provides a stable repeatable loop:
 
 ```text
 explore → meet horse → build trust → tame → ride → gather → build ranch → save → return
@@ -157,15 +187,16 @@ Required before Early Access:
 
 - reliable saves and migrations;
 - controller-complete menus/gameplay;
+- true pause and accessible input settings;
 - meaningful horse personalities;
 - stable ranch-building loop;
 - sufficient content for honest repeat play;
 - no roadmap promises phrased as guarantees;
-- transparent Early Access questionnaire describing what exists now.
+- a transparent Early Access questionnaire describing what exists now.
 
 ## Store asset production list
 
-Current required Steam asset targets:
+Current project asset targets:
 
 - Header Capsule: 920×430;
 - Small Capsule: 462×174;
@@ -185,11 +216,11 @@ Base capsules contain only game artwork, the readable HORSEBOUND name/logo and a
 
 - Release process: https://partner.steamgames.com/doc/store/releasing
 - Review process: https://partner.steamgames.com/doc/store/Review_Process
-- Uploading through SteamPipe: https://partner.steamgames.com/doc/sdk/uploading
+- SteamPipe: https://partner.steamgames.com/doc/sdk/uploading
 - Builds: https://partner.steamgames.com/doc/store/application/builds
 - Depots: https://partner.steamgames.com/doc/store/application/depots
 - Steam Cloud: https://partner.steamgames.com/doc/features/cloud
-- Steam Deck / Steam Machine recommendations: https://partner.steamgames.com/doc/steamhardware/recommendations
+- Steam hardware recommendations: https://partner.steamgames.com/doc/steamhardware/recommendations
 - Compatibility review: https://partner.steamgames.com/doc/steamhardware/compat
 - Early Access: https://partner.steamgames.com/doc/store/earlyaccess
 - Graphical assets: https://partner.steamgames.com/doc/store/assets

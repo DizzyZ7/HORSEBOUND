@@ -5,12 +5,9 @@ import com.badlogic.gdx.Gdx;
 
 import java.util.Objects;
 import java.util.function.DoubleSupplier;
+import java.util.function.Supplier;
 
-/**
- * Standard controller bindings:
- * A jump, X interact, Y mount, L1 build, R1 sprint/gallop,
- * Back manual save, Start or B pause/back.
- */
+/** Standardized controller adapter with configurable dead zones, inversion, sprint mode and rumble. */
 final class GamepadInputMapper implements InputMapper {
     private static final float LOOK_YAW_DEGREES_PER_SECOND = 150f;
     private static final float LOOK_PITCH_DEGREES_PER_SECOND = 110f;
@@ -18,43 +15,75 @@ final class GamepadInputMapper implements InputMapper {
 
     private final ControllerStateSource stateSource;
     private final DoubleSupplier frameDeltaSupplier;
+    private final Supplier<InputProfile> profileSupplier;
+    private final SprintLatch sprintLatch = new SprintLatch();
     private ControllerFrame previous = ControllerFrame.disconnected();
 
     GamepadInputMapper() {
-        this(new GdxControllerStateSource(), () -> Gdx.graphics.getDeltaTime());
+        this(new GdxControllerStateSource(), () -> Gdx.graphics.getDeltaTime(), InputProfileContext::current);
     }
 
     GamepadInputMapper(ControllerStateSource stateSource, DoubleSupplier frameDeltaSupplier) {
+        this(stateSource, frameDeltaSupplier, InputProfile::defaults);
+    }
+
+    GamepadInputMapper(
+        ControllerStateSource stateSource,
+        DoubleSupplier frameDeltaSupplier,
+        Supplier<InputProfile> profileSupplier
+    ) {
         this.stateSource = Objects.requireNonNull(stateSource, "stateSource");
         this.frameDeltaSupplier = Objects.requireNonNull(frameDeltaSupplier, "frameDeltaSupplier");
+        this.profileSupplier = Objects.requireNonNull(profileSupplier, "profileSupplier");
     }
 
     @Override
     public InputSnapshot sample() {
-        ControllerFrame current = Objects.requireNonNullElse(
-            stateSource.poll(),
-            ControllerFrame.disconnected()
-        );
+        ControllerFrame current = Objects.requireNonNullElse(stateSource.poll(), ControllerFrame.disconnected());
+        InputProfile profile = Objects.requireNonNullElse(profileSupplier.get(), InputProfile.defaults());
         if (!current.connected()) {
             previous = ControllerFrame.disconnected();
+            sprintLatch.reset();
             return new InputSnapshot(PlayerCommand.idle(), InputDeviceType.GAMEPAD);
         }
 
         float frameDelta = safeFrameDelta(frameDeltaSupplier.getAsDouble());
+        boolean jumpPressed = justPressed(current.buttonA(), previous.buttonA());
+        boolean interactPressed = justPressed(current.buttonX(), previous.buttonX());
+        boolean mountPressed = justPressed(current.buttonY(), previous.buttonY());
+        boolean buildPressed = justPressed(current.buttonL1(), previous.buttonL1());
+        boolean savePressed = justPressed(current.buttonBack(), previous.buttonBack());
+        boolean pausePressed = justPressed(current.buttonStart(), previous.buttonStart())
+            || justPressed(current.buttonB(), previous.buttonB());
+        boolean sprint = sprintLatch.update(
+            current.buttonR1(),
+            justPressed(current.buttonR1(), previous.buttonR1()),
+            profile.sprintMode()
+        );
+        float lookPitch = current.rightStick().y() * LOOK_PITCH_DEGREES_PER_SECOND * frameDelta;
+        if (profile.invertCameraY()) lookPitch = -lookPitch;
+
         PlayerCommand command = new PlayerCommand(
             -current.leftStick().y(),
             current.leftStick().x(),
             current.rightStick().x() * LOOK_YAW_DEGREES_PER_SECOND * frameDelta,
-            current.rightStick().y() * LOOK_PITCH_DEGREES_PER_SECOND * frameDelta,
-            current.buttonR1(),
-            justPressed(current.buttonA(), previous.buttonA()),
-            justPressed(current.buttonX(), previous.buttonX()),
-            justPressed(current.buttonY(), previous.buttonY()),
-            justPressed(current.buttonL1(), previous.buttonL1()),
-            justPressed(current.buttonBack(), previous.buttonBack()),
-            justPressed(current.buttonStart(), previous.buttonStart())
-                || justPressed(current.buttonB(), previous.buttonB())
+            lookPitch,
+            sprint,
+            jumpPressed,
+            interactPressed,
+            mountPressed,
+            buildPressed,
+            savePressed,
+            pausePressed
         );
+
+        if (interactPressed || mountPressed || buildPressed) {
+            ControllerRumble.pulse(profile, 65, 0.55f);
+        } else if (jumpPressed) {
+            ControllerRumble.pulse(profile, 35, 0.35f);
+        } else if (savePressed) {
+            ControllerRumble.pulse(profile, 45, 0.40f);
+        }
 
         previous = current;
         return new InputSnapshot(command, InputDeviceType.GAMEPAD);

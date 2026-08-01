@@ -8,11 +8,7 @@ final class InputGlyphCatalog {
     private InputGlyphCatalog() {
     }
 
-    static GlyphBinding binding(
-        PromptAction action,
-        InputDeviceType device,
-        ControllerGlyphFamily family
-    ) {
+    static GlyphBinding binding(PromptAction action, InputDeviceType device, ControllerGlyphFamily family) {
         if (device == InputDeviceType.KEYBOARD_MOUSE) {
             return new GlyphBinding(keyboardGlyph(action), action.label());
         }
@@ -32,27 +28,26 @@ final class InputGlyphCatalog {
                 PromptAction.PAUSE
             );
         }
-        if (screen instanceof SettingsScreen) {
+        if (screen instanceof InputSettingsScreen || screen instanceof SettingsScreen) {
             return List.of(PromptAction.NAVIGATE, PromptAction.ADJUST, PromptAction.CONFIRM, PromptAction.BACK);
-        }
-        if (screen instanceof SaveSlotsScreen) {
-            return List.of(PromptAction.NAVIGATE, PromptAction.CONFIRM, PromptAction.BACK);
         }
         return List.of(PromptAction.NAVIGATE, PromptAction.CONFIRM, PromptAction.BACK);
     }
 
     private static String keyboardGlyph(PromptAction action) {
+        InputProfile profile = InputProfileContext.current();
         return switch (action) {
             case NAVIGATE -> "WASD";
             case ADJUST -> "A / D";
             case CONFIRM -> "ENTER";
-            case BACK, PAUSE -> "ESC";
-            case INTERACT -> "E";
-            case MOUNT -> "F";
-            case BUILD -> "B";
-            case JUMP -> "SPACE";
-            case SPRINT -> "SHIFT";
-            case SAVE -> "F5";
+            case BACK -> "ESC";
+            case PAUSE -> KeyLabel.of(profile.pauseKey());
+            case INTERACT -> KeyLabel.of(profile.interactKey());
+            case MOUNT -> KeyLabel.of(profile.mountKey());
+            case BUILD -> KeyLabel.of(profile.buildKey());
+            case JUMP -> KeyLabel.of(profile.jumpKey());
+            case SPRINT -> KeyLabel.of(profile.sprintKey());
+            case SAVE -> KeyLabel.of(profile.saveKey());
         };
     }
 

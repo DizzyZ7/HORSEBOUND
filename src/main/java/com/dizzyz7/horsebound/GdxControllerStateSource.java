@@ -6,32 +6,37 @@ import com.badlogic.gdx.controllers.ControllerMapping;
 import com.badlogic.gdx.controllers.Controllers;
 import com.badlogic.gdx.utils.Array;
 
-/**
- * Rendering-thread adapter over the official gdx-controllers standardized mapping.
- */
-final class GdxControllerStateSource implements ControllerStateSource {
-    private static final float MOVE_DEAD_ZONE = 0.20f;
-    private static final float LOOK_DEAD_ZONE = 0.16f;
+import java.util.Objects;
+import java.util.function.Supplier;
 
+/** Rendering-thread adapter over the official gdx-controllers standardized mapping. */
+final class GdxControllerStateSource implements ControllerStateSource {
+    private final Supplier<InputProfile> profileSupplier;
     private Controller activeController;
+
+    GdxControllerStateSource() {
+        this(InputProfileContext::current);
+    }
+
+    GdxControllerStateSource(Supplier<InputProfile> profileSupplier) {
+        this.profileSupplier = Objects.requireNonNull(profileSupplier, "profileSupplier");
+    }
 
     @Override
     public ControllerFrame poll() {
         Controller controller = resolveController();
-        if (controller == null) {
-            return ControllerFrame.disconnected();
-        }
-
+        if (controller == null) return ControllerFrame.disconnected();
+        InputProfile profile = Objects.requireNonNullElse(profileSupplier.get(), InputProfile.defaults());
         ControllerMapping mapping = controller.getMapping();
         AnalogStick left = ControllerDeadZone.radial(
             safeAxis(controller, mapping.axisLeftX),
             safeAxis(controller, mapping.axisLeftY),
-            MOVE_DEAD_ZONE
+            profile.moveDeadZone()
         );
         AnalogStick right = ControllerDeadZone.radial(
             safeAxis(controller, mapping.axisRightX),
             safeAxis(controller, mapping.axisRightY),
-            LOOK_DEAD_ZONE
+            profile.lookDeadZone()
         );
 
         return new ControllerFrame(
@@ -54,16 +59,12 @@ final class GdxControllerStateSource implements ControllerStateSource {
     }
 
     private Controller resolveController() {
-        if (activeController != null && activeController.isConnected()) {
-            return activeController;
-        }
-
+        if (activeController != null && activeController.isConnected()) return activeController;
         Controller current = Controllers.getCurrent();
         if (current != null && current.isConnected()) {
             activeController = current;
             return activeController;
         }
-
         Array<Controller> controllers = Controllers.getControllers();
         for (Controller controller : controllers) {
             if (controller != null && controller.isConnected()) {
@@ -71,24 +72,19 @@ final class GdxControllerStateSource implements ControllerStateSource {
                 return activeController;
             }
         }
-
         activeController = null;
         return null;
     }
 
     private static float safeAxis(Controller controller, int axisCode) {
-        if (axisCode == ControllerMapping.UNDEFINED || axisCode < 0 || axisCode >= controller.getAxisCount()) {
-            return 0f;
-        }
+        if (axisCode == ControllerMapping.UNDEFINED || axisCode < 0 || axisCode >= controller.getAxisCount()) return 0f;
         float value = controller.getAxis(axisCode);
         return Float.isFinite(value) ? Math.max(-1f, Math.min(1f, value)) : 0f;
     }
 
     private static boolean safeButton(Controller controller, int buttonCode) {
         if (buttonCode == ControllerMapping.UNDEFINED) return false;
-        if (buttonCode < controller.getMinButtonIndex() || buttonCode > controller.getMaxButtonIndex()) {
-            return false;
-        }
+        if (buttonCode < controller.getMinButtonIndex() || buttonCode > controller.getMaxButtonIndex()) return false;
         return controller.getButton(buttonCode);
     }
 }
