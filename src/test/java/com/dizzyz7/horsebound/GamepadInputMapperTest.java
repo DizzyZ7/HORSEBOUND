@@ -25,8 +25,15 @@ class GamepadInputMapperTest {
             true, false, true, true,
             true, true, true, true
         );
-        GamepadInputMapper mapper = new GamepadInputMapper(() -> held, () -> 1d / 60d);
+        AtomicInteger frameIndex = new AtomicInteger();
+        GamepadInputMapper mapper = new GamepadInputMapper(
+            () -> frameIndex.getAndIncrement() == 0
+                ? frame(AnalogStick.zero(), AnalogStick.zero(), false, false, false, false, false, false, false, false)
+                : held,
+            () -> 1d / 60d
+        );
 
+        assertEquals(PlayerCommand.idle(), mapper.sample().command());
         PlayerCommand first = mapper.sample().command();
         PlayerCommand second = mapper.sample().command();
 
@@ -53,21 +60,42 @@ class GamepadInputMapperTest {
 
     @Test
     void dpadUpOpensInventoryOnlyOutsidePlacementContext() {
+        ControllerFrame neutral = dpadFrame(false, false, false, false);
         ControllerFrame up = dpadFrame(true, false, false, false);
-        GamepadInputMapper normal = new GamepadInputMapper(() -> up, () -> 1d / 60d);
+        AtomicInteger normalIndex = new AtomicInteger();
+        GamepadInputMapper normal = new GamepadInputMapper(
+            () -> normalIndex.getAndIncrement() == 0 ? neutral : up,
+            () -> 1d / 60d
+        );
+        assertFalse(normal.sample().command().inventoryPressed());
         assertTrue(normal.sample().command().inventoryPressed());
 
         HomesteadInputContext.configure(true, true, true, true, true);
-        GamepadInputMapper placement = new GamepadInputMapper(() -> up, () -> 1d / 60d);
+        AtomicInteger placementIndex = new AtomicInteger();
+        GamepadInputMapper placement = new GamepadInputMapper(
+            () -> placementIndex.getAndIncrement() == 0 ? neutral : up,
+            () -> 1d / 60d
+        );
+        assertFalse(placement.sample().command().inventoryPressed());
         assertFalse(placement.sample().command().inventoryPressed());
     }
 
     @Test
-    void resetsButtonEdgesAcrossDisconnectAndReconnect() {
+    void suppressesCarriedButtonEdgesOnInitialConnectionAndReconnect() {
+        ControllerFrame held = frame(
+            AnalogStick.zero(), AnalogStick.zero(), true, false, false, false, false, false, false, false
+        );
+        ControllerFrame neutral = frame(
+            AnalogStick.zero(), AnalogStick.zero(), false, false, false, false, false, false, false, false
+        );
         List<ControllerFrame> sequence = List.of(
-            frame(AnalogStick.zero(), AnalogStick.zero(), true, false, false, false, false, false, false, false),
+            held,
+            neutral,
+            held,
             ControllerFrame.disconnected(),
-            frame(AnalogStick.zero(), AnalogStick.zero(), true, false, false, false, false, false, false, false)
+            held,
+            neutral,
+            held
         );
         AtomicInteger index = new AtomicInteger();
         GamepadInputMapper mapper = new GamepadInputMapper(
@@ -75,8 +103,12 @@ class GamepadInputMapperTest {
             () -> 1d / 60d
         );
 
+        assertFalse(mapper.sample().command().jumpPressed());
+        assertFalse(mapper.sample().command().jumpPressed());
         assertTrue(mapper.sample().command().jumpPressed());
         assertEquals(PlayerCommand.idle(), mapper.sample().command());
+        assertFalse(mapper.sample().command().jumpPressed());
+        assertFalse(mapper.sample().command().jumpPressed());
         assertTrue(mapper.sample().command().jumpPressed());
     }
 
