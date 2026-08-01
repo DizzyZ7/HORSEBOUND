@@ -23,6 +23,8 @@ interface RanchWorldAccess {
 
     void setCameraObstacles(List<RanchCameraCollisionSystem.Obstacle> obstacles);
 
+    boolean isNaturePlacementBlocked(float x, float z, float radius);
+
     record ActorPose(float x, float z, float heading, boolean mounted) {
         public ActorPose {
             x = finiteOrZero(x);

@@ -20,6 +20,9 @@ final class MenuInputMapper {
     private final NavigationRepeater navigationRepeater = new NavigationRepeater();
     private ControllerFrame previousController = ControllerFrame.disconnected();
     private InputDeviceType activeDevice = InputDeviceType.KEYBOARD_MOUSE;
+    private boolean controllerPrimed;
+    private boolean awaitingControllerNeutral;
+    private boolean controllerSampleSuppressed;
 
     MenuInputMapper() {
         this(
@@ -54,7 +57,8 @@ final class MenuInputMapper {
 
         if (keyboard.hasActivity() && !controller.hasActivity()) {
             activeDevice = InputDeviceType.KEYBOARD_MOUSE;
-        } else if (controller.hasActivity() && !keyboard.hasActivity()) {
+        } else if ((controller.hasActivity() || (controllerSampleSuppressed && current.hasActivity()))
+            && !keyboard.hasActivity()) {
             activeDevice = InputDeviceType.GAMEPAD;
         }
 
@@ -86,8 +90,26 @@ final class MenuInputMapper {
     }
 
     private MenuCommand controllerCommand(ControllerFrame current, ControllerFrame previous, float delta) {
+        controllerSampleSuppressed = false;
         if (!current.connected()) {
+            controllerPrimed = false;
+            awaitingControllerNeutral = false;
             navigationRepeater.reset();
+            return MenuCommand.idle();
+        }
+
+        if (!controllerPrimed) {
+            controllerPrimed = true;
+            awaitingControllerNeutral = current.hasActivity();
+            controllerSampleSuppressed = true;
+            navigationRepeater.reset();
+            return MenuCommand.idle();
+        }
+
+        if (awaitingControllerNeutral) {
+            controllerSampleSuppressed = true;
+            navigationRepeater.reset();
+            if (!current.hasActivity()) awaitingControllerNeutral = false;
             return MenuCommand.idle();
         }
 
