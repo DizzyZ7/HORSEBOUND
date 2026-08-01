@@ -2,10 +2,12 @@
 package com.dizzyz7.horsebound;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 final class HomesteadState {
@@ -17,8 +19,9 @@ final class HomesteadState {
     static HomesteadState restore(List<SaveGame.StructureData> savedStructures) {
         HomesteadState state = new HomesteadState();
         if (savedStructures == null) return state;
+        Set<UUID> seenIds = new HashSet<>();
         for (SaveGame.StructureData saved : savedStructures) {
-            if (saved == null) continue;
+            if (saved == null || !seenIds.add(saved.id())) continue;
             state.structures.add(new PlacedStructure(
                 saved.id(),
                 saved.type(),
@@ -46,7 +49,11 @@ final class HomesteadState {
         for (Map.Entry<ItemId, Integer> cost : type.buildCost().entrySet()) {
             inventory.remove(cost.getKey(), cost.getValue());
         }
-        PlacedStructure placed = new PlacedStructure(UUID.randomUUID(), type, x, z, heading, 0);
+        UUID id;
+        do {
+            id = UUID.randomUUID();
+        } while (find(id).isPresent());
+        PlacedStructure placed = new PlacedStructure(id, type, x, z, heading, 0);
         structures.add(placed);
         return Optional.of(placed);
     }
@@ -85,8 +92,10 @@ final class HomesteadState {
     }
 
     boolean consumeNearestResource(ItemId resource, float x, float z, float radius) {
+        Objects.requireNonNull(resource, "resource");
+        float safeRadius = safeRadius(radius);
         PlacedStructure nearest = null;
-        float bestDistanceSquared = radius * radius;
+        float bestDistanceSquared = safeRadius * safeRadius;
         for (PlacedStructure structure : structures) {
             if (structure.type().acceptedResource() != resource || structure.storedUnits() <= 0) continue;
             float distanceSquared = distanceSquared(x, z, structure.x(), structure.z());
@@ -98,7 +107,9 @@ final class HomesteadState {
     }
 
     boolean hasNearby(HomesteadStructureType type, float x, float z, float radius) {
-        float radiusSquared = radius * radius;
+        Objects.requireNonNull(type, "type");
+        float safeRadius = safeRadius(radius);
+        float radiusSquared = safeRadius * safeRadius;
         for (PlacedStructure structure : structures) {
             if (structure.type() == type && distanceSquared(x, z, structure.x(), structure.z()) <= radiusSquared) {
                 return true;
@@ -108,6 +119,7 @@ final class HomesteadState {
     }
 
     Optional<PlacedStructure> find(UUID id) {
+        if (id == null) return Optional.empty();
         return structures.stream().filter(value -> value.id().equals(id)).findFirst();
     }
 
@@ -119,9 +131,16 @@ final class HomesteadState {
         return structures.stream().map(PlacedStructure::toSaveData).toList();
     }
 
+    private static float safeRadius(float value) {
+        if (!Float.isFinite(value)) return 0f;
+        return Math.max(0f, value);
+    }
+
     private static float distanceSquared(float ax, float az, float bx, float bz) {
-        float dx = ax - bx;
-        float dz = az - bz;
+        float safeAx = Float.isFinite(ax) ? ax : 0f;
+        float safeAz = Float.isFinite(az) ? az : 0f;
+        float dx = safeAx - bx;
+        float dz = safeAz - bz;
         return dx * dx + dz * dz;
     }
 }
