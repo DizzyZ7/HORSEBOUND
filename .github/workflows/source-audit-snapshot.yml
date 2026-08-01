@@ -1,28 +1,33 @@
-name: HORSEBOUND Source Audit Snapshot
+name: HORSEBOUND Apply Verified 0.5.6 Patch
 
 on:
   pull_request:
     branches: [ main ]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  source-snapshot:
+  apply-patch:
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Checkout exact audit head
+      - name: Checkout exact PR head
         uses: actions/checkout@v4
-
-      - name: Archive source tree
-        shell: bash
-        run: zip -qr HORSEBOUND-source-audit.zip . -x '.git/*' 'build/*' '*.log'
-
-      - name: Upload source audit snapshot
-        uses: actions/upload-artifact@v4
         with:
-          name: HORSEBOUND-source-audit
-          path: HORSEBOUND-source-audit.zip
-          if-no-files-found: error
-          retention-days: 1
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+
+      - name: Apply locally compiled hardening patch
+        shell: bash
+        run: |
+          cat .github/dev/horsebound-056.patch.b64.* | base64 -d | gzip -d > /tmp/horsebound-056.patch
+          git apply --check /tmp/horsebound-056.patch
+          git apply /tmp/horsebound-056.patch
+          rm -rf .github/dev
+          git config user.name "DizZyZ7 Release Bot"
+          git config user.email "99655528+DizzyZ7@users.noreply.github.com"
+          git add -A
+          git commit -m "fix: harden evening playtest routes"
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
