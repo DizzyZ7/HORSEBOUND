@@ -3,7 +3,9 @@ package com.dizzyz7.horsebound;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -81,5 +83,17 @@ class HomesteadStateTest {
         assertEquals(5, actual.storedUnits());
         assertEquals(-5f, actual.x());
         assertEquals(7f, actual.z());
+    }
+
+    @Test
+    void duplicatePersistentIdsCannotCreateAmbiguousStructures() {
+        UUID duplicate = UUID.fromString("ef13acd1-4982-47e7-908d-dc92db754fd2");
+        HomesteadState restored = HomesteadState.restore(List.of(
+            new SaveGame.StructureData(duplicate, HomesteadStructureType.FEEDER, 1f, 2f, 0f, 4),
+            new SaveGame.StructureData(duplicate, HomesteadStructureType.WATER_TROUGH, 8f, 9f, 0f, 12)
+        ));
+
+        assertEquals(1, restored.structures().size());
+        assertEquals(HomesteadStructureType.FEEDER, restored.find(duplicate).orElseThrow().type());
     }
 }
