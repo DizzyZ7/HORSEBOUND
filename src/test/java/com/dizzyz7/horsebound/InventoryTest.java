@@ -39,6 +39,24 @@ class InventoryTest {
             new InventoryStack(ItemId.APPLE, 5)
         ), stacks);
         assertEquals(45, stacks.stream().mapToInt(InventoryStack::amount).sum());
+        assertEquals(3, inventory.usedSlots());
+    }
+
+    @Test
+    void capacityUsesPartialStacksBeforeRejectingNewItems() {
+        Inventory inventory = new Inventory(2);
+        assertEquals(99, inventory.add(ItemId.WOOD, 99));
+        assertEquals(20, inventory.add(ItemId.APPLE, 20));
+        assertEquals(2, inventory.usedSlots());
+        assertEquals(0, inventory.add(ItemId.HAY, 1));
+
+        assertTrue(inventory.remove(ItemId.WOOD, 1));
+        assertEquals(1, inventory.add(ItemId.WOOD, 5));
+        assertEquals(99, inventory.count(ItemId.WOOD));
+
+        assertTrue(inventory.remove(ItemId.APPLE, 20));
+        assertEquals(50, inventory.add(ItemId.HAY, 80));
+        assertEquals(2, inventory.usedSlots());
     }
 
     @Test
@@ -55,5 +73,23 @@ class InventoryTest {
 
         assertEquals(120, inventory.count(ItemId.WOOD));
         assertEquals(0, inventory.count(ItemId.APPLE));
+    }
+
+    @Test
+    void legacyOverflowIsPreservedButBlocksNewStacksUntilSpaceIsFreed() {
+        Inventory inventory = Inventory.restore(
+            List.of(new SaveGame.ItemStackData(ItemId.WOOD.name(), 3000)),
+            0,
+            0
+        );
+
+        assertEquals(3000, inventory.count(ItemId.WOOD));
+        assertTrue(inventory.isOverCapacity());
+        assertEquals(0, inventory.add(ItemId.APPLE, 1));
+
+        assertTrue(inventory.remove(ItemId.WOOD, 723));
+        assertFalse(inventory.isOverCapacity());
+        assertEquals(20, inventory.add(ItemId.APPLE, 20));
+        assertEquals(Inventory.DEFAULT_SLOT_CAPACITY, inventory.usedSlots());
     }
 }
