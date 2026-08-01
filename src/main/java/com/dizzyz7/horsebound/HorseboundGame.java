@@ -6,6 +6,7 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Screen;
 
 import java.util.List;
+import java.util.Objects;
 
 public final class HorseboundGame extends Game {
     private final SettingsRepository settingsRepository;
@@ -37,9 +38,9 @@ public final class HorseboundGame extends Game {
         InputProfileRepository inputProfileRepository,
         InputProfile initialInputProfile
     ) {
-        this.settingsRepository = settingsRepository;
+        this.settingsRepository = Objects.requireNonNull(settingsRepository, "settingsRepository");
         this.settings = initialSettings == null ? GameSettings.defaults() : initialSettings;
-        this.inputProfileRepository = inputProfileRepository;
+        this.inputProfileRepository = Objects.requireNonNull(inputProfileRepository, "inputProfileRepository");
         this.inputProfile = initialInputProfile == null ? InputProfile.defaults() : initialInputProfile;
     }
 
@@ -161,7 +162,10 @@ public final class HorseboundGame extends Game {
     }
 
     void resumePausedWorld(LivingRanchScreen world) {
-        if (world == null) returnToMenu();
+        if (world == null) {
+            returnToMenu();
+            return;
+        }
         Screen previous = getScreen();
         setScreen(world);
         if (previous != null && previous != world) previous.dispose();
@@ -185,7 +189,7 @@ public final class HorseboundGame extends Game {
 
     private void switchTo(Screen next) {
         Screen previous = getScreen();
-        setScreen(next);
+        setScreen(Objects.requireNonNull(next, "next"));
         if (previous != null && previous != suspendedWorld) previous.dispose();
     }
 
