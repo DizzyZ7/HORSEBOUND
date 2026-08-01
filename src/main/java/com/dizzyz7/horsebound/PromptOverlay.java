@@ -50,7 +50,7 @@ final class PromptOverlay {
         shapes.setColor(PANEL);
         shapes.rect(0f, panelY, width, panelHeight);
 
-        if (screen instanceof LivingRanchScreen) {
+        if (screen instanceof RanchSessionScreen) {
             shapes.setColor(HEADER_PANEL);
             shapes.rect(0f, height - 52f * geometryScale, 350f * geometryScale, 52f * geometryScale);
         }
@@ -77,18 +77,13 @@ final class PromptOverlay {
             font.setColor(TEXT);
         }
 
-        if (screen instanceof LivingRanchScreen) {
+        if (screen instanceof RanchSessionScreen) {
             font.getData().setScale(0.84f * ui);
             font.setColor(TEXT);
             font.draw(batch, buildLabel, 14f * geometryScale, height - 18f * geometryScale);
             font.getData().setScale(0.64f * ui);
             font.setColor(SECONDARY);
-            font.draw(
-                batch,
-                deviceLabel(device, family),
-                14f * geometryScale,
-                height - 39f * geometryScale
-            );
+            font.draw(batch, deviceLabel(device, family), 14f * geometryScale, height - 39f * geometryScale);
         }
         batch.end();
 
@@ -96,11 +91,7 @@ final class PromptOverlay {
         Gdx.gl.glEnable(GL20.GL_DEPTH_TEST);
     }
 
-    private List<GlyphBinding> bindings(
-        Screen screen,
-        InputDeviceType device,
-        ControllerGlyphFamily family
-    ) {
+    private List<GlyphBinding> bindings(Screen screen, InputDeviceType device, ControllerGlyphFamily family) {
         List<GlyphBinding> result = new ArrayList<>();
         for (PromptAction action : InputGlyphCatalog.actionsForScreen(screen)) {
             result.add(InputGlyphCatalog.binding(action, device, family));
@@ -126,19 +117,12 @@ final class PromptOverlay {
             layout.setText(font, binding.glyph());
             float chipWidth = Math.max(28f * geometryScale, layout.width + 14f * geometryScale);
             layout.setText(font, binding.actionLabel());
-            float textWidth = layout.width;
-            float itemWidth = chipWidth + 7f * geometryScale + textWidth;
+            float itemWidth = chipWidth + 7f * geometryScale + layout.width;
             if (x + itemWidth > width - 14f * geometryScale && x > 14f * geometryScale) {
                 x = 14f * geometryScale;
                 y -= 28f * geometryScale;
             }
-            result.add(new PromptPosition(
-                x,
-                x + chipWidth + 7f * geometryScale,
-                y,
-                chipWidth,
-                itemHeight
-            ));
+            result.add(new PromptPosition(x, x + chipWidth + 7f * geometryScale, y, chipWidth, itemHeight));
             x += itemWidth + gap;
         }
         return result;
@@ -161,12 +145,6 @@ final class PromptOverlay {
         font.dispose();
     }
 
-    private record PromptPosition(
-        float chipX,
-        float textX,
-        float y,
-        float chipWidth,
-        float height
-    ) {
+    private record PromptPosition(float chipX, float textX, float y, float chipWidth, float height) {
     }
 }
