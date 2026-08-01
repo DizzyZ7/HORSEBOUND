@@ -29,20 +29,42 @@ class RanchUndoManagerTest {
     }
 
     @Test
-    void placementUndoRefusesChangedOrFilledStructure() {
+    void openingAndClosingGateStillInvalidatesPlacementUndo() {
         Inventory inventory = funded(HomesteadStructureType.GATE);
         HomesteadState state = new HomesteadState();
         PlacedStructure gate = state.place(HomesteadStructureType.GATE, 2f, 2f, 0f, inventory).orElseThrow();
         RanchUndoManager undo = new RanchUndoManager();
         undo.recordPlacement(gate);
         gate.toggleOpen();
+        gate.toggleOpen();
 
+        assertFalse(gate.isOpen());
         assertEquals(
             RanchUndoManager.UndoResult.STRUCTURE_CHANGED,
             undo.undo(state, inventory, (structure, x, z, heading) -> true)
         );
         assertEquals(1, state.structures().size());
         assertFalse(undo.hasPending());
+    }
+
+    @Test
+    void chestTransferOutAndBackStillInvalidatesPlacementUndo() {
+        Inventory inventory = funded(HomesteadStructureType.CHEST);
+        inventory.add(ItemId.APPLE, 1);
+        HomesteadState state = new HomesteadState();
+        PlacedStructure chest = state.place(HomesteadStructureType.CHEST, 2f, 2f, 0f, inventory).orElseThrow();
+        RanchUndoManager undo = new RanchUndoManager();
+        undo.recordPlacement(chest);
+
+        assertTrue(inventory.transferTo(chest.itemStorage(), ItemId.APPLE, 1));
+        assertTrue(chest.itemStorage().transferTo(inventory, ItemId.APPLE, 1));
+        assertTrue(chest.itemStorage().isEmpty());
+
+        assertEquals(
+            RanchUndoManager.UndoResult.STRUCTURE_CHANGED,
+            undo.undo(state, inventory, (structure, x, z, heading) -> true)
+        );
+        assertEquals(1, state.structures().size());
     }
 
     @Test
@@ -62,6 +84,23 @@ class RanchUndoManagerTest {
         assertEquals(1f, chest.x());
         assertEquals(2f, chest.z());
         assertEquals(15f, chest.heading());
+    }
+
+    @Test
+    void mutationAfterRelocationInvalidatesUndoEvenWhenTransformMatches() {
+        Inventory inventory = funded(HomesteadStructureType.GATE);
+        HomesteadState state = new HomesteadState();
+        PlacedStructure gate = state.place(HomesteadStructureType.GATE, 1f, 2f, 15f, inventory).orElseThrow();
+        state.relocate(gate.id(), 8f, 9f, 90f);
+        RanchUndoManager undo = new RanchUndoManager();
+        undo.recordRelocation(gate, 1f, 2f, 15f, 8f, 9f, 90f);
+        gate.toggleOpen();
+
+        assertEquals(
+            RanchUndoManager.UndoResult.STRUCTURE_CHANGED,
+            undo.undo(state, inventory, (structure, x, z, heading) -> true)
+        );
+        assertEquals(8f, gate.x());
     }
 
     @Test
