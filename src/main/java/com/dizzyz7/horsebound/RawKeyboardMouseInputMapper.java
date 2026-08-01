@@ -2,31 +2,50 @@
 package com.dizzyz7.horsebound;
 
 import com.badlogic.gdx.Gdx;
-import com.badlogic.gdx.Input;
+
+import java.util.Objects;
+import java.util.function.Supplier;
 
 final class RawKeyboardMouseInputMapper implements InputMapper {
     private final float mouseSensitivity;
+    private final Supplier<InputProfile> profileSupplier;
+    private final SprintLatch sprintLatch = new SprintLatch();
 
     RawKeyboardMouseInputMapper(float mouseSensitivity) {
+        this(mouseSensitivity, InputProfileContext::current);
+    }
+
+    RawKeyboardMouseInputMapper(float mouseSensitivity, Supplier<InputProfile> profileSupplier) {
         this.mouseSensitivity = Float.isFinite(mouseSensitivity)
             ? Math.max(0.01f, Math.min(2f, mouseSensitivity))
             : 0.20f;
+        this.profileSupplier = Objects.requireNonNull(profileSupplier, "profileSupplier");
     }
 
     @Override
     public InputSnapshot sample() {
+        InputProfile profile = Objects.requireNonNullElse(profileSupplier.get(), InputProfile.defaults());
+        boolean sprintPressed = Gdx.input.isKeyPressed(profile.sprintKey());
+        boolean sprint = sprintLatch.update(
+            sprintPressed,
+            Gdx.input.isKeyJustPressed(profile.sprintKey()),
+            profile.sprintMode()
+        );
+        float pitch = Gdx.input.getDeltaY() * mouseSensitivity * 0.75f;
+        if (profile.invertCameraY()) pitch = -pitch;
+
         PlayerCommand command = new PlayerCommand(
-            axis(Input.Keys.W, Input.Keys.S),
-            axis(Input.Keys.D, Input.Keys.A),
+            axis(profile.moveForwardKey(), profile.moveBackwardKey()),
+            axis(profile.moveRightKey(), profile.moveLeftKey()),
             -Gdx.input.getDeltaX() * mouseSensitivity,
-            Gdx.input.getDeltaY() * mouseSensitivity * 0.75f,
-            Gdx.input.isKeyPressed(Input.Keys.SHIFT_LEFT) || Gdx.input.isKeyPressed(Input.Keys.SHIFT_RIGHT),
-            Gdx.input.isKeyJustPressed(Input.Keys.SPACE),
-            Gdx.input.isKeyJustPressed(Input.Keys.E),
-            Gdx.input.isKeyJustPressed(Input.Keys.F),
-            Gdx.input.isKeyJustPressed(Input.Keys.B),
-            Gdx.input.isKeyJustPressed(Input.Keys.F5),
-            Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)
+            pitch,
+            sprint,
+            Gdx.input.isKeyJustPressed(profile.jumpKey()),
+            Gdx.input.isKeyJustPressed(profile.interactKey()),
+            Gdx.input.isKeyJustPressed(profile.mountKey()),
+            Gdx.input.isKeyJustPressed(profile.buildKey()),
+            Gdx.input.isKeyJustPressed(profile.saveKey()),
+            Gdx.input.isKeyJustPressed(profile.pauseKey())
         );
         return new InputSnapshot(command, InputDeviceType.KEYBOARD_MOUSE);
     }
