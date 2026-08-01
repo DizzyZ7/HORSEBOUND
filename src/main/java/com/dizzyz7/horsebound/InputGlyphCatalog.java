@@ -17,7 +17,7 @@ final class InputGlyphCatalog {
     }
 
     static List<PromptAction> actionsForScreen(Object screen) {
-        if (screen instanceof LivingRanchScreen) {
+        if (screen instanceof RanchSessionScreen) {
             return List.of(
                 PromptAction.INTERACT,
                 PromptAction.MOUNT,
