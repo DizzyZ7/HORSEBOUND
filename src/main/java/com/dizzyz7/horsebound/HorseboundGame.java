@@ -54,6 +54,7 @@ public final class HorseboundGame extends Game {
         HomesteadActionBus.reset();
         HomesteadInputContext.reset();
         InputProfileContext.set(inputProfile);
+        RanchAudio.setMasterVolume(settings.sfxVolume());
         Gdx.graphics.setVSync(settings.vsync());
         setScreen(new MenuScreen(this));
     }
@@ -93,6 +94,7 @@ public final class HorseboundGame extends Game {
     void updateSettings(GameSettings next) {
         GameSettings applied = DisplayController.applyRuntime(settings, next);
         settings = applied;
+        RanchAudio.setMasterVolume(applied.sfxVolume());
         try {
             settingsRepository.save(applied);
         } catch (SettingsRepository.SettingsException ex) {
@@ -199,6 +201,7 @@ public final class HorseboundGame extends Game {
         if (current != null) current.dispose();
         if (promptOverlay != null) promptOverlay.dispose();
         if (performanceOverlay != null) performanceOverlay.dispose();
+        RanchAudio.shutdown();
         InputProfileContext.reset();
         PauseRequestBus.reset();
         HomesteadActionBus.reset();
