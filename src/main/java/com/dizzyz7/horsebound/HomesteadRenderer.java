@@ -35,9 +35,10 @@ final class HomesteadRenderer implements Disposable {
     void render(
         PerspectiveCamera camera,
         HomesteadState state,
+        Set<UUID> hiddenStructureIds,
         PlacementPreview placement
     ) {
-        sync(state);
+        sync(state, hiddenStructureIds == null ? Set.of() : hiddenStructureIds);
         Gdx.gl.glEnable(GL20.GL_DEPTH_TEST);
         Gdx.gl.glEnable(GL20.GL_BLEND);
         Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
@@ -51,9 +52,10 @@ final class HomesteadRenderer implements Disposable {
         Gdx.gl.glDisable(GL20.GL_BLEND);
     }
 
-    private void sync(HomesteadState state) {
+    private void sync(HomesteadState state, Set<UUID> hiddenStructureIds) {
         Set<UUID> alive = new HashSet<>();
         for (PlacedStructure structure : state.structures()) {
+            if (hiddenStructureIds.contains(structure.id())) continue;
             alive.add(structure.id());
             ModelInstance instance = instances.computeIfAbsent(
                 structure.id(),
