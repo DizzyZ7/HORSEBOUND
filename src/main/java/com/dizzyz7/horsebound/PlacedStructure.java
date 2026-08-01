@@ -14,6 +14,7 @@ final class PlacedStructure {
     private float heading;
     private int storedUnits;
     private boolean open;
+    private long mutationVersion;
 
     PlacedStructure(
         UUID id,
@@ -84,30 +85,42 @@ final class PlacedStructure {
         return itemStorage;
     }
 
+    long operationalVersion() {
+        return mutationVersion + itemStorage.mutationVersion();
+    }
+
     boolean relocate(float nextX, float nextZ, float nextHeading) {
         if (!Float.isFinite(nextX) || !Float.isFinite(nextZ) || !Float.isFinite(nextHeading)) return false;
+        float normalizedHeading = normalizeHeading(nextHeading);
+        if (same(x, nextX) && same(z, nextZ) && sameAngle(heading, normalizedHeading)) return true;
         x = nextX;
         z = nextZ;
-        heading = normalizeHeading(nextHeading);
+        heading = normalizedHeading;
+        mutationVersion++;
         return true;
     }
 
     boolean toggleOpen() {
         if (!type.canToggleOpen()) return false;
         open = !open;
+        mutationVersion++;
         return true;
     }
 
     int addUnits(int amount) {
         if (!type.storesResource() || amount <= 0) return 0;
         int accepted = Math.min(amount, type.storageCapacity() - storedUnits);
-        storedUnits += accepted;
+        if (accepted > 0) {
+            storedUnits += accepted;
+            mutationVersion++;
+        }
         return accepted;
     }
 
     boolean consumeUnit() {
         if (storedUnits <= 0) return false;
         storedUnits--;
+        mutationVersion++;
         return true;
     }
 
@@ -117,7 +130,10 @@ final class PlacedStructure {
         int unitsPerItem = type.resourceUnitsPerItem();
         int recoverableItems = storedUnits / unitsPerItem;
         int accepted = destination.add(type.acceptedResource(), recoverableItems);
-        storedUnits -= accepted * unitsPerItem;
+        if (accepted > 0) {
+            storedUnits -= accepted * unitsPerItem;
+            mutationVersion++;
+        }
         return accepted;
     }
 
@@ -132,6 +148,15 @@ final class PlacedStructure {
             open,
             itemStorage.toSaveData()
         );
+    }
+
+    private static boolean same(float left, float right) {
+        return Math.abs(left - right) <= 0.001f;
+    }
+
+    private static boolean sameAngle(float left, float right) {
+        float difference = Math.abs(normalizeHeading(left) - normalizeHeading(right));
+        return Math.min(difference, 360f - difference) <= 0.001f;
     }
 
     private static float finiteOrZero(float value) {
