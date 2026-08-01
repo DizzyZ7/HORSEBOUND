@@ -6,6 +6,7 @@ import java.util.List;
 /** Pure-Java swept-circle collision against placed Homestead structures. */
 final class HomesteadCollisionSystem {
     private static final float MAX_STEP = 0.22f;
+    private static final float SCORE_EPSILON = 0.0001f;
 
     Position resolve(
         float previousX,
@@ -28,14 +29,27 @@ final class HomesteadCollisionSystem {
         int steps = Math.max(1, (int) Math.ceil(distance / MAX_STEP));
         float lastX = startX;
         float lastZ = startZ;
+        float lastScore = penetrationScore(startX, startZ, safeRadius, safeStructures);
+        boolean escapingInitialOverlap = lastScore > SCORE_EPSILON;
 
         for (int i = 1; i <= steps; i++) {
             float alpha = i / (float) steps;
             float candidateX = startX + dx * alpha;
             float candidateZ = startZ + dz * alpha;
-            if (collides(candidateX, candidateZ, safeRadius, safeStructures)) {
-                return new Position(lastX, lastZ, true);
+            float candidateScore = penetrationScore(candidateX, candidateZ, safeRadius, safeStructures);
+
+            if (escapingInitialOverlap) {
+                if (candidateScore > lastScore + SCORE_EPSILON) {
+                    return new Position(lastX, lastZ, true);
+                }
+                lastX = candidateX;
+                lastZ = candidateZ;
+                lastScore = candidateScore;
+                if (candidateScore <= SCORE_EPSILON) escapingInitialOverlap = false;
+                continue;
             }
+
+            if (candidateScore > SCORE_EPSILON) return new Position(lastX, lastZ, true);
             lastX = candidateX;
             lastZ = candidateZ;
         }
@@ -43,18 +57,30 @@ final class HomesteadCollisionSystem {
     }
 
     boolean collides(float x, float z, float actorRadius, List<PlacedStructure> structures) {
-        float safeX = finite(x);
-        float safeZ = finite(z);
-        float safeRadius = Float.isFinite(actorRadius) ? Math.max(0f, actorRadius) : 0f;
-        if (structures == null) return false;
+        return penetrationScore(
+            finite(x),
+            finite(z),
+            Float.isFinite(actorRadius) ? Math.max(0f, actorRadius) : 0f,
+            structures == null ? List.of() : structures
+        ) > SCORE_EPSILON;
+    }
+
+    private static float penetrationScore(
+        float x,
+        float z,
+        float actorRadius,
+        List<PlacedStructure> structures
+    ) {
+        float score = 0f;
         for (PlacedStructure structure : structures) {
             if (structure == null || !structure.blocksMovement()) continue;
-            float required = safeRadius + structure.type().collisionRadius();
-            float dx = safeX - structure.x();
-            float dz = safeZ - structure.z();
-            if (dx * dx + dz * dz < required * required) return true;
+            float required = actorRadius + structure.type().collisionRadius();
+            float dx = x - structure.x();
+            float dz = z - structure.z();
+            float overlap = required * required - (dx * dx + dz * dz);
+            if (overlap > 0f) score += overlap;
         }
-        return false;
+        return score;
     }
 
     private static float finite(float value) {
