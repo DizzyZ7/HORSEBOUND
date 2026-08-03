@@ -1,0 +1,45 @@
+name: HORSEBOUND Apply 0.5.7 Movement Fix
+
+on:
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: write
+
+jobs:
+  apply-movement-fix:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+
+      - name: Integrate tested camera-relative right axis
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path('src/main/java/com/dizzyz7/horsebound/LivingRanchScreen.java')
+          text = source.read_text(encoding='utf-8')
+          old = '        tmpRight.set(tmpForward.z, 0f, -tmpForward.x);'
+          new = '''        tmpRight.set(
+              CameraRelativeAxes.rightX(tmpForward.z),
+              0f,
+              CameraRelativeAxes.rightZ(tmpForward.x)
+          );'''
+          if text.count(old) != 1:
+              raise SystemExit('Expected exactly one legacy camera-right basis')
+          source.write_text(text.replace(old, new), encoding='utf-8')
+          Path('.github/workflows/apply-057-controls.yml').unlink()
+          PY
+          git config user.name "DizZyZ7 Release Bot"
+          git config user.email "99655528+DizzyZ7@users.noreply.github.com"
+          git add -A
+          git commit -m "fix: correct camera-relative A and D movement"
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
