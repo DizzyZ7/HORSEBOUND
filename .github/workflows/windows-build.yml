@@ -13,7 +13,7 @@ permissions:
 jobs:
   windows-x64:
     runs-on: windows-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
 
     steps:
       - name: Checkout HORSEBOUND
@@ -32,9 +32,9 @@ jobs:
 
       - name: Test compile and package Windows app
         shell: pwsh
-        run: gradle clean test windowsImage --no-daemon --stacktrace
+        run: gradle clean test windowsImage windowsInstaller --no-daemon --stacktrace
 
-      - name: Verify Steam-ready app image
+      - name: Verify Steam-ready app image and installer
         shell: pwsh
         run: |
           $root = Resolve-Path "build/jpackage/HORSEBOUND"
@@ -53,6 +53,14 @@ jobs:
             if (!(Test-Path $path)) {
               throw "Required packaged path is missing: $relative"
             }
+          }
+
+          $installer = Get-ChildItem "build/installer" -Filter "HORSEBOUND-*.exe" -File | Select-Object -First 1
+          if (!$installer) {
+            throw "HORSEBOUND Windows installer was not produced"
+          }
+          if ($installer.Length -lt 10MB) {
+            throw "HORSEBOUND installer is unexpectedly small: $($installer.Length) bytes"
           }
 
           $forbiddenNames = @(
@@ -101,6 +109,7 @@ jobs:
             "com/dizzyz7/horsebound/KeyLabel.class",
             "com/dizzyz7/horsebound/SprintLatch.class",
             "com/dizzyz7/horsebound/ControllerRumble.class",
+            "com/dizzyz7/horsebound/CameraRelativeAxes.class",
             "com/dizzyz7/horsebound/InventoryStack.class",
             "com/dizzyz7/horsebound/InventoryOverlay.class",
             "com/dizzyz7/horsebound/InventoryTransferService.class",
@@ -169,15 +178,28 @@ jobs:
           }
           $hashLines | Set-Content (Join-Path $root "SHA256SUMS.txt") -Encoding ascii
 
+          $installerHash = Get-FileHash $installer.FullName -Algorithm SHA256
+          "$($installerHash.Hash)  $($installer.Name)" | Set-Content "build/installer/SHA256SUMS.txt" -Encoding ascii
+
           $versionOutput | Write-Host
           Get-Item (Join-Path $root "HORSEBOUND.exe") | Format-List Name,Length,FullName
           Get-Item $jarPath | Format-List Name,Length,FullName
+          Get-Item $installer.FullName | Format-List Name,Length,FullName
           Get-Content (Join-Path $root "SHA256SUMS.txt")
+          Get-Content "build/installer/SHA256SUMS.txt"
 
-      - name: Upload self-contained Windows build
+      - name: Upload portable Windows build
         uses: actions/upload-artifact@v4
         with:
-          name: HORSEBOUND-Windows-x64
+          name: HORSEBOUND-Portable-Windows-x64
           path: build/jpackage/HORSEBOUND/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: HORSEBOUND-Installer-Windows-x64
+          path: build/installer/
           if-no-files-found: error
           retention-days: 30
