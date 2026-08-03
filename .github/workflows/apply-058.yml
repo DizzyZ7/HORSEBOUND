@@ -23,6 +23,20 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          cat > /tmp/chunks.sha256 <<'EOF'
+          49e20460af5baf1f35e84ba1f68377188c51ceab2daaddc09e0a4063d71b7ccd  .github/payload-058/chunk-00.txt
+          3668cddc4621aa08e0019bcb3f89e59166b9276eac786c8e054f5923ba1723fa  .github/payload-058/chunk-01.txt
+          4604f36a9d8a3e84a11968e42f379dad094008f0cded048f627374696f8634b9  .github/payload-058/chunk-02.txt
+          0d0f5e4578b23640bbbb86709e297e15cadc905384ed99d506785372c22ab706  .github/payload-058/chunk-03.txt
+          48cd5dad941c655a1c2b37a81f109823da85d0ab8e53c490d6c8043bb55d6706  .github/payload-058/chunk-04.txt
+          497d69a5ef3e83b668025a0601b9ad105511a9b91f9a5a84259235a3578c7c78  .github/payload-058/chunk-05.txt
+          c09469f0b585a430f0fcf3514cb921761c67a5bbef4b03dd603ee554345be40b  .github/payload-058/chunk-06.txt
+          0d709d9d95ad4d051c4bc7b5023007dc7227b764b4434402f5a096c4bdbab645  .github/payload-058/chunk-07.txt
+          e11203ce23aa17bc5b4b0f8e564ff89c672e98eadae17203ba68a66250c5e8ac  .github/payload-058/chunk-08.txt
+          7d4cc036281e505d4787d5be9e62289e298e12cfedf5d5e7a445cfb0c314c99d  .github/payload-058/chunk-09.txt
+          EOF
+          sha256sum --check /tmp/chunks.sha256
+          wc -c .github/payload-058/chunk-*.txt
           cat .github/payload-058/chunk-*.txt > /tmp/horsebound-058.b64
           base64 --decode /tmp/horsebound-058.b64 > /tmp/horsebound-058.tar.gz
           echo "f171325185febb461ff094d33dc8991b41be0f687314d9faf6d99ec9774f1eef  /tmp/horsebound-058.tar.gz" | sha256sum --check --strict
