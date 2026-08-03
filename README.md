@@ -5,42 +5,51 @@ Copyright © 2026 Dimash Janibekov. All rights reserved.
 
 HORSEBOUND is a cozy stylized 3D Java sandbox about horses, exploration, taming, riding and building a ranch. Its world uses continuous terrain and is intentionally not voxel/block based.
 
-## 0.5.6 — Evening Test Hardening
+## 0.5.7 — Controls, Installer & Visual Foundation
 
-This stabilization release prepares the current ranch loop for a serious manual playtest without expanding save format v5 or introducing the higher-risk Living World architecture.
+This release responds directly to the first successful manual 0.5.6 playtest. It fixes mirrored camera-relative keyboard strafing, adds a real Windows installer alongside the portable build and introduces the first restrained visual-foundation pass without changing save format v5.
 
-### Input transition safety
+### Correct camera-relative movement
 
-- fresh menu and gameplay controller mappers suppress buttons carried across screen transitions;
-- a held Confirm can no longer instantly activate the next screen;
-- a held A/Start/B/D-pad action can no longer cause an immediate jump, pause, save or inventory open when gameplay begins;
-- analog movement and camera input remain responsive on the first gameplay frame;
-- Toggle Sprint requires a fresh R1 press after entering or reconnecting.
+- `A` now moves visibly left relative to the current camera;
+- `D` now moves visibly right relative to the current camera;
+- the correction is shared by keyboard and controller command processing rather than swapping user bindings;
+- cardinal camera directions are locked by regression tests;
+- existing device-local rebinding files remain compatible.
 
-### Safer world interaction
+### Real Windows delivery
 
-- dismount uses deterministic safe-ground search instead of placing the player directly beside the horse;
-- Pushik catch-up teleports and invalid-save fallback also use safe dry ground;
-- new and moved structures cannot overlap live trees, rocks or horses;
-- horse-care HUD selection is limited to a useful nearby radius;
-- gameplay HUD version and keyboard prompts now come from the current build and live input profile.
+- CI now produces a normal per-user Windows `.exe` installer;
+- the installer offers a destination chooser, Start Menu entry and desktop shortcut;
+- a stable upgrade UUID allows later HORSEBOUND installers to update the same installation;
+- installation does not require administrator privileges;
+- the self-contained portable app-image remains available for Steam depot and no-install use;
+- both packages include the Java runtime and are independently hashed.
 
-### Save-slot hardening
+The installer is not code-signed yet. Windows SmartScreen may therefore show an unknown-publisher warning until a production signing certificate is introduced.
 
-- overwrite confirmation is cancelled whenever selection leaves the armed slot;
-- deliberate ranch replacement writes the new ranch to both primary and recovery backup;
-- a damaged new primary can no longer resurrect the previously overwritten ranch;
-- existing atomic writes, autosave history, v1–v5 migrations and ordinary backup recovery remain unchanged.
+### First visual-foundation pass
+
+- terrain mesh resolution is increased from a 4 m to a 3 m grid;
+- vertex colors create meadow, highland, shoreline and lake-bed variation;
+- terrain slope receives restrained natural shading;
+- player, horse, Pushik, trees, rocks, fences and water receive more detailed procedural geometry;
+- materials now distinguish matte, satin and reflective surfaces;
+- water receives smoother geometry and stronger specular response;
+- Pushik remains completely black, fluffy and quiet.
+
+This is still procedural placeholder art, not the final commercial asset set. Production visuals require authored GLB models, skeletal animation, PBR textures, shadows, atmosphere and a dedicated water/sky pipeline.
 
 Save format remains **v5**. No migration is required.
 
-See [`docs/releases/0.5.6.md`](docs/releases/0.5.6.md), [`docs/EVENING_PLAYTEST_0.5.6.md`](docs/EVENING_PLAYTEST_0.5.6.md) and [`docs/HOMESTEAD_RELEASE_CONTRACT.md`](docs/HOMESTEAD_RELEASE_CONTRACT.md).
+See [`docs/releases/0.5.7.md`](docs/releases/0.5.7.md), [`docs/VISUAL_ASSET_ROADMAP.md`](docs/VISUAL_ASSET_ROADMAP.md) and [`docs/WINDOWS_INSTALLATION.md`](docs/WINDOWS_INSTALLATION.md).
 
 ## Current playable gameplay
 
-- third-person movement with terrain, structure, tree and rock camera collision;
+- third-person movement with corrected camera-relative strafing;
+- terrain, structure, tree and rock camera collision;
 - soft camera-occluder fading for procedural trees and rocks;
-- procedural continuous terrain, lake, trees and rocks;
+- smoother color-varied continuous terrain, lake, trees and rocks;
 - resource gathering and persistent construction with tree, rock and horse placement exclusion;
 - visible hotbar and placement preview;
 - feeders, troughs, hay storage, Chests, Gates and Stalls;
@@ -70,6 +79,7 @@ Pushik is the completely black fluffy cat with fluffy black paws and almost sile
 HORSEBOUND has a true in-memory pause lifecycle and device-local input profile.
 
 - configurable keyboard bindings and conflict-safe key swapping;
+- corrected camera-relative left/right movement;
 - dedicated Inventory binding with legacy-profile fallback;
 - invert vertical camera;
 - movement and camera stick dead zones;
@@ -90,9 +100,11 @@ Input settings are stored in `%APPDATA%\HORSEBOUND\input.properties` and remain 
 - windowed and fullscreen modes;
 - 1280×720, 1280×800, 1600×900 and 1920×1080 profiles;
 - UI scale from 100% to 150%;
+- Low / Medium / High presets with 0× / 2× / 4× MSAA;
+- smoother terrain geometry and vertex-color biome variation;
+- refined procedural character and environment models;
 - ranch interaction effects from 0% to 100%;
 - meadow ambience from 0% to 100%;
-- Low / Medium / High startup presets;
 - optional rolling FPS/frame-time overlay;
 - global scalable action-prompt strip;
 - controller-readable menus, save slots, hotbar, inventory and build feedback.
@@ -106,6 +118,7 @@ This is **not** a Steam Deck Verified claim. Physical Deck, Proton, controller-f
 ```text
 HomesteadRanchScreen
 ├── LivingRanchScreen : RanchWorldAccess
+│   ├── CameraRelativeAxes
 │   ├── RanchCameraCollisionSystem
 │   ├── RanchCameraFadeSystem
 │   └── typed tree / rock camera geometry
@@ -144,12 +157,29 @@ Domain and persistence code do not use reflection or libGDX rendering. `RanchWor
 
 Steam Auto-Cloud is planned for ranch `save.hbs` and `save.bak` only. Display, audio and input settings plus diagnostics remain device-local.
 
+## Windows distribution
+
+Two Windows x64 packages are produced:
+
+```text
+HORSEBOUND-Installer-Windows-x64
+    HORSEBOUND-0.5.7.exe
+
+HORSEBOUND-Portable-Windows-x64
+    HORSEBOUND.exe
+    app/
+    runtime/
+```
+
+Use the installer for an ordinary desktop installation. Use the portable package for Steam depot preparation, diagnostics or a no-install copy.
+
 ## Steam readiness
 
-- self-contained Windows x64 `jpackage` image;
+- self-contained Windows x64 `jpackage` app-image;
+- separate per-user Windows installer;
 - direct `HORSEBOUND.exe` launch without a mandatory launcher;
 - bundled Java runtime;
-- exact packaged version/commit and SHA-256 manifest;
+- exact packaged version/commit and SHA-256 manifests;
 - no mutable user files inside the depot;
 - controller, migration, storage, collision, camera, audio-bus and typed-ranch package gates;
 - CI rejection of obsolete adapter regressions;
@@ -161,8 +191,9 @@ Key documents:
 - [`docs/STEAM_RELEASE_READINESS.md`](docs/STEAM_RELEASE_READINESS.md)
 - [`docs/STEAM_CONTROLLER_SMOKE_TEST.md`](docs/STEAM_CONTROLLER_SMOKE_TEST.md)
 - [`docs/HOMESTEAD_RELEASE_CONTRACT.md`](docs/HOMESTEAD_RELEASE_CONTRACT.md)
-- [`docs/releases/0.5.6.md`](docs/releases/0.5.6.md)
-- [`docs/EVENING_PLAYTEST_0.5.6.md`](docs/EVENING_PLAYTEST_0.5.6.md)
+- [`docs/releases/0.5.7.md`](docs/releases/0.5.7.md)
+- [`docs/WINDOWS_INSTALLATION.md`](docs/WINDOWS_INSTALLATION.md)
+- [`docs/VISUAL_ASSET_ROADMAP.md`](docs/VISUAL_ASSET_ROADMAP.md)
 - [`steam/README.md`](steam/README.md)
 
 ## Build
@@ -174,19 +205,20 @@ gradle run
 gradle test
 ```
 
-Windows self-contained image:
+Windows portable image and installer:
 
 ```powershell
-gradle clean test windowsImage
+gradle clean test windowsImage windowsInstaller
 ```
 
-Output:
+Outputs:
 
 ```text
 build/jpackage/HORSEBOUND/HORSEBOUND.exe
+build/installer/HORSEBOUND-0.5.7.exe
 ```
 
-CI verifies controller/accessibility, save migration, inventory/storage, typed ranch access, transactional undo, dismantle confirmation, nature-aware camera behavior, independent audio buses and live Homestead runtime inside the packaged JAR.
+CI verifies controller/accessibility, camera-relative movement, save migration, inventory/storage, typed ranch access, transactional undo, dismantle confirmation, nature-aware camera behavior, independent audio buses, portable packaging and installer generation.
 
 ## Tech
 
@@ -198,7 +230,7 @@ CI verifies controller/accessibility, save migration, inventory/storage, typed r
 - JDK binary persistence
 - JDK Properties settings
 - procedural mono interaction and ambience audio
-- Windows `jpackage`
+- Windows `jpackage` app-image and EXE installer
 
 ## Licensing and ownership
 
