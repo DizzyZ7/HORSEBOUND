@@ -1,8 +1,8 @@
 name: HORSEBOUND 0.5.8 Source Audit
 
 on:
-  push:
-    branches: [ feature/bilingual-ux-mechanics-clarity ]
+  pull_request:
+    branches: [ main ]
 
 permissions:
   contents: read
@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Checkout exact branch head
+      - name: Checkout exact pull request head
         uses: actions/checkout@v4
 
       - name: Upload localization audit source
