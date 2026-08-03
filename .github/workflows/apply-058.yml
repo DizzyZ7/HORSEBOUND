@@ -1,0 +1,52 @@
+name: HORSEBOUND Apply 0.5.8 Bilingual UX
+
+on:
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: write
+
+jobs:
+  apply-bilingual-ux:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact pull request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+
+      - name: Reconstruct and verify source payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .github/payload-058/chunk-*.txt > /tmp/horsebound-058.b64
+          base64 --decode /tmp/horsebound-058.b64 > /tmp/horsebound-058.tar.gz
+          echo "f171325185febb461ff094d33dc8991b41be0f687314d9faf6d99ec9774f1eef  /tmp/horsebound-058.tar.gz" | sha256sum --check --strict
+          tar -xzf /tmp/horsebound-058.tar.gz -C .
+
+      - name: Generate licensed Unicode bitmap font
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check "Pillow>=10,<12"
+          python tools/generate_ui_font.py --root .
+          grep -q "char id=65 " src/main/resources/fonts/horsebound-ui.fnt
+          grep -q "char id=1040 " src/main/resources/fonts/horsebound-ui.fnt
+          grep -q "char id=1072 " src/main/resources/fonts/horsebound-ui.fnt
+          test $(wc -c < src/main/resources/fonts/horsebound-ui.png) -gt 20000
+
+      - name: Commit bilingual UX atomically
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .github/payload-058
+          git config user.name "DizZyZ7 Release Bot"
+          git config user.email "99655528+DizzyZ7@users.noreply.github.com"
+          git add -A -- build.gradle licenses src tools .github/payload-058
+          git diff --cached --check
+          git commit -m "feat: add complete Russian and English UX"
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
