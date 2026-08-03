@@ -6,6 +6,7 @@ import com.badlogic.gdx.Screen;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
+import com.badlogic.gdx.graphics.g2d.GlyphLayout;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Rectangle;
@@ -28,7 +29,8 @@ final class InputSettingsScreen implements Screen {
     private final RanchSessionScreen pausedWorld;
     private final SpriteBatch batch = new SpriteBatch();
     private final ShapeRenderer shapes = new ShapeRenderer();
-    private final BitmapFont font = new BitmapFont();
+    private final BitmapFont font = GameFonts.create();
+    private final GlyphLayout glyphLayout = new GlyphLayout();
     private final MenuInputMapper menuInput = new MenuInputMapper();
     private final Rectangle[] rows = new Rectangle[ITEM_COUNT];
     private InputProfile profile;
@@ -100,13 +102,13 @@ final class InputSettingsScreen implements Screen {
         batch.getProjectionMatrix().setToOrtho2D(0f, 0f, width, height);
         batch.begin();
         font.setColor(Color.WHITE);
-        font.getData().setScale(2.15f * ui);
-        font.draw(batch, "INPUT & ACCESSIBILITY", width * 0.5f - 245f * ui, height - 35f * geometry);
-        font.getData().setScale(0.91f * ui);
+        GameFonts.setScale(font, 2.15f * ui);
+        drawCentered(I18n.text("input.title"), width * 0.5f, height - 35f * geometry);
+        GameFonts.setScale(font, 0.91f * ui);
         for (int i = 0; i < rows.length; i++) drawRow(i, rows[i], ui);
-        font.getData().setScale(0.67f * ui);
+        GameFonts.setScale(font, 0.67f * ui);
         font.setColor(new Color(0.68f, 0.73f, 0.69f, 1f));
-        font.draw(batch, "Stored locally in input.properties and excluded from ranch saves.", 18f * geometry, 48f * geometry);
+        font.draw(batch, I18n.text("input.local_notice"), 18f * geometry, 48f * geometry);
         batch.end();
     }
 
@@ -116,34 +118,35 @@ final class InputSettingsScreen implements Screen {
         String value = value(index);
         if (!value.isEmpty()) {
             font.setColor(new Color(1f, 0.88f, 0.58f, 1f));
-            font.draw(batch, value, row.x + row.width - 205f * ui, row.y + 28f * ui);
+            glyphLayout.setText(font, value);
+            font.draw(batch, value, row.x + row.width - 14f * ui - glyphLayout.width, row.y + 28f * ui);
         }
     }
 
     private String label(int index) {
         return switch (index) {
-            case INVERT_Y -> "Invert vertical camera";
-            case MOVE_DEAD_ZONE -> "Movement stick dead zone";
-            case LOOK_DEAD_ZONE -> "Camera stick dead zone";
-            case SPRINT_MODE -> "Sprint / gallop mode";
-            case RUMBLE -> "Controller rumble";
-            case RUMBLE_STRENGTH -> "Rumble strength";
-            case KEY_BINDINGS -> "Keyboard bindings";
-            case DEFAULTS -> "Restore input defaults";
-            case BACK -> "Back";
+            case INVERT_Y -> I18n.text("input.invert_y");
+            case MOVE_DEAD_ZONE -> I18n.text("input.move_dead_zone");
+            case LOOK_DEAD_ZONE -> I18n.text("input.look_dead_zone");
+            case SPRINT_MODE -> I18n.text("input.sprint_mode");
+            case RUMBLE -> I18n.text("input.rumble");
+            case RUMBLE_STRENGTH -> I18n.text("input.rumble_strength");
+            case KEY_BINDINGS -> I18n.text("input.key_bindings");
+            case DEFAULTS -> I18n.text("input.restore_defaults");
+            case BACK -> I18n.text("common.back");
             default -> throw new IllegalArgumentException("Unknown input setting: " + index);
         };
     }
 
     private String value(int index) {
         return switch (index) {
-            case INVERT_Y -> profile.invertCameraY() ? "ON" : "OFF";
+            case INVERT_Y -> profile.invertCameraY() ? I18n.text("common.on") : I18n.text("common.off");
             case MOVE_DEAD_ZONE -> String.format(Locale.ROOT, "%.2f", profile.moveDeadZone());
             case LOOK_DEAD_ZONE -> String.format(Locale.ROOT, "%.2f", profile.lookDeadZone());
             case SPRINT_MODE -> profile.sprintMode().displayName();
-            case RUMBLE -> profile.rumbleEnabled() ? "ON" : "OFF";
+            case RUMBLE -> profile.rumbleEnabled() ? I18n.text("common.on") : I18n.text("common.off");
             case RUMBLE_STRENGTH -> Math.round(profile.rumbleStrength() * 100f) + "%";
-            case KEY_BINDINGS -> "OPEN";
+            case KEY_BINDINGS -> I18n.text("common.open");
             case DEFAULTS, BACK -> "";
             default -> throw new IllegalArgumentException("Unknown input setting: " + index);
         };
@@ -171,6 +174,11 @@ final class InputSettingsScreen implements Screen {
     private void apply(InputProfile next) {
         game.updateInputProfile(next);
         profile = game.inputProfile();
+    }
+
+    private void drawCentered(String value, float centerX, float baselineY) {
+        glyphLayout.setText(font, value);
+        font.draw(batch, value, centerX - glyphLayout.width * 0.5f, baselineY);
     }
 
     private void goBack() {

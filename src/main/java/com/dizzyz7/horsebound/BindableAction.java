@@ -5,32 +5,27 @@ import com.badlogic.gdx.Input;
 
 /** Keyboard actions that may be rebound without changing gameplay semantics. */
 enum BindableAction {
-    MOVE_FORWARD("Move forward", Input.Keys.W),
-    MOVE_BACKWARD("Move backward", Input.Keys.S),
-    MOVE_LEFT("Move left", Input.Keys.A),
-    MOVE_RIGHT("Move right", Input.Keys.D),
-    JUMP("Jump", Input.Keys.SPACE),
-    INTERACT("Interact", Input.Keys.E),
-    MOUNT("Mount / dismount", Input.Keys.F),
-    BUILD("Build / edit", Input.Keys.B),
-    INVENTORY("Inventory", Input.Keys.I),
-    SPRINT("Sprint / gallop", Input.Keys.SHIFT_LEFT),
-    SAVE("Manual save", Input.Keys.F5),
-    PAUSE("Pause", Input.Keys.ESCAPE);
+    MOVE_FORWARD("action.move_forward", Input.Keys.W),
+    MOVE_BACKWARD("action.move_backward", Input.Keys.S),
+    MOVE_LEFT("action.move_left", Input.Keys.A),
+    MOVE_RIGHT("action.move_right", Input.Keys.D),
+    JUMP("action.jump", Input.Keys.SPACE),
+    INTERACT("action.interact", Input.Keys.E),
+    MOUNT("action.mount", Input.Keys.F),
+    BUILD("action.build", Input.Keys.B),
+    INVENTORY("action.inventory", Input.Keys.I),
+    SPRINT("action.sprint", Input.Keys.SHIFT_LEFT),
+    SAVE("action.save", Input.Keys.F5),
+    PAUSE("action.pause", Input.Keys.ESCAPE);
 
-    private final String displayName;
+    private final String displayKey;
     private final int defaultKey;
 
-    BindableAction(String displayName, int defaultKey) {
-        this.displayName = displayName;
+    BindableAction(String displayKey, int defaultKey) {
+        this.displayKey = displayKey;
         this.defaultKey = defaultKey;
     }
 
-    String displayName() {
-        return displayName;
-    }
-
-    int defaultKey() {
-        return defaultKey;
-    }
+    String displayName() { return I18n.text(displayKey); }
+    int defaultKey() { return defaultKey; }
 }

@@ -6,22 +6,25 @@ import com.badlogic.gdx.Screen;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
+import com.badlogic.gdx.graphics.g2d.GlyphLayout;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Rectangle;
 
 final class SettingsHubScreen implements Screen {
-    private static final int DISPLAY = 0;
-    private static final int INPUT = 1;
-    private static final int BACK = 2;
-    private static final int ITEM_COUNT = 3;
+    private static final int LANGUAGE = 0;
+    private static final int DISPLAY = 1;
+    private static final int INPUT = 2;
+    private static final int BACK = 3;
+    private static final int ITEM_COUNT = 4;
 
     private final HorseboundGame game;
     private final SpriteBatch batch = new SpriteBatch();
     private final ShapeRenderer shapes = new ShapeRenderer();
-    private final BitmapFont font = new BitmapFont();
+    private final BitmapFont font = GameFonts.create();
+    private final GlyphLayout glyphLayout = new GlyphLayout();
     private final MenuInputMapper menuInput = new MenuInputMapper();
-    private final Rectangle[] rows = {new Rectangle(), new Rectangle(), new Rectangle()};
+    private final Rectangle[] rows = {new Rectangle(), new Rectangle(), new Rectangle(), new Rectangle()};
     private int selectedIndex;
 
     SettingsHubScreen(HorseboundGame game) {
@@ -39,15 +42,18 @@ final class SettingsHubScreen implements Screen {
         int height = Gdx.graphics.getHeight();
         float ui = UiScale.effective(width, height, game.settings().uiScale());
         float geometry = Math.min(ui, 1.20f);
-        float rowWidth = Math.min(width - 40f * geometry, 560f * geometry);
+        float rowWidth = Math.min(width - 40f * geometry, 640f * geometry);
         float rowHeight = 58f * geometry;
         float x = (width - rowWidth) * 0.5f;
-        float top = height * 0.58f;
-        for (int i = 0; i < rows.length; i++) rows[i].set(x, top - i * 76f * geometry, rowWidth, rowHeight);
+        float top = height * 0.62f;
+        for (int i = 0; i < rows.length; i++) rows[i].set(x, top - i * 72f * geometry, rowWidth, rowHeight);
 
         MenuInputSnapshot input = menuInput.sample();
         if (input.command().upPressed()) selectedIndex = Math.floorMod(selectedIndex - 1, ITEM_COUNT);
         if (input.command().downPressed()) selectedIndex = Math.floorMod(selectedIndex + 1, ITEM_COUNT);
+        if ((input.command().leftPressed() || input.command().rightPressed()) && selectedIndex == LANGUAGE) {
+            toggleLanguage();
+        }
         if (input.command().confirmPressed()) {
             activate();
             return;
@@ -76,15 +82,16 @@ final class SettingsHubScreen implements Screen {
         batch.getProjectionMatrix().setToOrtho2D(0f, 0f, width, height);
         batch.begin();
         font.setColor(Color.WHITE);
-        font.getData().setScale(2.35f * ui);
-        font.draw(batch, "SETTINGS", width * 0.5f - 115f * ui, height * 0.82f);
-        font.getData().setScale(1.08f * ui);
-        draw("DISPLAY & GRAPHICS", rows[DISPLAY], ui);
-        draw("INPUT & ACCESSIBILITY", rows[INPUT], ui);
-        draw("BACK", rows[BACK], ui);
-        font.getData().setScale(0.70f * ui);
+        GameFonts.setScale(font, 2.35f * ui);
+        drawCentered(I18n.text("settings.title"), width * 0.5f, height * 0.84f);
+        GameFonts.setScale(font, 1.03f * ui);
+        draw(I18n.text("settings.language") + ":  " + game.settings().language().selfName(), rows[LANGUAGE], ui);
+        draw(I18n.text("settings.display"), rows[DISPLAY], ui);
+        draw(I18n.text("settings.input"), rows[INPUT], ui);
+        draw(I18n.text("settings.back"), rows[BACK], ui);
+        GameFonts.setScale(font, 0.70f * ui);
         font.setColor(new Color(0.68f, 0.73f, 0.69f, 1f));
-        font.draw(batch, "Device settings stay outside ranch saves and Steam Cloud.", x, top - 250f * geometry);
+        font.draw(batch, I18n.text("settings.local_notice"), x, top - 300f * geometry);
         batch.end();
     }
 
@@ -93,13 +100,23 @@ final class SettingsHubScreen implements Screen {
         font.draw(batch, text, row.x + 18f * ui, row.y + 38f * ui);
     }
 
+    private void drawCentered(String text, float centerX, float baselineY) {
+        glyphLayout.setText(font, text);
+        font.draw(batch, text, centerX - glyphLayout.width * 0.5f, baselineY);
+    }
+
     private void activate() {
         switch (selectedIndex) {
+            case LANGUAGE -> toggleLanguage();
             case DISPLAY -> game.showDisplaySettings();
             case INPUT -> game.showInputSettings(null);
             case BACK -> game.returnToMenu();
             default -> throw new IllegalStateException("Unknown settings hub item: " + selectedIndex);
         }
+    }
+
+    private void toggleLanguage() {
+        game.updateSettings(game.settings().withLanguage(game.settings().language().toggled()));
     }
 
     private boolean handlePointer(int height) {

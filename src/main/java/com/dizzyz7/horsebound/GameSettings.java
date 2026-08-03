@@ -12,7 +12,8 @@ record GameSettings(
     GraphicsPreset graphicsPreset,
     boolean showPerformanceStats,
     float sfxVolume,
-    float ambienceVolume
+    float ambienceVolume,
+    Language language
 ) {
     static final float MIN_SENSITIVITY = 0.05f;
     static final float MAX_SENSITIVITY = 0.40f;
@@ -46,6 +47,28 @@ record GameSettings(
         sfxVolume = Math.max(MIN_SFX_VOLUME, Math.min(MAX_SFX_VOLUME, sfxVolume));
         if (!Float.isFinite(ambienceVolume)) ambienceVolume = DEFAULT_AMBIENCE_VOLUME;
         ambienceVolume = Math.max(MIN_AMBIENCE_VOLUME, Math.min(MAX_AMBIENCE_VOLUME, ambienceVolume));
+        language = language == null ? Language.systemDefault() : language;
+    }
+
+    /** Compatibility constructor for settings created before language selection. */
+    GameSettings(
+        boolean vsync,
+        float mouseSensitivity,
+        int autosaveSeconds,
+        WindowMode windowMode,
+        int windowWidth,
+        int windowHeight,
+        float uiScale,
+        GraphicsPreset graphicsPreset,
+        boolean showPerformanceStats,
+        float sfxVolume,
+        float ambienceVolume
+    ) {
+        this(
+            vsync, mouseSensitivity, autosaveSeconds, windowMode, windowWidth, windowHeight,
+            uiScale, graphicsPreset, showPerformanceStats, sfxVolume, ambienceVolume,
+            Language.systemDefault()
+        );
     }
 
     GameSettings(
@@ -61,17 +84,9 @@ record GameSettings(
         float sfxVolume
     ) {
         this(
-            vsync,
-            mouseSensitivity,
-            autosaveSeconds,
-            windowMode,
-            windowWidth,
-            windowHeight,
-            uiScale,
-            graphicsPreset,
-            showPerformanceStats,
-            sfxVolume,
-            DEFAULT_AMBIENCE_VOLUME
+            vsync, mouseSensitivity, autosaveSeconds, windowMode, windowWidth, windowHeight,
+            uiScale, graphicsPreset, showPerformanceStats, sfxVolume,
+            DEFAULT_AMBIENCE_VOLUME, Language.systemDefault()
         );
     }
 
@@ -87,17 +102,9 @@ record GameSettings(
         boolean showPerformanceStats
     ) {
         this(
-            vsync,
-            mouseSensitivity,
-            autosaveSeconds,
-            windowMode,
-            windowWidth,
-            windowHeight,
-            uiScale,
-            graphicsPreset,
-            showPerformanceStats,
-            DEFAULT_SFX_VOLUME,
-            DEFAULT_AMBIENCE_VOLUME
+            vsync, mouseSensitivity, autosaveSeconds, windowMode, windowWidth, windowHeight,
+            uiScale, graphicsPreset, showPerformanceStats,
+            DEFAULT_SFX_VOLUME, DEFAULT_AMBIENCE_VOLUME, Language.systemDefault()
         );
     }
 
@@ -113,7 +120,8 @@ record GameSettings(
             GraphicsPreset.MEDIUM,
             false,
             DEFAULT_SFX_VOLUME,
-            DEFAULT_AMBIENCE_VOLUME
+            DEFAULT_AMBIENCE_VOLUME,
+            Language.systemDefault()
         );
     }
 
@@ -126,44 +134,48 @@ record GameSettings(
     }
 
     GameSettings withVsync(boolean enabled) {
-        return copy(enabled, mouseSensitivity, autosaveSeconds, windowMode, windowWidth, windowHeight, uiScale, graphicsPreset, showPerformanceStats, sfxVolume, ambienceVolume);
+        return copy(enabled, mouseSensitivity, autosaveSeconds, windowMode, windowWidth, windowHeight, uiScale, graphicsPreset, showPerformanceStats, sfxVolume, ambienceVolume, language);
     }
 
     GameSettings withMouseSensitivity(float value) {
-        return copy(vsync, value, autosaveSeconds, windowMode, windowWidth, windowHeight, uiScale, graphicsPreset, showPerformanceStats, sfxVolume, ambienceVolume);
+        return copy(vsync, value, autosaveSeconds, windowMode, windowWidth, windowHeight, uiScale, graphicsPreset, showPerformanceStats, sfxVolume, ambienceVolume, language);
     }
 
     GameSettings withAutosaveSeconds(int value) {
-        return copy(vsync, mouseSensitivity, value, windowMode, windowWidth, windowHeight, uiScale, graphicsPreset, showPerformanceStats, sfxVolume, ambienceVolume);
+        return copy(vsync, mouseSensitivity, value, windowMode, windowWidth, windowHeight, uiScale, graphicsPreset, showPerformanceStats, sfxVolume, ambienceVolume, language);
     }
 
     GameSettings withWindowMode(WindowMode value) {
-        return copy(vsync, mouseSensitivity, autosaveSeconds, value, windowWidth, windowHeight, uiScale, graphicsPreset, showPerformanceStats, sfxVolume, ambienceVolume);
+        return copy(vsync, mouseSensitivity, autosaveSeconds, value, windowWidth, windowHeight, uiScale, graphicsPreset, showPerformanceStats, sfxVolume, ambienceVolume, language);
     }
 
     GameSettings withResolution(DisplayResolution resolution) {
         DisplayResolution safe = resolution == null ? DisplayResolution.DECK_800 : resolution;
-        return copy(vsync, mouseSensitivity, autosaveSeconds, windowMode, safe.width(), safe.height(), uiScale, graphicsPreset, showPerformanceStats, sfxVolume, ambienceVolume);
+        return copy(vsync, mouseSensitivity, autosaveSeconds, windowMode, safe.width(), safe.height(), uiScale, graphicsPreset, showPerformanceStats, sfxVolume, ambienceVolume, language);
     }
 
     GameSettings withUiScale(float value) {
-        return copy(vsync, mouseSensitivity, autosaveSeconds, windowMode, windowWidth, windowHeight, value, graphicsPreset, showPerformanceStats, sfxVolume, ambienceVolume);
+        return copy(vsync, mouseSensitivity, autosaveSeconds, windowMode, windowWidth, windowHeight, value, graphicsPreset, showPerformanceStats, sfxVolume, ambienceVolume, language);
     }
 
     GameSettings withGraphicsPreset(GraphicsPreset value) {
-        return copy(vsync, mouseSensitivity, autosaveSeconds, windowMode, windowWidth, windowHeight, uiScale, value, showPerformanceStats, sfxVolume, ambienceVolume);
+        return copy(vsync, mouseSensitivity, autosaveSeconds, windowMode, windowWidth, windowHeight, uiScale, value, showPerformanceStats, sfxVolume, ambienceVolume, language);
     }
 
     GameSettings withPerformanceStats(boolean enabled) {
-        return copy(vsync, mouseSensitivity, autosaveSeconds, windowMode, windowWidth, windowHeight, uiScale, graphicsPreset, enabled, sfxVolume, ambienceVolume);
+        return copy(vsync, mouseSensitivity, autosaveSeconds, windowMode, windowWidth, windowHeight, uiScale, graphicsPreset, enabled, sfxVolume, ambienceVolume, language);
     }
 
     GameSettings withSfxVolume(float value) {
-        return copy(vsync, mouseSensitivity, autosaveSeconds, windowMode, windowWidth, windowHeight, uiScale, graphicsPreset, showPerformanceStats, value, ambienceVolume);
+        return copy(vsync, mouseSensitivity, autosaveSeconds, windowMode, windowWidth, windowHeight, uiScale, graphicsPreset, showPerformanceStats, value, ambienceVolume, language);
     }
 
     GameSettings withAmbienceVolume(float value) {
-        return copy(vsync, mouseSensitivity, autosaveSeconds, windowMode, windowWidth, windowHeight, uiScale, graphicsPreset, showPerformanceStats, sfxVolume, value);
+        return copy(vsync, mouseSensitivity, autosaveSeconds, windowMode, windowWidth, windowHeight, uiScale, graphicsPreset, showPerformanceStats, sfxVolume, value, language);
+    }
+
+    GameSettings withLanguage(Language value) {
+        return copy(vsync, mouseSensitivity, autosaveSeconds, windowMode, windowWidth, windowHeight, uiScale, graphicsPreset, showPerformanceStats, sfxVolume, ambienceVolume, value);
     }
 
     private static GameSettings copy(
@@ -177,20 +189,12 @@ record GameSettings(
         GraphicsPreset preset,
         boolean performanceStats,
         float sfxVolume,
-        float ambienceVolume
+        float ambienceVolume,
+        Language language
     ) {
         return new GameSettings(
-            vsync,
-            sensitivity,
-            autosave,
-            mode,
-            width,
-            height,
-            uiScale,
-            preset,
-            performanceStats,
-            sfxVolume,
-            ambienceVolume
+            vsync, sensitivity, autosave, mode, width, height, uiScale, preset,
+            performanceStats, sfxVolume, ambienceVolume, language
         );
     }
 }

@@ -24,7 +24,7 @@ final class PromptOverlay {
 
     private final ShapeRenderer shapes = new ShapeRenderer();
     private final SpriteBatch batch = new SpriteBatch();
-    private final BitmapFont font = new BitmapFont();
+    private final BitmapFont font = GameFonts.create();
     private final GlyphLayout layout = new GlyphLayout();
     private final String buildLabel = BuildInfo.current().displayLabel();
 
@@ -64,7 +64,7 @@ final class PromptOverlay {
 
         batch.getProjectionMatrix().setToOrtho2D(0f, 0f, width, height);
         batch.begin();
-        font.getData().setScale(0.72f * ui);
+        GameFonts.setScale(font, 0.72f * ui);
         font.setColor(TEXT);
         for (int i = 0; i < positions.size(); i++) {
             PromptPosition position = positions.get(i);
@@ -78,10 +78,10 @@ final class PromptOverlay {
         }
 
         if (screen instanceof RanchSessionScreen) {
-            font.getData().setScale(0.84f * ui);
+            GameFonts.setScale(font, 0.84f * ui);
             font.setColor(TEXT);
             font.draw(batch, buildLabel, 14f * geometryScale, height - 18f * geometryScale);
-            font.getData().setScale(0.64f * ui);
+            GameFonts.setScale(font, 0.64f * ui);
             font.setColor(SECONDARY);
             font.draw(batch, deviceLabel(device, family), 14f * geometryScale, height - 39f * geometryScale);
         }
@@ -107,7 +107,7 @@ final class PromptOverlay {
         float ui
     ) {
         List<PromptPosition> result = new ArrayList<>(bindings.size());
-        font.getData().setScale(0.72f * ui);
+        GameFonts.setScale(font, 0.72f * ui);
         float gap = 14f * geometryScale;
         float x = 14f * geometryScale;
         float y = panelHeight - 29f * geometryScale;
@@ -129,14 +129,14 @@ final class PromptOverlay {
     }
 
     private static String deviceLabel(InputDeviceType device, ControllerGlyphFamily family) {
-        if (device == InputDeviceType.KEYBOARD_MOUSE) return "Keyboard / Mouse prompts";
-        return switch (family) {
-            case PLAYSTATION -> "PlayStation controller prompts";
-            case STEAM_DECK -> "Steam Deck controller prompts";
-            case XBOX -> "Xbox controller prompts";
-            case NINTENDO -> "Nintendo controller prompts";
-            case GENERIC -> "Generic controller prompts";
-        };
+        if (device == InputDeviceType.KEYBOARD_MOUSE) return I18n.text("prompt.keyboard_mouse");
+        return I18n.text(switch (family) {
+            case PLAYSTATION -> "prompt.playstation";
+            case STEAM_DECK -> "prompt.steam_deck";
+            case XBOX -> "prompt.xbox";
+            case NINTENDO -> "prompt.nintendo";
+            case GENERIC -> "prompt.generic";
+        });
     }
 
     void dispose() {

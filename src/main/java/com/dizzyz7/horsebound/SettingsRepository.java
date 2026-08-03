@@ -52,6 +52,11 @@ final class SettingsRepository {
                 properties.getProperty("ambienceVolume"),
                 defaults.ambienceVolume()
             );
+            Language language = parseEnum(
+                Language.class,
+                properties.getProperty("language"),
+                defaults.language()
+            );
             return new GameSettings(
                 vsync,
                 sensitivity,
@@ -63,7 +68,8 @@ final class SettingsRepository {
                 graphicsPreset,
                 performanceStats,
                 sfxVolume,
-                ambienceVolume
+                ambienceVolume,
+                language
             );
         } catch (IOException | RuntimeException ex) {
             return GameSettings.defaults();
@@ -85,6 +91,7 @@ final class SettingsRepository {
         properties.setProperty("showPerformanceStats", Boolean.toString(settings.showPerformanceStats()));
         properties.setProperty("sfxVolume", Float.toString(settings.sfxVolume()));
         properties.setProperty("ambienceVolume", Float.toString(settings.ambienceVolume()));
+        properties.setProperty("language", settings.language().name());
 
         try {
             if (parent != null) Files.createDirectories(parent);

@@ -12,7 +12,7 @@ import java.util.Locale;
 
 final class PerformanceOverlay implements Disposable {
     private final SpriteBatch batch = new SpriteBatch();
-    private final BitmapFont font = new BitmapFont();
+    private final BitmapFont font = GameFonts.create();
 
     void render(FrameMetrics metrics, GameSettings settings) {
         if (!settings.showPerformanceStats()) return;
@@ -20,13 +20,12 @@ final class PerformanceOverlay implements Disposable {
         int width = Gdx.graphics.getWidth();
         int height = Gdx.graphics.getHeight();
         float ui = UiScale.effective(width, height, settings.uiScale());
-        String target = metrics.meetsDeckTarget() ? "PASS" : "CHECK";
-        String line = String.format(
-            Locale.ROOT,
-            "FPS %d | avg %.1f ms | worst %.1f ms | 800p/30 %s | %s | %dx%d",
+        String target = I18n.text(metrics.meetsDeckTarget() ? "performance.pass" : "performance.check");
+        String line = I18n.text(
+            "performance.line",
             metrics.averageFps(),
-            metrics.averageMilliseconds(),
-            metrics.worstMilliseconds(),
+            String.format(Locale.ROOT, "%.1f", metrics.averageMilliseconds()),
+            String.format(Locale.ROOT, "%.1f", metrics.worstMilliseconds()),
             target,
             settings.graphicsPreset().displayName(),
             width,
@@ -36,7 +35,7 @@ final class PerformanceOverlay implements Disposable {
         Gdx.gl.glDisable(GL20.GL_DEPTH_TEST);
         batch.getProjectionMatrix().setToOrtho2D(0f, 0f, width, height);
         batch.begin();
-        font.getData().setScale(0.78f * ui);
+        GameFonts.setScale(font, 0.78f * ui);
         font.setColor(metrics.meetsDeckTarget()
             ? new Color(0.68f, 1f, 0.72f, 1f)
             : new Color(1f, 0.72f, 0.48f, 1f));

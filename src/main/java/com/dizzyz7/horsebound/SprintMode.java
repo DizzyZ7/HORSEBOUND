@@ -2,20 +2,11 @@
 package com.dizzyz7.horsebound;
 
 enum SprintMode {
-    HOLD("Hold"),
-    TOGGLE("Toggle");
+    HOLD("sprint.hold"),
+    TOGGLE("sprint.toggle");
 
-    private final String displayName;
-
-    SprintMode(String displayName) {
-        this.displayName = displayName;
-    }
-
-    String displayName() {
-        return displayName;
-    }
-
-    SprintMode toggled() {
-        return this == HOLD ? TOGGLE : HOLD;
-    }
+    private final String displayKey;
+    SprintMode(String displayKey) { this.displayKey = displayKey; }
+    String displayName() { return I18n.text(displayKey); }
+    SprintMode toggled() { return this == HOLD ? TOGGLE : HOLD; }
 }

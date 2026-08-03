@@ -54,6 +54,7 @@ public final class HorseboundGame extends Game {
         HomesteadActionBus.reset();
         HomesteadInputContext.reset();
         InputProfileContext.set(inputProfile);
+        I18n.setLanguage(settings.language());
         RanchAudio.setVolumes(settings.sfxVolume(), settings.ambienceVolume());
         Gdx.graphics.setVSync(settings.vsync());
         setScreen(new MenuScreen(this));
@@ -94,6 +95,7 @@ public final class HorseboundGame extends Game {
     void updateSettings(GameSettings next) {
         GameSettings applied = DisplayController.applyRuntime(settings, next);
         settings = applied;
+        I18n.setLanguage(applied.language());
         RanchAudio.setVolumes(applied.sfxVolume(), applied.ambienceVolume());
         try {
             settingsRepository.save(applied);

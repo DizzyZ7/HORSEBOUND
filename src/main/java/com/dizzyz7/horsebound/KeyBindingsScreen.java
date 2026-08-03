@@ -6,6 +6,7 @@ import com.badlogic.gdx.Screen;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
+import com.badlogic.gdx.graphics.g2d.GlyphLayout;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Rectangle;
@@ -20,13 +21,14 @@ final class KeyBindingsScreen implements Screen {
     private final RanchSessionScreen pausedWorld;
     private final SpriteBatch batch = new SpriteBatch();
     private final ShapeRenderer shapes = new ShapeRenderer();
-    private final BitmapFont font = new BitmapFont();
+    private final BitmapFont font = GameFonts.create();
+    private final GlyphLayout glyphLayout = new GlyphLayout();
     private final MenuInputMapper menuInput = new MenuInputMapper();
     private final Rectangle[] rows = new Rectangle[ITEM_COUNT];
     private InputProfile profile;
     private int selectedIndex;
     private BindableAction capturing;
-    private String message = "Select an action, confirm, then press a keyboard key.";
+    private String message = I18n.text("input.bindings.instructions");
 
     KeyBindingsScreen(HorseboundGame game, RanchSessionScreen pausedWorld) {
         this.game = game;
@@ -58,7 +60,7 @@ final class KeyBindingsScreen implements Screen {
         if (capturing != null) {
             if (input.command().backPressed()) {
                 capturing = null;
-                message = "Binding cancelled. Select another action or go back.";
+                message = I18n.text("input.bindings.cancelled");
             } else {
                 captureKey();
             }
@@ -91,20 +93,22 @@ final class KeyBindingsScreen implements Screen {
         batch.getProjectionMatrix().setToOrtho2D(0f, 0f, width, height);
         batch.begin();
         font.setColor(Color.WHITE);
-        font.getData().setScale(1.75f * ui);
-        font.draw(batch, "KEYBOARD BINDINGS", width * 0.5f - 170f * ui, height - 24f * geometry);
-        font.getData().setScale(0.78f * ui);
+        GameFonts.setScale(font, 1.75f * ui);
+        drawCentered(I18n.text("input.bindings.title"), width * 0.5f, height - 24f * geometry);
+        GameFonts.setScale(font, 0.78f * ui);
         for (int i = 0; i < ACTIONS.length; i++) {
             BindableAction action = ACTIONS[i];
             Rectangle row = rows[i];
             font.setColor(i == selectedIndex ? Color.WHITE : new Color(0.84f, 0.90f, 0.85f, 1f));
             font.draw(batch, action.displayName(), row.x + 12f * ui, row.y + 22f * ui);
             font.setColor(new Color(1f, 0.88f, 0.58f, 1f));
-            font.draw(batch, KeyLabel.of(profile.keyFor(action)), row.x + row.width - 155f * ui, row.y + 22f * ui);
+            String keyName = KeyLabel.of(profile.keyFor(action));
+            glyphLayout.setText(font, keyName);
+            font.draw(batch, keyName, row.x + row.width - 12f * ui - glyphLayout.width, row.y + 22f * ui);
         }
-        drawFooterRow(DEFAULTS_INDEX, "RESTORE DEFAULT BINDINGS", ui);
-        drawFooterRow(BACK_INDEX, "BACK", ui);
-        font.getData().setScale(0.66f * ui);
+        drawFooterRow(DEFAULTS_INDEX, I18n.text("input.bindings.restore"), ui);
+        drawFooterRow(BACK_INDEX, I18n.text("common.back"), ui);
+        GameFonts.setScale(font, 0.66f * ui);
         font.setColor(capturing == null
             ? new Color(0.70f, 0.78f, 0.71f, 1f)
             : new Color(1f, 0.86f, 0.48f, 1f));
@@ -117,7 +121,7 @@ final class KeyBindingsScreen implements Screen {
             if (!Gdx.input.isKeyJustPressed(keyCode)) continue;
             profile = profile.withBinding(capturing, keyCode);
             game.updateInputProfile(profile);
-            message = capturing.displayName() + " is now bound to " + KeyLabel.of(keyCode) + ".";
+            message = I18n.text("input.bindings.bound", capturing.displayName(), KeyLabel.of(keyCode));
             capturing = null;
             return;
         }
@@ -126,17 +130,22 @@ final class KeyBindingsScreen implements Screen {
     private boolean activate() {
         if (selectedIndex < ACTIONS.length) {
             capturing = ACTIONS[selectedIndex];
-            message = "Press a keyboard key for " + capturing.displayName() + ". Esc / Back cancels.";
+            message = I18n.text("input.bindings.press", capturing.displayName());
             return false;
         }
         if (selectedIndex == DEFAULTS_INDEX) {
             profile = InputProfile.defaults();
             game.updateInputProfile(profile);
-            message = "Default keyboard bindings restored.";
+            message = I18n.text("input.bindings.restored");
             return false;
         }
         goBack();
         return true;
+    }
+
+    private void drawCentered(String value, float centerX, float baselineY) {
+        glyphLayout.setText(font, value);
+        font.draw(batch, value, centerX - glyphLayout.width * 0.5f, baselineY);
     }
 
     private void drawFooterRow(int index, String text, float ui) {

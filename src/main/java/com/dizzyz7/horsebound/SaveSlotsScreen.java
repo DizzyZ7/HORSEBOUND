@@ -31,7 +31,7 @@ final class SaveSlotsScreen implements Screen {
     private final Mode mode;
     private final SpriteBatch batch = new SpriteBatch();
     private final ShapeRenderer shapes = new ShapeRenderer();
-    private final BitmapFont font = new BitmapFont();
+    private final BitmapFont font = GameFonts.create();
     private final GlyphLayout layout = new GlyphLayout();
     private final MenuInputMapper menuInput = new MenuInputMapper();
     private final Rectangle[] slotButtons = {new Rectangle(), new Rectangle(), new Rectangle()};
@@ -92,11 +92,11 @@ final class SaveSlotsScreen implements Screen {
         batch.begin();
         drawCenteredTitle(width, height, ui);
 
-        font.getData().setScale(0.82f * ui);
+        GameFonts.setScale(font, 0.82f * ui);
         font.setColor(new Color(0.76f, 0.84f, 0.78f, 1f));
         String subtitle = mode == Mode.NEW_GAME
-            ? "Choose a ranch slot. Select an occupied slot twice to replace it."
-            : "Choose a saved ranch to continue.";
+            ? I18n.text("save.new_hint")
+            : I18n.text("save.load_hint");
         drawCentered(subtitle, width * 0.5f, height - 98f * geometryScale);
 
         for (int i = 0; i < slots.size(); i++) {
@@ -104,11 +104,11 @@ final class SaveSlotsScreen implements Screen {
         }
 
         font.setColor(Color.WHITE);
-        font.getData().setScale(1.0f * ui);
-        drawCentered("BACK", backButton.x + backButton.width * 0.5f, backButton.y + 33f * geometryScale);
+        GameFonts.setScale(font, 1.0f * ui);
+        drawCentered(I18n.text("common.back"), backButton.x + backButton.width * 0.5f, backButton.y + 33f * geometryScale);
 
         if (message != null) {
-            font.getData().setScale(0.80f * ui);
+            GameFonts.setScale(font, 0.80f * ui);
             font.setColor(new Color(1f, 0.88f, 0.58f, 1f));
             drawCentered(message, width * 0.5f, 88f * geometryScale);
         }
@@ -130,8 +130,8 @@ final class SaveSlotsScreen implements Screen {
 
     private void drawCenteredTitle(int width, int height, float ui) {
         font.setColor(Color.WHITE);
-        font.getData().setScale(2.25f * ui);
-        drawCentered(mode == Mode.NEW_GAME ? "NEW RANCH" : "LOAD RANCH", width * 0.5f, height - 42f * ui);
+        GameFonts.setScale(font, 2.25f * ui);
+        drawCentered(mode == Mode.NEW_GAME ? I18n.text("save.new_title") : I18n.text("save.load_title"), width * 0.5f, height - 42f * ui);
     }
 
     private void drawCentered(String text, float centerX, float baselineY) {
@@ -191,27 +191,26 @@ final class SaveSlotsScreen implements Screen {
 
     private void drawSlot(SaveSlotInfo slot, Rectangle rect, int number, float ui, float geometryScale) {
         float left = rect.x + 18f * geometryScale;
-        font.getData().setScale(1.05f * ui);
+        GameFonts.setScale(font, 1.05f * ui);
         font.setColor(Color.WHITE);
         font.draw(batch, number + ". " + slot.label(), left, rect.y + 56f * geometryScale);
 
-        font.getData().setScale(0.72f * ui);
+        GameFonts.setScale(font, 0.72f * ui);
         if (slot.state() == SaveSlotInfo.State.EMPTY) {
             font.setColor(new Color(0.68f, 0.76f, 0.70f, 1f));
-            font.draw(batch, "Empty slot", left, rect.y + 28f * geometryScale);
+            font.draw(batch, I18n.text("save.empty"), left, rect.y + 28f * geometryScale);
             return;
         }
         if (slot.state() == SaveSlotInfo.State.CORRUPT) {
             font.setColor(new Color(1f, 0.62f, 0.56f, 1f));
-            font.draw(batch, "Save and backup are unreadable", left, rect.y + 28f * geometryScale);
+            font.draw(batch, I18n.text("save.corrupt"), left, rect.y + 28f * geometryScale);
             return;
         }
 
         font.setColor(new Color(0.74f, 0.84f, 0.76f, 1f));
         String saved = DATE_FORMAT.format(Instant.ofEpochMilli(slot.savedAtEpochMillis()));
         font.draw(batch,
-            "Saved " + saved + " | horses " + slot.horseCount() + " | tamed " + slot.tamedHorseCount()
-                + " | structures " + slot.structureCount(),
+            I18n.text("save.summary", saved, slot.horseCount(), slot.tamedHorseCount(), slot.structureCount()),
             left,
             rect.y + 28f * geometryScale
         );
@@ -233,8 +232,8 @@ final class SaveSlotsScreen implements Screen {
         if (mode == Mode.LOAD_GAME) {
             if (!slot.canLoad()) {
                 message = slot.state() == SaveSlotInfo.State.CORRUPT
-                    ? "That ranch cannot be loaded because both save copies are damaged."
-                    : "That ranch slot is empty.";
+                    ? I18n.text("save.cannot_load_corrupt")
+                    : I18n.text("save.cannot_load_empty");
                 return;
             }
             game.loadWorld(slot.slotId());
@@ -248,7 +247,7 @@ final class SaveSlotsScreen implements Screen {
 
         SaveSlotOverwriteConfirmation.Decision decision = overwriteConfirmation.request(slot.slotId());
         if (decision == SaveSlotOverwriteConfirmation.Decision.ARMED) {
-            message = "Select " + slot.label() + " again to permanently replace that ranch.";
+            message = I18n.text("save.confirm_replace", slot.label());
             return;
         }
         if (decision == SaveSlotOverwriteConfirmation.Decision.CONFIRMED) {

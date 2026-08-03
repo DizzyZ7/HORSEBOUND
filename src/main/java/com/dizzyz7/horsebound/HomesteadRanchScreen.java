@@ -51,7 +51,7 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
     private final Set<UUID> hiddenLegacyStructureIds;
     private final ShapeRenderer shapes = new ShapeRenderer();
     private final SpriteBatch batch = new SpriteBatch();
-    private final BitmapFont font = new BitmapFont();
+    private final BitmapFont font = GameFonts.create();
 
     private HomesteadRenderer.PlacementPreview placement;
     private UUID editedStructureId;
@@ -60,7 +60,8 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
     private boolean buildMode;
     private boolean editMode;
     private boolean disposed;
-    private String homesteadStatus = "Open inventory or select hotbar slots with 1–8 / D-pad.";
+    private Language displayedLanguage = I18n.language();
+    private String homesteadStatus = I18n.text("homestead.initial");
     private float statusTimer = 7f;
     private float careFeedbackCooldown;
 
@@ -179,7 +180,7 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
         if (!buildMode && !editMode && input.hotbarDelta() != 0) session.hotbar().cycle(input.hotbarDelta());
         if (buildMode && input.buildTypeDelta() != 0) {
             buildTypeIndex = Math.floorMod(buildTypeIndex + input.buildTypeDelta(), BUILD_TYPES.length);
-            setStatus("Build blueprint: " + selectedBuildType().displayName() + ".");
+            setStatus(I18n.text("homestead.blueprint", selectedBuildType().displayName()));
         }
         if ((buildMode || editMode) && input.rotationDelta() != 0) {
             placementHeading = snapHeading(placementHeading + input.rotationDelta() * 15f);
@@ -187,7 +188,7 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
     }
 
     private void handleSemanticActions(PlacedStructure nearby, boolean editPressed, boolean undoPressed) {
-        if (HomesteadActionBus.consumeCancel()) cancelPlacement("Placement cancelled.");
+        if (HomesteadActionBus.consumeCancel()) cancelPlacement(I18n.text("homestead.cancelled"));
 
         if (undoPressed && !buildMode && !editMode) {
             undoLastRanchEdit();
@@ -195,7 +196,7 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
 
         if (HomesteadActionBus.consumeInventory()) {
             if (buildMode || editMode) {
-                setStatus("Cancel placement before opening inventory.");
+                setStatus(I18n.text("homestead.cancel_inventory"));
             } else {
                 inventoryOverlay.open(session.inventory(), null);
                 return;
@@ -221,7 +222,7 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
         editedStructureId = null;
         placementHeading = snapHeading(worldAccess.actorPose().heading());
         placement = calculatePlacement(worldAccess.actorPose());
-        setStatus("Build mode: " + selectedBuildType().displayName() + ". Build confirms; Back cancels.");
+        setStatus(I18n.text("homestead.build_mode", selectedBuildType().displayName()));
     }
 
     private void startEditMode() {
@@ -231,7 +232,7 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
             .filter(value -> !hiddenLegacyStructureIds.contains(value.id()))
             .orElse(null);
         if (nearest == null) {
-            setStatus("No editable Homestead structure nearby.");
+            setStatus(I18n.text("homestead.no_editable"));
             return;
         }
         buildMode = false;
@@ -239,7 +240,7 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
         editedStructureId = nearest.id();
         placementHeading = nearest.heading();
         placement = calculatePlacement(pose);
-        setStatus("Editing " + nearest.type().displayName() + ": highlighted origin + move ghost are active.");
+        setStatus(I18n.text("homestead.editing", nearest.type().displayName()));
     }
 
     private void cancelPlacement(String message) {
@@ -253,7 +254,7 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
 
     private void confirmPlacement() {
         if (placement == null || !placement.valid()) {
-            setStatus(placement == null ? "No placement preview." : placement.reason());
+            setStatus(placement == null ? I18n.text("homestead.no_preview") : placement.reason());
             return;
         }
         HomesteadStructureType type = selectedBuildType();
@@ -265,22 +266,22 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
             session.inventory()
         ).orElse(null);
         if (placed == null) {
-            setStatus("Missing materials: " + costText(type) + ".");
+            setStatus(I18n.text("homestead.missing_materials", costText(type)));
             return;
         }
         undoManager.recordPlacement(placed);
         ControllerRumble.pulse(game.inputProfile(), 65, 0.42f);
-        setStatus(type.displayName() + " placed. U/Ctrl+Z or Pause can undo the unchanged build.");
+        setStatus(I18n.text("homestead.placed", type.displayName()));
     }
 
     private void confirmRelocation() {
         if (editedStructureId == null || placement == null || !placement.valid()) {
-            setStatus(placement == null ? "No relocation preview." : placement.reason());
+            setStatus(placement == null ? I18n.text("homestead.no_relocation_preview") : placement.reason());
             return;
         }
         PlacedStructure structure = session.homestead().find(editedStructureId).orElse(null);
         if (structure == null) {
-            cancelPlacement("That structure is no longer available.");
+            cancelPlacement(I18n.text("homestead.unavailable"));
             return;
         }
         float fromX = structure.x();
@@ -292,7 +293,7 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
             placement.z(),
             placement.heading()
         )) {
-            cancelPlacement("That structure is no longer available.");
+            cancelPlacement(I18n.text("homestead.unavailable"));
             return;
         }
         undoManager.recordRelocation(
@@ -305,7 +306,7 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
             placement.heading()
         );
         ControllerRumble.pulse(game.inputProfile(), 60, 0.38f);
-        cancelPlacement("Structure moved. U/Ctrl+Z or Pause can restore its previous position.");
+        cancelPlacement(I18n.text("homestead.moved"));
     }
 
     private void requestDismantleEditedStructure() {
@@ -316,13 +317,13 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
             case ARMED -> {
                 RanchAudio.play(RanchAudio.Cue.DISMANTLE_ARM);
                 ControllerRumble.pulse(game.inputProfile(), 32, 0.25f);
-                setStatus(
-                    "Dismantle armed: press Mount/Y again within "
-                        + Math.round(dismantleConfirmation.remainingSeconds()) + " seconds."
-                );
+                setStatus(I18n.text(
+                    "homestead.dismantle_armed",
+                    Math.round(dismantleConfirmation.remainingSeconds())
+                ));
             }
             case CONFIRMED -> performDismantleEditedStructure();
-            case INVALID -> cancelPlacement("That structure is no longer available.");
+            case INVALID -> cancelPlacement(I18n.text("homestead.unavailable"));
         }
     }
 
@@ -333,17 +334,17 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
             case SUCCESS -> {
                 undoManager.clear();
                 ControllerRumble.pulse(game.inputProfile(), 70, 0.45f);
-                cancelPlacement("Structure dismantled; half materials returned.");
+                cancelPlacement(I18n.text("homestead.dismantled"));
             }
             case STORAGE_NOT_EMPTY -> {
                 dismantleConfirmation.cancel();
-                setStatus("Empty the structure before dismantling it.");
+                setStatus(I18n.text("homestead.empty_before_dismantle"));
             }
             case INVENTORY_FULL -> {
                 dismantleConfirmation.cancel();
-                setStatus("Not enough backpack space for the refund.");
+                setStatus(I18n.text("homestead.refund_full"));
             }
-            case NOT_FOUND -> cancelPlacement("That structure is no longer available.");
+            case NOT_FOUND -> cancelPlacement(I18n.text("homestead.unavailable"));
         }
     }
 
@@ -352,7 +353,7 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
         if (structure.type().canToggleOpen()) {
             if (session.homestead().toggleGate(structure.id())) {
                 ControllerRumble.pulse(game.inputProfile(), 42, 0.30f);
-                setStatus("Gate " + (structure.isOpen() ? "opened." : "closed."));
+                setStatus(I18n.text(structure.isOpen() ? "homestead.gate_opened" : "homestead.gate_closed"));
             }
             return;
         }
@@ -368,22 +369,24 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
         ItemId selected = session.hotbar().selectedItem();
         ItemId accepted = structure.type().acceptedResource();
         if (selected != accepted) {
-            setStatus(structure.type().displayName() + " accepts " + accepted.displayName() + ".");
+            setStatus(I18n.text("homestead.accepts", structure.type().displayName(), accepted.displayName()));
             return;
         }
         int acceptedUnits = session.homestead().depositOneResource(structure.id(), session.inventory());
         if (acceptedUnits <= 0) {
             String reason = session.inventory().count(accepted) <= 0
-                ? "No " + accepted.displayName() + " in inventory."
-                : structure.type().displayName() + " is full.";
+                ? I18n.text("homestead.no_resource", accepted.displayName())
+                : I18n.text("homestead.storage_full", structure.type().displayName());
             setStatus(reason);
             return;
         }
         ControllerRumble.pulse(game.inputProfile(), 45, 0.28f);
-        setStatus(
-            "Deposited " + accepted.displayName() + ": "
-                + structure.storedUnits() + "/" + structure.type().storageCapacity() + " units."
-        );
+        setStatus(I18n.text(
+            "homestead.deposited",
+            accepted.displayName(),
+            structure.storedUnits(),
+            structure.type().storageCapacity()
+        ));
     }
 
     private HomesteadRenderer.PlacementPreview calculatePlacement(RanchWorldAccess.ActorPose pose) {
@@ -401,7 +404,7 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
             z,
             snapHeading(placementHeading),
             reason == null,
-            reason == null ? "Ready" : reason
+            reason == null ? I18n.text("common.ready") : reason
         );
     }
 
@@ -413,8 +416,8 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
         boolean checkRecipe
     ) {
         float limit = Terrain.WORLD_HALF_SIZE - 4f;
-        if (Math.abs(x) > limit || Math.abs(z) > limit) return "Too close to the world boundary.";
-        if (Terrain.isInsideLake(x, z)) return "Structures cannot be placed in the lake.";
+        if (Math.abs(x) > limit || Math.abs(z) > limit) return I18n.text("homestead.boundary");
+        if (Terrain.isInsideLake(x, z)) return I18n.text("homestead.lake");
 
         float center = Terrain.heightAt(x, z);
         float maximumSlope = 0f;
@@ -423,15 +426,15 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
         maximumSlope = Math.max(maximumSlope, Math.abs(center - Terrain.heightAt(x - sample, z)));
         maximumSlope = Math.max(maximumSlope, Math.abs(center - Terrain.heightAt(x, z + sample)));
         maximumSlope = Math.max(maximumSlope, Math.abs(center - Terrain.heightAt(x, z - sample)));
-        if (maximumSlope > 0.85f) return "Ground is too steep for this structure.";
+        if (maximumSlope > 0.85f) return I18n.text("homestead.steep");
         if (worldAccess.isNaturePlacementBlocked(x, z, type.collisionRadius() + 0.15f)) {
-            return "Placement overlaps a tree or rock.";
+            return I18n.text("homestead.nature_overlap");
         }
         for (RanchWorldAccess.HorseTelemetry horse : worldAccess.horses()) {
             if (RanchPlacementCollision.overlaps(
                 x, z, type.collisionRadius(), horse.x(), horse.z(), HORSE_COLLISION_RADIUS, 0.25f
             )) {
-                return "Move the horse away before building here.";
+                return I18n.text("homestead.horse_overlap");
             }
         }
 
@@ -439,13 +442,13 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
             if (existing.id().equals(ignoredStructureId)) continue;
             float required = type.collisionRadius() + existing.type().collisionRadius() + 0.20f;
             if (distanceSquared(x, z, existing.x(), existing.z()) < required * required) {
-                return "Placement overlaps " + existing.type().displayName() + ".";
+                return I18n.text("homestead.structure_overlap", existing.type().displayName());
             }
         }
         if (checkRecipe) {
             for (Map.Entry<ItemId, Integer> cost : type.buildCost().entrySet()) {
                 if (!session.inventory().has(cost.getKey(), cost.getValue())) {
-                    return "Missing materials: " + costText(type) + ".";
+                    return I18n.text("homestead.missing_materials", costText(type));
                 }
             }
         }
@@ -504,8 +507,9 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
             );
             horseNeeds.put(horse.id(), result.needs());
             if (careFeedbackCooldown <= 0f && (result.fed() || result.watered() || result.rested())) {
-                String action = result.fed() ? "ate hay" : result.watered() ? "drank water" : "is resting in a stall";
-                setStatus("A ranch horse " + action + " automatically.");
+                setStatus(I18n.text(result.fed()
+                    ? "homestead.auto_hay"
+                    : result.watered() ? "homestead.auto_water" : "homestead.auto_rest"));
                 careFeedbackCooldown = 4f;
             }
         }
@@ -607,11 +611,11 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
         for (int i = 0; i < Hotbar.SLOT_COUNT; i++) {
             float x = startX + i * (slotSize + gap);
             ItemId item = session.hotbar().itemAt(i);
-            font.getData().setScale(0.62f * ui);
+            GameFonts.setScale(font, 0.62f * ui);
             font.setColor(Color.WHITE);
             font.draw(batch, Integer.toString(i + 1), x + 4f * geometry, startY + slotSize - 4f * geometry);
             if (item != null) {
-                font.getData().setScale(0.53f * ui);
+                GameFonts.setScale(font, 0.53f * ui);
                 font.draw(batch, shortName(item), x + 5f * geometry, startY + 22f * geometry);
                 font.setColor(new Color(1f, 0.88f, 0.55f, 1f));
                 font.draw(batch, Integer.toString(session.inventory().count(item)), x + 5f * geometry, startY + 9f * geometry);
@@ -622,73 +626,101 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
         RanchWorldAccess.HorseTelemetry nearest = nearestHorse(pose.x(), pose.z(), 12f);
         if (nearest != null) {
             HorseNeeds needs = horseNeeds.getOrDefault(nearest.id(), HorseNeeds.healthy());
-            font.getData().setScale(0.68f * ui);
+            GameFonts.setScale(font, 0.68f * ui);
             font.setColor(new Color(0.94f, 0.90f, 0.69f, 1f));
             font.draw(
                 batch,
-                "Horse care | hunger " + Math.round(needs.hunger())
-                    + "% | thirst " + Math.round(needs.thirst())
-                    + "% | energy " + Math.round(needs.energy()) + "%",
+                I18n.text(
+                    "hud.horse_care",
+                    Math.round(needs.hunger()),
+                    Math.round(needs.thirst()),
+                    Math.round(needs.energy())
+                ),
                 16f * geometry,
                 startY + slotSize + 25f * geometry
             );
         }
 
+        if (!buildMode && !editMode && !dismantleConfirmation.isArmed()) {
+            RanchGuidance.Objective objective = RanchGuidance.next(session, worldAccess.horses());
+            GameFonts.setScale(font, 0.68f * ui);
+            font.setColor(new Color(0.72f, 0.92f, 1f, 1f));
+            font.draw(
+                batch,
+                I18n.text("hud.objective", objective.title()),
+                16f * geometry,
+                height - 72f * geometry
+            );
+            GameFonts.setScale(font, 0.61f * ui);
+            font.setColor(new Color(0.82f, 0.88f, 0.84f, 1f));
+            font.draw(
+                batch,
+                I18n.text("hud.objective_detail", objective.detail()),
+                16f * geometry,
+                height - 94f * geometry
+            );
+        }
+
         if ((buildMode || editMode) && placement != null) {
-            font.getData().setScale(0.68f * ui);
+            GameFonts.setScale(font, 0.68f * ui);
             font.setColor(placement.valid() ? new Color(0.62f, 1f, 0.68f, 1f) : new Color(1f, 0.58f, 0.50f, 1f));
-            String prefix = editMode ? "EDIT" : "BUILD";
-            String controls = editMode
-                ? " | highlighted origin -> ghost | R/D-pad rotate | Build move | Mount/Y dismantle | Back cancel"
-                : " | [ / ] type | R/D-pad rotate | Build place | Back cancel";
+            String prefix = I18n.text(editMode ? "homestead.mode_edit" : "homestead.mode_build");
+            String controls = I18n.text(editMode ? "homestead.controls_edit" : "homestead.controls_build");
             String moveDelta = "";
             if (editMode && editedStructureId != null) {
                 PlacedStructure edited = session.homestead().find(editedStructureId).orElse(null);
                 if (edited != null) {
-                    moveDelta = String.format(
-                        Locale.ROOT,
-                        " | %.1f,%.1f -> %.1f,%.1f",
-                        edited.x(), edited.z(), placement.x(), placement.z()
+                    moveDelta = I18n.text(
+                        "homestead.move_delta",
+                        String.format(Locale.ROOT, "%.1f", edited.x()),
+                        String.format(Locale.ROOT, "%.1f", edited.z()),
+                        String.format(Locale.ROOT, "%.1f", placement.x()),
+                        String.format(Locale.ROOT, "%.1f", placement.z())
                     );
                 }
             }
             font.draw(
                 batch,
-                prefix + ": " + placement.type().displayName().toUpperCase(Locale.ROOT)
-                    + (editMode ? "" : " | cost " + costText(placement.type()))
+                prefix + ": " + placement.type().displayName().toUpperCase(I18n.language().locale())
+                    + (editMode ? "" : I18n.text("homestead.cost", costText(placement.type())))
                     + moveDelta
                     + controls
-                    + (placement.valid() ? "" : " | " + placement.reason()),
+                    + (placement.valid() ? "" : I18n.text("homestead.invalid", placement.reason())),
                 16f * geometry,
                 height - 70f * geometry
             );
         }
         if (undoManager.hasPending()) {
-            String undoLabel = undoManager.pendingKind() == RanchUndoManager.Kind.PLACEMENT
-                ? "UNDO READY: LAST BUILD"
-                : "UNDO READY: LAST MOVE";
-            font.getData().setScale(0.64f * ui);
+            String undoLabel = I18n.text(undoManager.pendingKind() == RanchUndoManager.Kind.PLACEMENT
+                ? "homestead.undo_build"
+                : "homestead.undo_move");
+            GameFonts.setScale(font, 0.64f * ui);
             font.setColor(new Color(0.62f, 0.88f, 1f, 1f));
             font.draw(
                 batch,
-                undoLabel + " | U / Ctrl+Z / Pause",
+                I18n.text("homestead.undo_controls", undoLabel),
                 Math.max(16f * geometry, width - 330f * geometry),
                 startY + slotSize + 25f * geometry
             );
         }
         if (dismantleConfirmation.isArmed()) {
-            font.getData().setScale(0.72f * ui);
+            GameFonts.setScale(font, 0.72f * ui);
             font.setColor(new Color(1f, 0.54f, 0.34f, 1f));
             font.draw(
                 batch,
-                "CONFIRM DISMANTLE: Mount/Y again | "
-                    + String.format(Locale.ROOT, "%.1fs", dismantleConfirmation.remainingSeconds()),
+                I18n.text(
+                    "homestead.confirm_dismantle",
+                    I18n.text(
+                        "common.seconds_short",
+                        String.format(Locale.ROOT, "%.1f", dismantleConfirmation.remainingSeconds())
+                    )
+                ),
                 16f * geometry,
                 height - 98f * geometry
             );
         }
         if (statusTimer > 0f) {
-            font.getData().setScale(0.67f * ui);
+            GameFonts.setScale(font, 0.67f * ui);
             font.setColor(new Color(1f, 0.94f, 0.73f, 1f));
             font.draw(batch, homesteadStatus, 16f * geometry, startY + slotSize + 48f * geometry);
         }
@@ -739,11 +771,11 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
             .sorted(Map.Entry.comparingByKey())
             .map(entry -> entry.getValue() + " " + entry.getKey().displayName())
             .reduce((left, right) -> left + ", " + right)
-            .orElse("free");
+            .orElse(I18n.text("common.free"));
     }
 
     private static String shortName(ItemId item) {
-        return item == ItemId.WATER_BUCKET ? "WATER" : item.name();
+        return item.shortName();
     }
 
     private void setStatus(String message) {
@@ -779,12 +811,12 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
             (structure, x, z, heading) -> validatePlacement(structure.type(), x, z, structure.id(), false) == null
         );
         String message = switch (result) {
-            case PLACEMENT_REVERTED -> "Last unchanged build removed; full materials returned.";
-            case RELOCATION_REVERTED -> "Last structure move restored to its previous position.";
-            case NOTHING_TO_UNDO -> "Nothing to undo in this ranch session.";
-            case STRUCTURE_CHANGED -> "Undo expired because that structure changed after the edit.";
-            case INVENTORY_FULL -> "Free backpack space before undoing the build refund.";
-            case RESTORE_BLOCKED -> "The previous position is now blocked; undo remains available.";
+            case PLACEMENT_REVERTED -> I18n.text("homestead.undo.placement");
+            case RELOCATION_REVERTED -> I18n.text("homestead.undo.relocation");
+            case NOTHING_TO_UNDO -> I18n.text("homestead.undo.none");
+            case STRUCTURE_CHANGED -> I18n.text("homestead.undo.changed");
+            case INVENTORY_FULL -> I18n.text("homestead.undo.inventory");
+            case RESTORE_BLOCKED -> I18n.text("homestead.undo.blocked");
         };
         if (result == RanchUndoManager.UndoResult.PLACEMENT_REVERTED
             || result == RanchUndoManager.UndoResult.RELOCATION_REVERTED) {
@@ -813,6 +845,11 @@ final class HomesteadRanchScreen implements RanchSessionScreen {
     @Override
     public void resume() {
         delegate.resume();
+        if (displayedLanguage != I18n.language()) {
+            displayedLanguage = I18n.language();
+            homesteadStatus = I18n.text("homestead.initial");
+            statusTimer = 4f;
+        }
     }
 
     @Override

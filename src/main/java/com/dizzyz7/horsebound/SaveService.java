@@ -34,7 +34,7 @@ final class SaveService {
         List<SaveSlotInfo> slots = new ArrayList<>(SLOT_IDS.size());
         for (int i = 0; i < SLOT_IDS.size(); i++) {
             String slotId = SLOT_IDS.get(i);
-            String label = "Ranch " + (i + 1);
+            String label = I18n.text("save.ranch_label", i + 1);
             if (!repository.exists(slotId)) {
                 slots.add(new SaveSlotInfo(slotId, label, SaveSlotInfo.State.EMPTY, 0L, 0L, 0, 0, 0));
                 continue;
@@ -112,6 +112,11 @@ final class SaveService {
 
     String activeSlot() {
         return activeSlot;
+    }
+
+    String activeSlotLabel() {
+        int index = SLOT_IDS.indexOf(activeSlot);
+        return index < 0 ? activeSlot : I18n.text("save.ranch_label", index + 1);
     }
 
     String saveLocation() {
