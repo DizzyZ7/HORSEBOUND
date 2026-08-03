@@ -2,20 +2,11 @@
 package com.dizzyz7.horsebound;
 
 enum WindowMode {
-    WINDOWED("Windowed"),
-    FULLSCREEN("Fullscreen");
+    WINDOWED("window.windowed"),
+    FULLSCREEN("window.fullscreen");
 
-    private final String displayName;
-
-    WindowMode(String displayName) {
-        this.displayName = displayName;
-    }
-
-    String displayName() {
-        return displayName;
-    }
-
-    WindowMode toggled() {
-        return this == WINDOWED ? FULLSCREEN : WINDOWED;
-    }
+    private final String displayKey;
+    WindowMode(String displayKey) { this.displayKey = displayKey; }
+    String displayName() { return I18n.text(displayKey); }
+    WindowMode toggled() { return this == WINDOWED ? FULLSCREEN : WINDOWED; }
 }

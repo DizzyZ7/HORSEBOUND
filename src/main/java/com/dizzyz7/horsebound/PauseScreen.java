@@ -6,6 +6,7 @@ import com.badlogic.gdx.Screen;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
+import com.badlogic.gdx.graphics.g2d.GlyphLayout;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Rectangle;
@@ -23,7 +24,8 @@ final class PauseScreen implements Screen {
     private final RanchSessionScreen world;
     private final SpriteBatch batch = new SpriteBatch();
     private final ShapeRenderer shapes = new ShapeRenderer();
-    private final BitmapFont font = new BitmapFont();
+    private final BitmapFont font = GameFonts.create();
+    private final GlyphLayout glyphLayout = new GlyphLayout();
     private final MenuInputMapper menuInput = new MenuInputMapper();
     private final Rectangle[] rows = {
         new Rectangle(),
@@ -33,7 +35,7 @@ final class PauseScreen implements Screen {
         new Rectangle()
     };
     private int selectedIndex;
-    private String message = "Ranch simulation is paused.";
+    private String message = I18n.text("pause.message");
 
     PauseScreen(HorseboundGame game, RanchSessionScreen world) {
         this.game = game;
@@ -88,23 +90,28 @@ final class PauseScreen implements Screen {
         batch.getProjectionMatrix().setToOrtho2D(0f, 0f, width, height);
         batch.begin();
         font.setColor(Color.WHITE);
-        font.getData().setScale(2.4f * ui);
-        font.draw(batch, "PAUSED", width * 0.5f - 92f * ui, height * 0.84f);
-        font.getData().setScale(0.98f * ui);
-        drawLabel("RESUME", rows[RESUME], ui);
+        GameFonts.setScale(font, 2.4f * ui);
+        drawCentered(I18n.text("pause.title"), width * 0.5f, height * 0.84f);
+        GameFonts.setScale(font, 0.98f * ui);
+        drawLabel(I18n.text("pause.resume"), rows[RESUME], ui);
         drawLabel(
-            world.hasUndoableRanchEdit() ? "UNDO LAST RANCH EDIT" : "NO RANCH EDIT TO UNDO",
+            world.hasUndoableRanchEdit() ? I18n.text("pause.undo") : I18n.text("pause.undo_unavailable"),
             rows[UNDO],
             ui,
             world.hasUndoableRanchEdit()
         );
-        drawLabel("INPUT & ACCESSIBILITY", rows[INPUT], ui);
-        drawLabel("SAVE GAME", rows[SAVE], ui);
-        drawLabel("SAVE & MAIN MENU", rows[MAIN_MENU], ui);
-        font.getData().setScale(0.76f * ui);
+        drawLabel(I18n.text("pause.input"), rows[INPUT], ui);
+        drawLabel(I18n.text("pause.save"), rows[SAVE], ui);
+        drawLabel(I18n.text("pause.save_menu"), rows[MAIN_MENU], ui);
+        GameFonts.setScale(font, 0.76f * ui);
         font.setColor(new Color(0.78f, 0.86f, 0.79f, 1f));
         font.draw(batch, message, x, startY - 318f * geometry);
         batch.end();
+    }
+
+    private void drawCentered(String value, float centerX, float baselineY) {
+        glyphLayout.setText(font, value);
+        font.draw(batch, value, centerX - glyphLayout.width * 0.5f, baselineY);
     }
 
     private void drawLabel(String text, Rectangle row, float ui) {
@@ -121,7 +128,7 @@ final class PauseScreen implements Screen {
             case RESUME -> game.resumePausedWorld(world);
             case UNDO -> {
                 if (!world.hasUndoableRanchEdit()) {
-                    message = "No ranch edit is currently safe to undo.";
+                    message = I18n.text("pause.no_undo");
                     return;
                 }
                 message = world.undoLastRanchEdit();
@@ -131,7 +138,7 @@ final class PauseScreen implements Screen {
             case SAVE -> {
                 world.saveSession();
                 ControllerRumble.pulse(game.inputProfile(), 55, 0.45f);
-                message = "Ranch saved without leaving the session.";
+                message = I18n.text("pause.saved");
             }
             case MAIN_MENU -> game.leavePausedWorldToMenu(world);
             default -> throw new IllegalStateException("Unknown pause item: " + selectedIndex);

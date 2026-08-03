@@ -51,7 +51,7 @@ final class LivingRanchScreen implements Screen, RanchWorldAccess {
     private final GameModels models = new GameModels();
     private final ModelBatch modelBatch = new ModelBatch();
     private final SpriteBatch spriteBatch = new SpriteBatch();
-    private final BitmapFont font = new BitmapFont();
+    private final BitmapFont font = GameFonts.create();
     private final String buildLabel = GameplayHudCopy.buildLabel(BuildInfo.current());
     private final PerspectiveCamera camera;
     private final Environment environment = new Environment();
@@ -85,7 +85,8 @@ final class LivingRanchScreen implements Screen, RanchWorldAccess {
     private float playerJumpOffset;
     private float playerJumpVelocity;
     private float autosaveTimer;
-    private String status = "Explore the meadow, meet a horse, and build your first paddock.";
+    private Language displayedLanguage = I18n.language();
+    private String status = I18n.text("status.explore");
     private float statusTimer = 8f;
     private boolean returnToMenuRequested;
     private boolean disposed;
@@ -181,7 +182,7 @@ final class LivingRanchScreen implements Screen, RanchWorldAccess {
         updateCameraInput(command);
 
         if (command.savePressed()) {
-            saveNow("Game saved.");
+            saveNow(I18n.text("status.game_saved"));
         }
         if (command.pausePressed()) {
             returnToMenuRequested = true;
@@ -496,10 +497,10 @@ final class LivingRanchScreen implements Screen, RanchWorldAccess {
         if (command.interactPressed()) {
             if (planarDistance(playerPosition.x, playerPosition.z, pushik.position.x, pushik.position.z) < 3.1f) {
                 session.pushikMind().pet();
-                setStatus(
-                    "Pushik purrs. Affection " + Math.round(session.pushikMind().affection())
-                        + "% — his fluffy black paws are almost silent."
-                );
+                setStatus(I18n.text(
+                    "status.pushik_purrs",
+                    Math.round(session.pushikMind().affection())
+                ));
                 return;
             }
 
@@ -513,10 +514,10 @@ final class LivingRanchScreen implements Screen, RanchWorldAccess {
             if (tree != null && !tree.harvested) {
                 tree.harvested = true;
                 int accepted = session.inventory().add(ItemId.WOOD, 2);
-                setStatus("Collected " + accepted + " wood. Fence cost: 2 wood.");
+                setStatus(I18n.text("status.collected_wood", accepted));
                 return;
             }
-            setStatus("Nothing close enough to interact with.");
+            setStatus(I18n.text("status.nothing_near"));
         }
 
         if (command.mountPressed()) toggleMount();
@@ -526,32 +527,36 @@ final class LivingRanchScreen implements Screen, RanchWorldAccess {
     private void interactHorse(HorseActor horse) {
         if (!horse.tamed) {
             if (!session.inventory().remove(ItemId.APPLE, 1)) {
-                setStatus(horse.name + " watches you carefully. You need an apple.");
+                setStatus(I18n.text("status.horse_needs_apple", HorseNames.display(horse.name)));
                 return;
             }
             horse.relationship.feed(horse.personality);
             if (horse.relationship.isReadyToTame()) {
                 horse.tamed = true;
                 saveNow(null);
-                setStatus(
-                    horse.name + " trusts you now. Bond " + Math.round(horse.relationship.bond())
-                        + "%. Progress saved."
-                );
+                setStatus(I18n.text(
+                    "status.horse_tamed",
+                    HorseNames.display(horse.name),
+                    Math.round(horse.relationship.bond())
+                ));
             } else if (horse.relationship.trust() >= 100f) {
-                setStatus(
-                    horse.name + " trusts you but needs calm. Fear "
-                        + Math.round(horse.relationship.fear()) + "% ."
-                );
+                setStatus(I18n.text(
+                    "status.horse_needs_calm",
+                    HorseNames.display(horse.name),
+                    Math.round(horse.relationship.fear())
+                ));
             } else {
-                setStatus(
-                    horse.name + " accepted the apple. " + horse.personality.displayName()
-                        + " | trust " + Math.round(horse.relationship.trust())
-                        + "% | fear " + Math.round(horse.relationship.fear()) + "%"
-                );
+                setStatus(I18n.text(
+                    "status.horse_apple",
+                    HorseNames.display(horse.name),
+                    horse.personality.displayName(),
+                    Math.round(horse.relationship.trust()),
+                    Math.round(horse.relationship.fear())
+                ));
             }
         } else {
             horse.relationship.pet(horse.personality);
-            setStatus("You pet " + horse.name + ". Bond " + Math.round(horse.relationship.bond()) + "%.");
+            setStatus(I18n.text("status.horse_pet", HorseNames.display(horse.name), Math.round(horse.relationship.bond())));
         }
     }
 
@@ -571,28 +576,30 @@ final class LivingRanchScreen implements Screen, RanchWorldAccess {
                 WORLD_LIMIT
             );
             playerPosition.set(safe.x(), Terrain.heightAt(safe.x(), safe.z()), safe.z());
-            setStatus("Dismounted " + old.name + ".");
+            setStatus(I18n.text("status.dismounted", HorseNames.display(old.name)));
             return;
         }
 
         HorseActor horse = nearestHorse(4.8f);
         if (horse == null) {
-            setStatus("Stand closer to a horse to mount.");
+            setStatus(I18n.text("status.mount_near"));
         } else if (!horse.tamed) {
-            setStatus(
-                horse.name + " is not ready yet. Trust "
-                    + Math.round(horse.relationship.trust()) + "%.");
+            setStatus(I18n.text(
+                "status.mount_not_ready",
+                HorseNames.display(horse.name),
+                Math.round(horse.relationship.trust())
+            ));
         } else {
             mountedHorse = horse;
             horse.mounted = true;
             horse.speed = 0f;
-            setStatus("Mounted " + horse.name + ". Sprint gallops; jump clears obstacles.");
+            setStatus(I18n.text("status.mounted", HorseNames.display(horse.name)));
         }
     }
 
     private void buildFence() {
         if (!session.inventory().remove(ItemId.WOOD, 2)) {
-            setStatus("You need 2 wood for a fence segment.");
+            setStatus(I18n.text("status.fence_materials"));
             return;
         }
 
@@ -602,7 +609,7 @@ final class LivingRanchScreen implements Screen, RanchWorldAccess {
         float z = origin.z + tmpForward.z * 3.3f;
         if (Terrain.isInsideLake(x, z) || Math.abs(x) > WORLD_LIMIT || Math.abs(z) > WORLD_LIMIT) {
             session.inventory().add(ItemId.WOOD, 2);
-            setStatus("You cannot build there.");
+            setStatus(I18n.text("status.cannot_build"));
             return;
         }
 
@@ -610,7 +617,7 @@ final class LivingRanchScreen implements Screen, RanchWorldAccess {
         ModelInstance fence = new ModelInstance(models.fence);
         fence.transform.setToTranslation(x, Terrain.heightAt(x, z), z).rotate(Vector3.Y, heading);
         fences.add(new FenceNode(fence, x, z, heading));
-        setStatus("Fence placed. Ranch construction is persistent.");
+        setStatus(I18n.text("status.fence_placed"));
     }
 
     private void updateLighting() {
@@ -640,7 +647,7 @@ final class LivingRanchScreen implements Screen, RanchWorldAccess {
         autosaveTimer += dt;
         if (autosaveTimer >= settings.autosaveSeconds()) {
             autosaveTimer = 0f;
-            saveNow("Autosaved.");
+            saveNow(I18n.text("status.autosaved"));
         }
     }
 
@@ -809,18 +816,21 @@ final class LivingRanchScreen implements Screen, RanchWorldAccess {
         spriteBatch.begin();
 
         font.setColor(Color.WHITE);
-        font.getData().setScale(1f * ui);
+        GameFonts.setScale(font, 1f * ui);
         font.draw(spriteBatch, buildLabel, left, height - 18f * geometry);
-        font.getData().setScale(0.76f * ui);
+        GameFonts.setScale(font, 0.76f * ui);
         font.setColor(new Color(0.88f, 0.91f, 0.86f, 1f));
         font.draw(spriteBatch, inputHint(), left, height - 42f * geometry);
         font.draw(
             spriteBatch,
-            "Wood " + session.inventory().count(ItemId.WOOD)
-                + " | Apples " + session.inventory().count(ItemId.APPLE)
-                + " | Seed " + session.worldSeed()
-                + " | Save " + saveService.activeSlot()
-                + " | Input " + activeInputDevice,
+            I18n.text(
+                "hud.resources",
+                session.inventory().count(ItemId.WOOD),
+                session.inventory().count(ItemId.APPLE),
+                session.worldSeed(),
+                saveService.activeSlotLabel(),
+                activeInputDevice.displayName()
+            ),
             left,
             height - 64f * geometry
         );
@@ -830,15 +840,22 @@ final class LivingRanchScreen implements Screen, RanchWorldAccess {
             font.setColor(new Color(1f, 0.87f, 0.57f, 1f));
             font.draw(
                 spriteBatch,
-                focus.name + " | " + focus.personality.displayName()
-                    + " | trust " + Math.round(focus.relationship.trust())
-                    + "% | bond " + Math.round(focus.relationship.bond())
-                    + "% | fear " + Math.round(focus.relationship.fear())
-                    + "%" + (focus.tamed ? " | tamed" : " | wild")
-                    + (focus == mountedHorse
-                    ? " | stamina " + Math.round(focus.stamina)
-                        + "% | speed " + String.format(Locale.ROOT, "%.1f", Math.abs(focus.speed))
-                    : ""),
+                I18n.text(
+                    "hud.horse",
+                    HorseNames.display(focus.name),
+                    focus.personality.displayName(),
+                    Math.round(focus.relationship.trust()),
+                    Math.round(focus.relationship.bond()),
+                    Math.round(focus.relationship.fear()),
+                    I18n.text(focus.tamed ? "hud.horse_tamed" : "hud.horse_wild")
+                        + (focus == mountedHorse
+                        ? I18n.text(
+                            "hud.horse_mounted",
+                            Math.round(focus.stamina),
+                            String.format(Locale.ROOT, "%.1f", Math.abs(focus.speed))
+                        )
+                        : "")
+                ),
                 left,
                 height - 86f * geometry
             );
@@ -848,9 +865,11 @@ final class LivingRanchScreen implements Screen, RanchWorldAccess {
             font.setColor(new Color(0.82f, 0.82f, 0.86f, 1f));
             font.draw(
                 spriteBatch,
-                "Pushik: " + session.pushikMind().state()
-                    + " | affection " + Math.round(session.pushikMind().affection())
-                    + "% | fluffy paws: silent",
+                I18n.text(
+                    "hud.pushik",
+                    session.pushikMind().state().displayName(),
+                    Math.round(session.pushikMind().affection())
+                ),
                 left,
                 52f * geometry
             );
@@ -861,10 +880,10 @@ final class LivingRanchScreen implements Screen, RanchWorldAccess {
         }
 
         font.setColor(new Color(0.68f, 0.73f, 0.69f, 1f));
-        font.getData().setScale(0.68f * ui);
+        GameFonts.setScale(font, 0.68f * ui);
         font.draw(
             spriteBatch,
-            "Created by Dimash Janibekov (DizZyZ7) | (c) 2026 All rights reserved",
+            I18n.text("common.copyright"),
             Math.max(left, width - 430f * geometry),
             20f * geometry
         );
@@ -912,7 +931,7 @@ final class LivingRanchScreen implements Screen, RanchWorldAccess {
             if (message != null) setStatus(message);
         } catch (SaveRepository.SaveException ex) {
             Gdx.app.error("HORSEBOUND", "Save failed", ex);
-            setStatus("Save failed. Current session remains playable.");
+            setStatus(I18n.text("status.save_failed"));
         }
     }
 
@@ -1119,6 +1138,11 @@ final class LivingRanchScreen implements Screen, RanchWorldAccess {
 
     @Override
     public void resume() {
+        if (displayedLanguage != I18n.language()) {
+            displayedLanguage = I18n.language();
+            status = I18n.text("status.explore");
+            statusTimer = 4f;
+        }
     }
 
     @Override

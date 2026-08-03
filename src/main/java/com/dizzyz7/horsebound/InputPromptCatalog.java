@@ -6,21 +6,18 @@ final class InputPromptCatalog {
     }
 
     static String gameplayHint(InputDeviceType device) {
-        return switch (device) {
-            case KEYBOARD_MOUSE ->
-                "[WASD] Move  [Mouse] Camera  [E] Interact  [F] Mount  [B] Build  [Shift] Gallop  [Space] Jump";
-            case GAMEPAD, STEAM_INPUT ->
-                "[LS] Move  [RS] Camera  [X] Interact  [Y] Mount  [LB] Build  [RB] Gallop  [A] Jump";
-        };
+        return I18n.text(device == InputDeviceType.KEYBOARD_MOUSE
+            ? "prompt.game.keyboard"
+            : "prompt.game.controller");
     }
 
     static String menuHint(InputDeviceType device) {
-        return device == InputDeviceType.KEYBOARD_MOUSE
-            ? "[Arrows/WASD] Select  [Enter] Confirm  [Esc] Back"
-            : "[D-pad/LS] Select  [A] Confirm  [B] Back";
+        return I18n.text(device == InputDeviceType.KEYBOARD_MOUSE
+            ? "prompt.menu.keyboard"
+            : "prompt.menu.controller");
     }
 
     static String savePrompt(InputDeviceType device) {
-        return device == InputDeviceType.KEYBOARD_MOUSE ? "[F5] Save" : "[View] Save";
+        return I18n.text(device == InputDeviceType.KEYBOARD_MOUSE ? "prompt.save.keyboard" : "prompt.save.controller");
     }
 }

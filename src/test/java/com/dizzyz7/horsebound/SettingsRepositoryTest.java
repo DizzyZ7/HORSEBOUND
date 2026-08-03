@@ -73,6 +73,16 @@ class SettingsRepositoryTest {
     }
 
     @Test
+    void languageRoundTripsOutsideRanchSaves() {
+        SettingsRepository repository = new SettingsRepository(tempDir.resolve("settings.properties"));
+        GameSettings expected = GameSettings.defaults().withLanguage(Language.RUSSIAN);
+
+        repository.save(expected);
+
+        assertEquals(Language.RUSSIAN, repository.load().language());
+    }
+
+    @Test
     void audioBusVolumesAreClampedOnLoad() throws Exception {
         Path path = tempDir.resolve("settings.properties");
         Files.writeString(path, "sfxVolume=5.0\nambienceVolume=-3.0\n");

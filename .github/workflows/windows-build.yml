@@ -45,7 +45,8 @@ jobs:
             "THIRD_PARTY_NOTICES.txt",
             "licenses/APACHE-2.0.txt",
             "licenses/BSD-3-CLAUSE.txt",
-            "licenses/ZLIB.txt"
+            "licenses/ZLIB.txt",
+            "licenses/BITSTREAM-VERA-FONT.txt"
           )
 
           foreach ($relative in $required) {
@@ -110,6 +111,15 @@ jobs:
             "com/dizzyz7/horsebound/SprintLatch.class",
             "com/dizzyz7/horsebound/ControllerRumble.class",
             "com/dizzyz7/horsebound/CameraRelativeAxes.class",
+            "com/dizzyz7/horsebound/Language.class",
+            "com/dizzyz7/horsebound/I18n.class",
+            "com/dizzyz7/horsebound/GameFonts.class",
+            "com/dizzyz7/horsebound/HorseNames.class",
+            "com/dizzyz7/horsebound/RanchGuidance.class",
+            "i18n/messages_en.properties",
+            "i18n/messages_ru.properties",
+            "fonts/horsebound-ui.fnt",
+            "fonts/horsebound-ui.png",
             "com/dizzyz7/horsebound/InventoryStack.class",
             "com/dizzyz7/horsebound/InventoryOverlay.class",
             "com/dizzyz7/horsebound/InventoryTransferService.class",

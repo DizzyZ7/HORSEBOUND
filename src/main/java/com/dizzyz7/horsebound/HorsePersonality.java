@@ -39,8 +39,7 @@ enum HorsePersonality {
     }
 
     String displayName() {
-        String lower = name().toLowerCase(Locale.ROOT);
-        return Character.toUpperCase(lower.charAt(0)) + lower.substring(1);
+        return I18n.text("personality." + name().toLowerCase(Locale.ROOT));
     }
 
     static HorsePersonality fromIdentity(UUID id) {

@@ -6,6 +6,7 @@ import com.badlogic.gdx.Screen;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
+import com.badlogic.gdx.graphics.g2d.GlyphLayout;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Rectangle;
@@ -30,7 +31,8 @@ final class SettingsScreen implements Screen {
     private final HorseboundGame game;
     private final SpriteBatch batch = new SpriteBatch();
     private final ShapeRenderer shapes = new ShapeRenderer();
-    private final BitmapFont font = new BitmapFont();
+    private final BitmapFont font = GameFonts.create();
+    private final GlyphLayout glyphLayout = new GlyphLayout();
     private final MenuInputMapper menuInput = new MenuInputMapper();
     private final Rectangle[] rows = new Rectangle[ITEM_COUNT];
 
@@ -79,15 +81,15 @@ final class SettingsScreen implements Screen {
         batch.getProjectionMatrix().setToOrtho2D(0f, 0f, width, height);
         batch.begin();
         font.setColor(Color.WHITE);
-        font.getData().setScale(2.25f * ui);
-        font.draw(batch, "SETTINGS", width * 0.5f - 105f * layoutScale, height - 34f * layoutScale);
+        GameFonts.setScale(font, 2.25f * ui);
+        drawCentered(I18n.text("settings.title"), width * 0.5f, height - 34f * layoutScale);
 
-        font.getData().setScale(0.92f * ui);
+        GameFonts.setScale(font, 0.92f * ui);
         for (int i = 0; i < rows.length; i++) drawRow(i, rows[i], ui, layoutScale);
 
-        font.getData().setScale(0.72f * ui);
+        GameFonts.setScale(font, 0.72f * ui);
         font.setColor(new Color(0.68f, 0.73f, 0.69f, 1f));
-        font.draw(batch, "Display and audio-bus settings are device-local and excluded from Steam Cloud.", 18f * layoutScale, 42f * layoutScale);
+        font.draw(batch, I18n.text("settings.display_notice"), 18f * layoutScale, 42f * layoutScale);
         font.draw(batch, InputPromptCatalog.menuHint(input.activeDevice()), 18f * layoutScale, 23f * layoutScale);
         batch.end();
     }
@@ -109,24 +111,25 @@ final class SettingsScreen implements Screen {
         String value = value(index);
         if (!value.isEmpty()) {
             font.setColor(new Color(1f, 0.88f, 0.58f, 1f));
-            font.draw(batch, value, row.x + row.width - 245f * layoutScale, row.y + 25f * layoutScale);
+            glyphLayout.setText(font, value);
+            font.draw(batch, value, row.x + row.width - 14f * layoutScale - glyphLayout.width, row.y + 25f * layoutScale);
         }
     }
 
     private String label(int index) {
         return switch (index) {
-            case WINDOW_MODE -> "Window mode";
-            case RESOLUTION -> "Windowed resolution";
-            case VSYNC -> "VSync";
-            case GRAPHICS -> "Graphics preset";
-            case UI_SCALE -> "UI / text scale";
-            case SENSITIVITY -> "Mouse / camera sensitivity";
-            case SFX_VOLUME -> "Ranch effects volume";
-            case AMBIENCE_VOLUME -> "Meadow ambience volume";
-            case PERFORMANCE -> "Performance overlay";
-            case AUTOSAVE -> "Autosave interval";
-            case DEFAULTS -> "Restore Deck-safe defaults";
-            case BACK -> "Back";
+            case WINDOW_MODE -> I18n.text("settings.window_mode");
+            case RESOLUTION -> I18n.text("settings.resolution");
+            case VSYNC -> I18n.text("settings.vsync");
+            case GRAPHICS -> I18n.text("settings.graphics");
+            case UI_SCALE -> I18n.text("settings.ui_scale");
+            case SENSITIVITY -> I18n.text("settings.sensitivity");
+            case SFX_VOLUME -> I18n.text("settings.sfx");
+            case AMBIENCE_VOLUME -> I18n.text("settings.ambience");
+            case PERFORMANCE -> I18n.text("settings.performance");
+            case AUTOSAVE -> I18n.text("settings.autosave");
+            case DEFAULTS -> I18n.text("settings.restore_defaults");
+            case BACK -> I18n.text("settings.back");
             default -> throw new IllegalArgumentException("Unknown settings index: " + index);
         };
     }
@@ -135,14 +138,14 @@ final class SettingsScreen implements Screen {
         return switch (index) {
             case WINDOW_MODE -> settings.windowMode().displayName();
             case RESOLUTION -> settings.displayResolution().displayName();
-            case VSYNC -> settings.vsync() ? "ON" : "OFF";
-            case GRAPHICS -> settings.graphicsPreset().displayName() + " | MSAA next launch";
+            case VSYNC -> settings.vsync() ? I18n.text("common.on") : I18n.text("common.off");
+            case GRAPHICS -> I18n.text("settings.msaa_restart", settings.graphicsPreset().displayName());
             case UI_SCALE -> Math.round(settings.uiScale() * 100f) + "%";
             case SENSITIVITY -> String.format(Locale.ROOT, "%.2f", settings.mouseSensitivity());
             case SFX_VOLUME -> Math.round(settings.sfxVolume() * 100f) + "%";
             case AMBIENCE_VOLUME -> Math.round(settings.ambienceVolume() * 100f) + "%";
-            case PERFORMANCE -> settings.showPerformanceStats() ? "ON" : "OFF";
-            case AUTOSAVE -> settings.autosaveSeconds() + " sec";
+            case PERFORMANCE -> settings.showPerformanceStats() ? I18n.text("common.on") : I18n.text("common.off");
+            case AUTOSAVE -> I18n.text("common.seconds", settings.autosaveSeconds());
             case DEFAULTS, BACK -> "";
             default -> throw new IllegalArgumentException("Unknown settings index: " + index);
         };
@@ -155,7 +158,7 @@ final class SettingsScreen implements Screen {
         if (command.rightPressed()) adjustSelected(1);
         if (command.confirmPressed()) {
             if (selectedIndex == DEFAULTS) {
-                apply(GameSettings.defaults());
+                apply(GameSettings.defaults().withLanguage(settings.language()));
             } else if (selectedIndex == BACK) {
                 game.returnToMenu();
                 return true;
@@ -197,7 +200,7 @@ final class SettingsScreen implements Screen {
             if (!row.contains(x, y)) continue;
             selectedIndex = i;
             if (i == DEFAULTS) {
-                apply(GameSettings.defaults());
+                apply(GameSettings.defaults().withLanguage(settings.language()));
             } else if (i == BACK) {
                 game.returnToMenu();
                 return true;
@@ -212,6 +215,11 @@ final class SettingsScreen implements Screen {
     private void apply(GameSettings next) {
         game.updateSettings(next);
         settings = game.settings();
+    }
+
+    private void drawCentered(String value, float centerX, float baselineY) {
+        glyphLayout.setText(font, value);
+        font.draw(batch, value, centerX - glyphLayout.width * 0.5f, baselineY);
     }
 
     private static Color selectedColor() {

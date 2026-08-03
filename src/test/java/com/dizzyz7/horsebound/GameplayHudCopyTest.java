@@ -2,6 +2,7 @@
 package com.dizzyz7.horsebound;
 
 import com.badlogic.gdx.Input;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -9,6 +10,10 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GameplayHudCopyTest {
+    @BeforeEach
+    void useEnglish() {
+        I18n.setLanguage(Language.ENGLISH);
+    }
     @Test
     void usesTheCurrentBuildMetadataInsteadOfALegacyLiteral() {
         assertEquals(

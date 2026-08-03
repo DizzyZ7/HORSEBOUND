@@ -12,6 +12,6 @@ interface RanchSessionScreen extends Screen {
     }
 
     default String undoLastRanchEdit() {
-        return "Nothing to undo in this ranch session.";
+        return I18n.text("homestead.undo.none");
     }
 }

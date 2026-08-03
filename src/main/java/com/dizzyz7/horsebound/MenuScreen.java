@@ -22,7 +22,7 @@ final class MenuScreen implements Screen {
     private final HorseboundGame game;
     private final SpriteBatch batch = new SpriteBatch();
     private final ShapeRenderer shapes = new ShapeRenderer();
-    private final BitmapFont font = new BitmapFont();
+    private final BitmapFont font = GameFonts.create();
     private final GlyphLayout glyphLayout = new GlyphLayout();
     private final MenuInputMapper menuInput = new MenuInputMapper();
     private final Rectangle[] buttons = {
@@ -72,31 +72,31 @@ final class MenuScreen implements Screen {
         batch.getProjectionMatrix().setToOrtho2D(0f, 0f, width, height);
         batch.begin();
         font.setColor(Color.WHITE);
-        font.getData().setScale(3.1f * ui);
+        GameFonts.setScale(font, 3.1f * ui);
         drawCentered("HORSEBOUND", width * 0.5f, height * 0.88f);
 
-        font.getData().setScale(1.02f * ui);
+        GameFonts.setScale(font, 1.02f * ui);
         font.setColor(new Color(0.80f, 0.90f, 0.82f, 1f));
-        drawCentered("A cozy 3D horse sandbox", width * 0.5f, height * 0.80f);
+        drawCentered(I18n.text("menu.tagline"), width * 0.5f, height * 0.80f);
 
-        drawButtonLabel("CONTINUE", CONTINUE, canContinue, ui);
-        drawButtonLabel("NEW GAME", NEW_GAME, true, ui);
-        drawButtonLabel("LOAD GAME", LOAD_GAME, true, ui);
-        drawButtonLabel("SETTINGS", SETTINGS, true, ui);
-        drawButtonLabel("EXIT", EXIT, true, ui);
+        drawButtonLabel(I18n.text("menu.continue"), CONTINUE, canContinue, ui);
+        drawButtonLabel(I18n.text("menu.new_game"), NEW_GAME, true, ui);
+        drawButtonLabel(I18n.text("menu.load_game"), LOAD_GAME, true, ui);
+        drawButtonLabel(I18n.text("menu.settings"), SETTINGS, true, ui);
+        drawButtonLabel(I18n.text("menu.exit"), EXIT, true, ui);
 
-        font.getData().setScale(0.78f * ui);
+        GameFonts.setScale(font, 0.78f * ui);
         font.setColor(new Color(0.66f, 0.74f, 0.68f, 1f));
         drawCentered(
-            canContinue ? "Continue opens the most recently saved ranch." : "No ranch yet. Start a new world.",
+            canContinue ? I18n.text("menu.continue_hint") : I18n.text("menu.new_hint"),
             width * 0.5f,
             91f * layoutScale
         );
         drawCentered(InputPromptCatalog.menuHint(input.activeDevice()), width * 0.5f, 67f * layoutScale);
 
-        font.getData().setScale(0.78f * ui);
+        GameFonts.setScale(font, 0.78f * ui);
         font.setColor(new Color(0.75f, 0.80f, 0.76f, 1f));
-        font.draw(batch, "Created by Dimash Janibekov (DizZyZ7)", 18f * layoutScale, 38f * layoutScale);
+        font.draw(batch, I18n.text("common.created_by"), 18f * layoutScale, 38f * layoutScale);
         batch.end();
     }
 
@@ -169,7 +169,7 @@ final class MenuScreen implements Screen {
     }
 
     private void drawButtonLabel(String label, int index, boolean enabled, float ui) {
-        font.getData().setScale(1.08f * ui);
+        GameFonts.setScale(font, 1.08f * ui);
         font.setColor(enabled ? Color.WHITE : new Color(0.48f, 0.52f, 0.49f, 1f));
         Rectangle button = buttons[index];
         glyphLayout.setText(font, label);

@@ -17,7 +17,7 @@ final class InventoryOverlay implements Disposable {
 
     private final ShapeRenderer shapes = new ShapeRenderer();
     private final SpriteBatch batch = new SpriteBatch();
-    private final BitmapFont font = new BitmapFont();
+    private final BitmapFont font = GameFonts.create();
     private final MenuInputMapper input = new MenuInputMapper();
     private final InventoryTransferService transfers = new InventoryTransferService();
 
@@ -26,7 +26,7 @@ final class InventoryOverlay implements Disposable {
     private boolean open;
     private boolean chestPanel;
     private int selectedIndex;
-    private String message = "Confirm: one | Build/L1: stack | Mount/Y: all.";
+    private String message = I18n.text("inventory.instructions");
 
     void open(Inventory playerInventory, PlacedStructure chestStructure) {
         player = playerInventory;
@@ -35,8 +35,8 @@ final class InventoryOverlay implements Disposable {
         selectedIndex = 0;
         open = true;
         message = chest == null
-            ? "Player inventory. Back closes."
-            : "Confirm: one | Build/L1: stack | Mount/Y: all.";
+            ? I18n.text("inventory.player_hint")
+            : I18n.text("inventory.instructions");
         Gdx.input.setCursorCatched(false);
     }
 
@@ -83,14 +83,14 @@ final class InventoryOverlay implements Disposable {
     private void transferSelected(InventoryTransferService.TransferMode mode) {
         List<InventoryStack> stacks = currentStacks();
         if (stacks.isEmpty()) {
-            message = "This inventory is empty.";
+            message = I18n.text("inventory.empty");
             return;
         }
         selectedIndex = Math.min(selectedIndex, stacks.size() - 1);
         InventoryStack selected = stacks.get(selectedIndex);
         ItemId item = selected.item();
         if (chest == null) {
-            message = "Open a nearby Chest with Interact to transfer items.";
+            message = I18n.text("inventory.chest_required");
             return;
         }
 
@@ -105,8 +105,8 @@ final class InventoryOverlay implements Disposable {
         );
         message = switch (result.status()) {
             case SUCCESS -> transferSuccessMessage(mode, item, result.moved());
-            case FULL -> chestPanel ? "Player inventory has insufficient space." : "Chest has insufficient space.";
-            case NO_ITEM -> "That item is no longer available.";
+            case FULL -> I18n.text(chestPanel ? "inventory.player_full" : "inventory.chest_full");
+            case NO_ITEM -> I18n.text("inventory.item_missing");
         };
         List<InventoryStack> after = currentStacks();
         selectedIndex = after.isEmpty() ? 0 : Math.min(selectedIndex, after.size() - 1);
@@ -118,11 +118,10 @@ final class InventoryOverlay implements Disposable {
         int moved
     ) {
         RanchAudio.play(RanchAudio.Cue.INVENTORY_TRANSFER);
-        String verb = chestPanel ? "Took " : "Stored ";
         String amount = mode == InventoryTransferService.TransferMode.ONE
             ? "1"
             : Integer.toString(moved);
-        return verb + amount + " " + item.displayName() + ".";
+        return I18n.text(chestPanel ? "inventory.took" : "inventory.stored", amount, item.displayName());
     }
 
     private List<InventoryStack> currentStacks() {
@@ -159,16 +158,16 @@ final class InventoryOverlay implements Disposable {
         batch.getProjectionMatrix().setToOrtho2D(0f, 0f, width, height);
         batch.begin();
         font.setColor(Color.WHITE);
-        font.getData().setScale(1.35f * ui);
-        font.draw(batch, "INVENTORY", x + 18f * geometry, y + panelHeight - 22f * geometry);
-        font.getData().setScale(0.82f * ui);
+        GameFonts.setScale(font, 1.35f * ui);
+        font.draw(batch, I18n.text("inventory.title"), x + 18f * geometry, y + panelHeight - 22f * geometry);
+        GameFonts.setScale(font, 0.82f * ui);
         font.setColor(!chestPanel ? Color.WHITE : new Color(0.65f, 0.72f, 0.67f, 1f));
-        font.draw(batch, "BACKPACK  " + player.usedSlots() + "/" + player.slotCapacity(), x + 18f * geometry, y + panelHeight - 62f * geometry);
+        font.draw(batch, I18n.text("inventory.backpack", player.usedSlots(), player.slotCapacity()), x + 18f * geometry, y + panelHeight - 62f * geometry);
         if (chest != null) {
             font.setColor(chestPanel ? Color.WHITE : new Color(0.65f, 0.72f, 0.67f, 1f));
             font.draw(
                 batch,
-                "CHEST  " + chest.itemStorage().usedSlots() + "/" + chest.itemStorage().slotCapacity(),
+                I18n.text("inventory.chest", chest.itemStorage().usedSlots(), chest.itemStorage().slotCapacity()),
                 x + half + 10f * geometry,
                 y + panelHeight - 62f * geometry
             );
@@ -177,7 +176,7 @@ final class InventoryOverlay implements Disposable {
         if (chest != null) {
             drawRowsText(x + half + 10f * geometry, y + 72f * geometry, chest.itemStorage().stackView(), chestPanel, ui, geometry);
         }
-        font.getData().setScale(0.72f * ui);
+        GameFonts.setScale(font, 0.72f * ui);
         font.setColor(new Color(1f, 0.88f, 0.58f, 1f));
         font.draw(batch, message, x + 18f * geometry, y + 36f * geometry);
         batch.end();
@@ -214,7 +213,7 @@ final class InventoryOverlay implements Disposable {
         float geometry
     ) {
         int start = scrollStart(stacks.size());
-        font.getData().setScale(0.76f * ui);
+        GameFonts.setScale(font, 0.76f * ui);
         for (int row = 0; row < ROWS_VISIBLE; row++) {
             int index = start + row;
             if (index >= stacks.size()) continue;

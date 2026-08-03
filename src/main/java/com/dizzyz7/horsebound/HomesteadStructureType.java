@@ -5,15 +5,15 @@ import java.util.Map;
 import java.util.Optional;
 
 enum HomesteadStructureType {
-    FENCE("Fence", Map.of(ItemId.WOOD, 2), 0, null, 0, 0, 1.25f),
-    GATE("Gate", Map.of(ItemId.WOOD, 4), 0, null, 0, 0, 1.40f),
-    FEEDER("Feeder", Map.of(ItemId.WOOD, 6), 20, ItemId.HAY, 5, 0, 0.90f),
-    WATER_TROUGH("Water Trough", Map.of(ItemId.WOOD, 4, ItemId.STONE, 4), 20, ItemId.WATER_BUCKET, 5, 0, 1.10f),
-    HAY_STORAGE("Hay Storage", Map.of(ItemId.WOOD, 8), 100, ItemId.HAY, 5, 0, 1.45f),
-    CHEST("Chest", Map.of(ItemId.WOOD, 8), 0, null, 0, 12, 0.80f),
-    STALL("Stable Stall", Map.of(ItemId.WOOD, 20, ItemId.STONE, 8), 0, null, 0, 0, 1.90f);
+    FENCE("structure.fence", Map.of(ItemId.WOOD, 2), 0, null, 0, 0, 1.25f),
+    GATE("structure.gate", Map.of(ItemId.WOOD, 4), 0, null, 0, 0, 1.40f),
+    FEEDER("structure.feeder", Map.of(ItemId.WOOD, 6), 20, ItemId.HAY, 5, 0, 0.90f),
+    WATER_TROUGH("structure.water_trough", Map.of(ItemId.WOOD, 4, ItemId.STONE, 4), 20, ItemId.WATER_BUCKET, 5, 0, 1.10f),
+    HAY_STORAGE("structure.hay_storage", Map.of(ItemId.WOOD, 8), 100, ItemId.HAY, 5, 0, 1.45f),
+    CHEST("structure.chest", Map.of(ItemId.WOOD, 8), 0, null, 0, 12, 0.80f),
+    STALL("structure.stall", Map.of(ItemId.WOOD, 20, ItemId.STONE, 8), 0, null, 0, 0, 1.90f);
 
-    private final String displayName;
+    private final String displayKey;
     private final Map<ItemId, Integer> buildCost;
     private final int storageCapacity;
     private final ItemId acceptedResource;
@@ -22,7 +22,7 @@ enum HomesteadStructureType {
     private final float collisionRadius;
 
     HomesteadStructureType(
-        String displayName,
+        String displayKey,
         Map<ItemId, Integer> buildCost,
         int storageCapacity,
         ItemId acceptedResource,
@@ -30,7 +30,7 @@ enum HomesteadStructureType {
         int itemStorageSlots,
         float collisionRadius
     ) {
-        this.displayName = displayName;
+        this.displayKey = displayKey;
         this.buildCost = Map.copyOf(buildCost);
         this.storageCapacity = Math.max(0, storageCapacity);
         this.acceptedResource = acceptedResource;
@@ -40,44 +40,18 @@ enum HomesteadStructureType {
     }
 
     String displayName() {
-        return displayName;
+        return I18n.text(displayKey);
     }
 
-    Map<ItemId, Integer> buildCost() {
-        return buildCost;
-    }
-
-    int storageCapacity() {
-        return storageCapacity;
-    }
-
-    ItemId acceptedResource() {
-        return acceptedResource;
-    }
-
-    int resourceUnitsPerItem() {
-        return resourceUnitsPerItem;
-    }
-
-    int itemStorageSlots() {
-        return itemStorageSlots;
-    }
-
-    float collisionRadius() {
-        return collisionRadius;
-    }
-
-    boolean storesResource() {
-        return acceptedResource != null && storageCapacity > 0 && resourceUnitsPerItem > 0;
-    }
-
-    boolean storesItems() {
-        return itemStorageSlots > 0;
-    }
-
-    boolean canToggleOpen() {
-        return this == GATE;
-    }
+    Map<ItemId, Integer> buildCost() { return buildCost; }
+    int storageCapacity() { return storageCapacity; }
+    ItemId acceptedResource() { return acceptedResource; }
+    int resourceUnitsPerItem() { return resourceUnitsPerItem; }
+    int itemStorageSlots() { return itemStorageSlots; }
+    float collisionRadius() { return collisionRadius; }
+    boolean storesResource() { return acceptedResource != null && storageCapacity > 0 && resourceUnitsPerItem > 0; }
+    boolean storesItems() { return itemStorageSlots > 0; }
+    boolean canToggleOpen() { return this == GATE; }
 
     static Optional<HomesteadStructureType> parse(String value) {
         if (value == null || value.isBlank()) return Optional.empty();

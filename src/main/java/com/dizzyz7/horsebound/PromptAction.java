@@ -2,26 +2,24 @@
 package com.dizzyz7.horsebound;
 
 enum PromptAction {
-    NAVIGATE("Navigate"),
-    ADJUST("Adjust"),
-    CONFIRM("Confirm"),
-    BACK("Back"),
-    INTERACT("Interact"),
-    MOUNT("Mount"),
-    BUILD("Build / Edit"),
-    INVENTORY("Inventory"),
-    JUMP("Jump"),
-    SPRINT("Sprint / Gallop"),
-    SAVE("Save"),
-    PAUSE("Pause");
+    NAVIGATE("prompt.action.navigate"),
+    ADJUST("prompt.action.adjust"),
+    CONFIRM("prompt.action.confirm"),
+    BACK("prompt.action.back"),
+    INTERACT("prompt.action.interact"),
+    MOUNT("prompt.action.mount"),
+    BUILD("prompt.action.build"),
+    INVENTORY("prompt.action.inventory"),
+    JUMP("prompt.action.jump"),
+    SPRINT("prompt.action.sprint"),
+    SAVE("prompt.action.save"),
+    PAUSE("prompt.action.pause");
 
-    private final String label;
+    private final String labelKey;
 
-    PromptAction(String label) {
-        this.label = label;
+    PromptAction(String labelKey) {
+        this.labelKey = labelKey;
     }
 
-    String label() {
-        return label;
-    }
+    String label() { return I18n.text(labelKey); }
 }

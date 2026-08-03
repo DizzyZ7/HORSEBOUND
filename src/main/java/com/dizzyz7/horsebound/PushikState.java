@@ -8,6 +8,10 @@ enum PushikState {
     SLEEP,
     GREET;
 
+    String displayName() {
+        return I18n.text("pushik." + name().toLowerCase(java.util.Locale.ROOT));
+    }
+
     static PushikState parseOrDefault(String value) {
         if (value == null || value.isBlank()) return FOLLOW;
         try {
