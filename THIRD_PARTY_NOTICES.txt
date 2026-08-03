@@ -32,7 +32,13 @@ HORSEBOUND's proprietary game-content license.
    License: zlib License
    License text: licenses/ZLIB.txt
 
-6. OpenJDK runtime image
+6. DejaVu Sans-derived HORSEBOUND Unicode bitmap font atlas
+   The packaged UI atlas is reproducibly generated from DejaVu Sans for Latin,
+   Cyrillic and required interface symbols. The generated atlas remains subject
+   to the Bitstream Vera / DejaVu font license terms.
+   License text: licenses/BITSTREAM-VERA-FONT.txt
+
+7. OpenJDK runtime image
    The self-contained Windows package is produced with JDK jpackage/jlink.
    OpenJDK module-specific legal notices are retained under the packaged
    runtime/legal directory.
