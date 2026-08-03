@@ -1,6 +1,8 @@
 name: HORSEBOUND Apply 0.5.7 Lighting Pass
 
 on:
+  push:
+    branches: [ feature/controls-installer-visual-pass ]
   pull_request:
     branches: [ main ]
 
@@ -9,14 +11,14 @@ permissions:
 
 jobs:
   apply-lighting-pass:
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Checkout exact PR head
+      - name: Checkout exact feature head
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.ref }}
+          ref: feature/controls-installer-visual-pass
           fetch-depth: 0
 
       - name: Integrate dynamic ambient and fill lighting
@@ -87,4 +89,4 @@ jobs:
           git config user.email "99655528+DizzyZ7@users.noreply.github.com"
           git add -A
           git commit -m "feat: add dynamic ambient and fill lighting"
-          git push origin HEAD:${{ github.event.pull_request.head.ref }}
+          git push origin HEAD:feature/controls-installer-visual-pass
