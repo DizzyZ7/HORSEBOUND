@@ -319,7 +319,11 @@ final class LivingRanchScreen implements Screen, RanchWorldAccess {
 
     private void updatePlayer(float dt, PlayerCommand command) {
         getCameraForward(tmpForward);
-        tmpRight.set(tmpForward.z, 0f, -tmpForward.x);
+        tmpRight.set(
+    CameraRelativeAxes.rightX(tmpForward.z),
+    0f,
+    CameraRelativeAxes.rightZ(tmpForward.x)
+);
         tmpMove.setZero()
             .mulAdd(tmpForward, command.moveForward())
             .mulAdd(tmpRight, command.moveRight());
