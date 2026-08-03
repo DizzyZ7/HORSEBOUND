@@ -1,0 +1,28 @@
+name: HORSEBOUND 0.5.8 Source Audit
+
+on:
+  push:
+    branches: [ feature/bilingual-ux-mechanics-clarity ]
+
+permissions:
+  contents: read
+
+jobs:
+  source-snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact branch head
+        uses: actions/checkout@v4
+
+      - name: Upload localization audit source
+        uses: actions/upload-artifact@v4
+        with:
+          name: HORSEBOUND-0.5.8-source-audit
+          path: |
+            src/main/java
+            src/test/java
+            build.gradle
+            .github/workflows/windows-build.yml
+          if-no-files-found: error
+          retention-days: 3
