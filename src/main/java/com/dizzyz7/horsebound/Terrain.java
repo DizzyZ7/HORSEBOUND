@@ -21,11 +21,17 @@ final class Terrain implements Disposable {
     static final float LAKE_RADIUS = 17f;
     static final float WATER_LEVEL = 0.35f;
 
+    private static final Color LOWLAND = new Color(0.20f, 0.43f, 0.20f, 1f);
+    private static final Color MEADOW = new Color(0.34f, 0.58f, 0.27f, 1f);
+    private static final Color HIGHLAND = new Color(0.43f, 0.55f, 0.29f, 1f);
+    private static final Color SHORE = new Color(0.52f, 0.48f, 0.29f, 1f);
+    private static final Color LAKE_BED = new Color(0.16f, 0.28f, 0.20f, 1f);
+
     final Model model;
     final ModelInstance instance;
 
     Terrain() {
-        model = buildTerrain(WORLD_HALF_SIZE * 2f, 4f);
+        model = buildTerrain(WORLD_HALF_SIZE * 2f, 3f);
         instance = new ModelInstance(model);
     }
 
@@ -65,27 +71,30 @@ final class Terrain implements Disposable {
     private static Model buildTerrain(float size, float step) {
         ModelBuilder builder = new ModelBuilder();
         builder.begin();
-        Material grass = new Material(ColorAttribute.createDiffuse(new Color(0.29f, 0.55f, 0.28f, 1f)));
+        Material grass = new Material(ColorAttribute.createDiffuse(Color.WHITE));
         MeshPartBuilder mesh = builder.part(
             "rolling_meadow",
             GL20.GL_TRIANGLES,
-            VertexAttributes.Usage.Position | VertexAttributes.Usage.Normal,
+            VertexAttributes.Usage.Position
+                | VertexAttributes.Usage.Normal
+                | VertexAttributes.Usage.ColorUnpacked,
             grass
         );
 
         float min = -size * 0.5f;
         float max = size * 0.5f;
         Vector3 normal = new Vector3();
+        Color color = new Color();
 
         for (float x = min; x < max; x += step) {
             for (float z = min; z < max; z += step) {
                 float x1 = Math.min(x + step, max);
                 float z1 = Math.min(z + step, max);
 
-                MeshPartBuilder.VertexInfo v00 = vertex(x, z, normal);
-                MeshPartBuilder.VertexInfo v10 = vertex(x1, z, normal);
-                MeshPartBuilder.VertexInfo v11 = vertex(x1, z1, normal);
-                MeshPartBuilder.VertexInfo v01 = vertex(x, z1, normal);
+                MeshPartBuilder.VertexInfo v00 = vertex(x, z, normal, color);
+                MeshPartBuilder.VertexInfo v10 = vertex(x1, z, normal, color);
+                MeshPartBuilder.VertexInfo v11 = vertex(x1, z1, normal, color);
+                MeshPartBuilder.VertexInfo v01 = vertex(x, z1, normal, color);
 
                 short i00 = mesh.vertex(v00);
                 short i10 = mesh.vertex(v10);
@@ -99,11 +108,45 @@ final class Terrain implements Disposable {
         return builder.end();
     }
 
-    private static MeshPartBuilder.VertexInfo vertex(float x, float z, Vector3 normalScratch) {
-        Vector3 n = normalAt(x, z, normalScratch);
+    private static MeshPartBuilder.VertexInfo vertex(
+        float x,
+        float z,
+        Vector3 normalScratch,
+        Color colorScratch
+    ) {
+        Vector3 normal = normalAt(x, z, normalScratch);
+        Color color = colorAt(x, z, normal, colorScratch);
         return new MeshPartBuilder.VertexInfo()
             .setPos(x, heightAt(x, z), z)
-            .setNor(n.x, n.y, n.z);
+            .setNor(normal.x, normal.y, normal.z)
+            .setCol(color);
+    }
+
+    private static Color colorAt(float x, float z, Vector3 normal, Color out) {
+        float height = heightAt(x, z);
+        float highland = MathUtils.clamp((height - 2f) / 6.5f, 0f, 1f);
+        float variation = 0.5f + 0.5f * MathUtils.sin(x * 0.13f + MathUtils.cos(z * 0.11f) * 2.1f);
+        out.set(LOWLAND).lerp(MEADOW, 0.48f + variation * 0.30f).lerp(HIGHLAND, highland * 0.58f);
+
+        float dx = x - LAKE_X;
+        float dz = z - LAKE_Z;
+        float distance = (float) Math.sqrt(dx * dx + dz * dz);
+        if (distance < LAKE_RADIUS + 5.5f) {
+            float shoreBand = 1f - MathUtils.clamp(
+                Math.abs(distance - (LAKE_RADIUS + 0.5f)) / 5.5f,
+                0f,
+                1f
+            );
+            out.lerp(SHORE, shoreBand * 0.74f);
+        }
+        if (distance < LAKE_RADIUS) {
+            float bed = 1f - MathUtils.clamp(distance / LAKE_RADIUS, 0f, 1f);
+            out.lerp(LAKE_BED, 0.72f + bed * 0.20f);
+        }
+
+        float slopeShade = MathUtils.clamp((1f - normal.y) * 0.85f, 0f, 0.24f);
+        out.mul(1f - slopeShade, 1f - slopeShade * 0.72f, 1f - slopeShade, 1f);
+        return out;
     }
 
     @Override
